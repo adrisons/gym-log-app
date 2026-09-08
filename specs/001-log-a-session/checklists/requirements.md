@@ -13,11 +13,10 @@
 
 ## Requirement Completeness
 
-- [x] No [NEEDS CLARIFICATION] markers remain in Requirements (the two open
-      items — default unit D4, multiple sessions per day D6 — are recorded
-      as Assumptions with a pointer to resolve them in `/speckit-clarify`,
-      not left as blocking markers, since both already have a documented
-      recommendation in `docs/requirements.md` §8)
+- [x] No [NEEDS CLARIFICATION] markers remain in Requirements — D4 (default
+      unit), D6 (multiple sessions/day), midnight rollover, and undo-on-close
+      were all resolved via `/speckit-clarify` on 2026-09-08 and recorded in
+      the Clarifications section
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -35,8 +34,8 @@
 
 ## Notes
 
-- D4 (default unit) and D6 (multiple sessions per day) are open project
-  decisions per `docs/requirements.md` §8. This spec assumes their
-  recommended defaults so it is buildable, but both should be explicitly
-  confirmed with the project owner via `/speckit-clarify` before
-  `/speckit-plan`, per `docs/handoff.md` §4 step 3.
+- D4 and D6 were confirmed with the project owner via `/speckit-clarify` on
+  2026-09-08, per `docs/handoff.md` §4 step 3. Two further ambiguities found
+  during that pass (session-date rollover at midnight; undo behavior when
+  the app closes during the 5s undo window) were resolved in the same
+  session. Spec is ready for `/speckit-plan`.

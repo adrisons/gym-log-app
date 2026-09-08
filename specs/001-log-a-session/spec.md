@@ -8,6 +8,15 @@
 
 **Input**: User description: "The logging critical path from docs/requirements.md: FR-1 (log a session), FR-2 (blocks), FR-3 (sets and load), FR-4 (effort), FR-5 (exercise catalogue). This is the smallest complete slice through the hexagonal storage port and the first spec in the build order set by docs/agent-brief.md and docs/handoff.md."
 
+## Clarifications
+
+### Session 2026-09-08
+
+- Q: D4 — What is the default unit for Weight loads? → A: kg by default; the unit is stored exactly as entered and converted only for display (never in storage).
+- Q: D6 — Are multiple sessions per calendar day allowed? → A: Yes — a user can start a second, fully independent session on the same day (FR-021).
+- Q: If a session is still open when midnight passes, does it stay "today's" session for FR-001's auto-resume, or does a new session start at the new calendar date? → A: A session's date is fixed at creation; FR-001 resumes it as long as it's unfinished, regardless of the current calendar date.
+- Q: When a user deletes a set and immediately backgrounds or closes the app while the 5-second undo window is still open, does the deletion finalize, or does closing cancel it? → A: The deletion finalizes — undo is a time-boxed reversal of an already-applied change, not a delayed commit; closing the app does not cancel it.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Log a set between reps (Priority: P1)
@@ -34,6 +43,10 @@ its own.
 2. **Given** the user already has an unfinished session from today,
    **When** they open the app, **Then** that session is resumed automatically
    — no picker, no "continue?" dialog.
+2a. **Given** the user has an unfinished session that started yesterday (e.g.
+    began at 11:40pm and is still open after midnight), **When** they open
+    the app, **Then** that same session is resumed — a session's date is
+    fixed at creation and does not split at midnight.
 3. **Given** the user is adding an exercise, **When** they open the exercise
    field, **Then** they see their most-used and most-recently-used exercises
    first, and can create a brand-new exercise from the same field.
@@ -171,21 +184,27 @@ independently verifiable without blocks, load types, or effort.
 - How does the app handle a user undoing a deleted set after the 5-second
   undo window has passed? The deletion is permanent; there is no further
   recovery.
+- What happens if the user deletes a set and backgrounds or closes the app
+  before the 5-second undo window elapses? The deletion has already been
+  applied — undo is a time-boxed reversal of an applied change, not a
+  delayed commit — so closing the app does not cancel it; the set stays
+  deleted.
 - What happens if the user records a set for an exercise whose load type was
   changed after that set was recorded? Past sets keep the load value and
   type they were recorded with; only new sets pick up the new default.
 - What happens when the user creates a second, distinct session on the same
-  calendar day? See Assumptions — multiple sessions per day are allowed
-  (open decision D6, `docs/requirements.md` §8, recommended to remain open
-  by default per that recommendation, tracked below).
+  calendar day? It is allowed — a fully independent second session, per
+  FR-021 (confirmed decision D6).
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST resume an unfinished session from today
-  automatically on open; if none exists, it MUST create a new one in a
-  single tap.
+- **FR-001**: The system MUST resume an unfinished session automatically on
+  open — including one whose creation date is not today's calendar date,
+  because a session's date is fixed at creation and does not roll over at
+  midnight — and MUST create a new one in a single tap when none is
+  unfinished.
 - **FR-002**: The system MUST let the user add an exercise via a catalogue
   search that surfaces the most-used and most-recently-used exercises first,
   and MUST let the user create a new exercise from that same search field.
@@ -194,7 +213,9 @@ independently verifiable without blocks, load types, or effort.
   action exposed anywhere in the logging flow.
 - **FR-004**: The system MUST make every destructive action on the logging
   screen (deleting a set, an exercise entry, or a block) undoable for at
-  least 5 seconds from the same screen before it becomes permanent.
+  least 5 seconds from the same screen before the undo option disappears.
+  The underlying change is applied immediately (not held pending) so that
+  closing or backgrounding the app during the window does not cancel it.
 - **FR-005**: The system MUST NOT lose any change already confirmed by the
   user if the app is closed, backgrounded, or killed at any point.
 - **FR-006**: The system MUST let the user create, rename, reorder, and
@@ -235,8 +256,8 @@ independently verifiable without blocks, load types, or effort.
   `docs/requirements.md` §3.3).
 - **FR-020**: Renaming a catalogue exercise MUST NOT change what any past
   set refers to — references are by identifier, never by name.
-- **FR-021**: The system MUST allow more than one session per calendar day
-  [see Assumptions — tracks open decision D6].
+- **FR-021**: The system MUST allow more than one session per calendar day,
+  each fully independent (confirmed decision D6).
 
 ### Key Entities *(include if feature involves data)*
 
@@ -279,16 +300,12 @@ independently verifiable without blocks, load types, or effort.
 
 ## Assumptions
 
-- **Default unit (D4, open in `docs/requirements.md` §8)**: this spec
-  assumes kilograms as the default unit, with the unit stored exactly as
-  entered and converted only for display, per that document's own
-  recommendation. This assumption should be confirmed or overridden during
-  `/speckit-clarify` before `/speckit-plan`, since it affects the Weight
-  load's default presentation.
-- **Multiple sessions per day (D6, open in `docs/requirements.md` §8)**:
-  this spec assumes multiple sessions per calendar day ARE allowed (FR-021),
-  per that document's own recommendation ("simpler model, matches reality").
-  This should likewise be confirmed during `/speckit-clarify`.
+- **Default unit (D4)**: confirmed — kilograms are the default unit; the
+  unit is stored exactly as entered and converted only for display, never
+  in storage (see Clarifications).
+- **Multiple sessions per day (D6)**: confirmed — allowed; a user may start
+  a second, fully independent session on the same calendar day (FR-021, see
+  Clarifications).
 - **e1RM formula (D5)** and **session templates (D7, FR-13)** do not affect
   this feature slice (FR-1 to FR-5) and are left open for the specs that do
   depend on them (progression, FR-8, and templates, FR-13, respectively).
