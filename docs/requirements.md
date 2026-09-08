@@ -46,6 +46,10 @@ turned into a recorded decision.
 - Not a cloud service: no multi-device sync in v1.
 - Not a wearable companion: no heart-rate monitors or sensors in v1.
 
+Social and coaching ideas raised for possible future consideration are
+captured in §10 — they remain non-goals today and are not designed into
+anything above.
+
 ### 1.4 Extensibility beyond strength training
 
 The app ships with strength training fully specified (v1). It is not a
@@ -460,3 +464,50 @@ before code.
 - **Later, only with a recorded decision** — multi-device sync, additional body
   measurements (girths, photos), import from other apps, report export,
   further exercise disciplines beyond the first one added under v1.1.
+
+---
+
+## 10. Future directions (not committed)
+
+Ideas raised for possible consideration well past v1.1. They are captured
+here so they aren't lost, not because they are scoped, planned, or
+compatible with this document as it stands. They are **not** requirements,
+they are **not** MVP/v1/v1.1 scope (§9), and as described they directly
+conflict with invariant 1 (§1.2 — no mandatory account, no v1 backend, no
+user content sent to third parties) and the "not a social network" /
+"not a program prescriber" non-goals (§1.3). Nothing below is designed into
+the domain model, the FRs, or any spec.
+
+- **Peer comparison.** Seeing a friend's activity and comparing progress
+  across exercises. This is the most direct conflict with invariant 1 and
+  the "not a social network" non-goal of the three — it requires shared
+  identity and a way for one user's data to reach another's device, which
+  today's local-first, no-backend model has no place for.
+- **Coach / gym-owner private groups.** A trainer creates a private group;
+  members join it (potentially under a visible username distinct from
+  their real name, for privacy); the trainer defines exercises for the
+  group so members see them recommended; the trainer can see members'
+  training data. Of the three, this has the most plausible privacy shape —
+  opt-in, scoped to a group, a coach seeing only what a member logs under
+  that group's context — but it is still fundamentally multi-user: it
+  needs accounts, a backend, and a consent/visibility model (what exactly a
+  coach can see, whether a member can leave and revoke access, whether
+  access is retroactive or only forward-looking) that does not exist today.
+- **Coach-assigned workouts.** A trainer defines a workout that appears
+  directly to assigned users, who then log reps/weight against the
+  trainer's defined exercises. This runs into the "not a program
+  prescriber" non-goal directly (§1.3: "it records what you did, it does
+  not tell you what to do") — it is a different product surface
+  (prescription) layered on top of the current one (recording), not an
+  extension of it.
+
+If any of these is ever pursued, it needs, in order: its own recorded
+decision confirming it's in scope (which necessarily means revisiting
+invariant 1 and the two non-goals above — possibly by scoping a "connected"
+mode that coexists with, rather than replaces, the current single-user
+local-first guarantees); its own domain model work (group membership,
+roles, visibility and consent rules) before any FR is written for it; and
+its own review against every invariant this document currently treats as
+non-negotiable. None of that work is started by this section — it exists
+only to record that the idea was raised and roughly why it doesn't fit
+today.
