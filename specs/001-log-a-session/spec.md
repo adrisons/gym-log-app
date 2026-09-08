@@ -309,6 +309,10 @@ independently verifiable without blocks, load types, or effort.
 - **e1RM formula (D5)** and **session templates (D7, FR-13)** do not affect
   this feature slice (FR-1 to FR-5) and are left open for the specs that do
   depend on them (progression, FR-8, and templates, FR-13, respectively).
+- **Exercise discipline (D8)**: out of scope here. Every exercise in this
+  spec is implicitly the Strength discipline (`docs/requirements.md` §1.4);
+  no user-facing discipline selection, and no non-Strength exercise
+  behavior, is part of FR-1 to FR-5.
 - The exercise catalogue, storage port, and session state already exist as
   concepts to build against (this is the first feature spec in the project;
   no prior implementation exists yet) — this spec describes required

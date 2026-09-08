@@ -46,6 +46,28 @@ turned into a recorded decision.
 - Not a cloud service: no multi-device sync in v1.
 - Not a wearable companion: no heart-rate monitors or sensors in v1.
 
+### 1.4 Extensibility beyond strength training
+
+The app ships with strength training fully specified (v1). It is not a
+strength-only app by design — the domain model (§3) and the computation
+rules (§5) are deliberately generalized so that a second discipline (a
+first candidate: swimming, e.g. tracking the best time achieved for a fixed
+distance like 100 m freestyle) can be added later without a rework of the
+canonical data. Concretely: a Set's `Volume` already distinguishes reps,
+duration and distance, and its `Load` already has a `None` variant for work
+where load doesn't apply — a swim length is representable today as a Set
+with `Volume: Distance` and `Load: None`. The Exercise catalogue's new
+`discipline` field (§3.1) is itself a schema change — a persisted fact
+about a canonical entity, not a derived value — so per §6 it ships with a
+version bump, an ADR, and a (trivial, default-to-Strength) migration when
+implementation happens; being additive with a safe default does not exempt
+it. What v1 does NOT ship is any
+strength-specific computation (e1RM, tonnage, §5.2–5.3) applied to a
+non-strength discipline, any UI for a non-strength discipline, or a second
+discipline's own progression metric (e.g. "fastest time" as a tracked
+trend). Which disciplines beyond strength are in scope, and when, is D8
+(§8) — open.
+
 ---
 
 ## 2. User and scenarios
@@ -62,6 +84,7 @@ what they do.
 | S5 | Understand whether I'm improving | Monthly review | Insights showing the claim, the data behind it, and the period |
 | S6 | Track body composition | After weighing in | Record weight/fat/muscle in ≤ 15 s and see the trend |
 | S7 | Take my data with me | New phone, distrust, curiosity | Export everything to an open file and import it back |
+| S8 | Skim what I've trained lately | Casual check, not reviewing one exercise | See recent sessions with their date and what kind of work each one was, without opening each one |
 
 ---
 
@@ -72,8 +95,13 @@ One vocabulary, used identically in code, UI and documentation.
 ### 3.1 Entities
 
 - **Exercise (catalogue).** Canonical name, aliases, movement pattern, muscle
-  groups, default load type, unilateral flag. The catalogue belongs to the user:
-  they can create, rename and merge entries.
+  groups, default load type, unilateral flag, discipline (§1.4 — `Strength`
+  in v1; the field exists so a future discipline is additive, not a
+  reshape). The catalogue belongs to the user: they can create, rename and
+  merge entries. A custom name is free text set by the user — e.g. "hip
+  thrust con barra" and "hip thrust en máquina" are two distinct entries
+  (or one entry with the other as an alias) at the user's choice, never
+  forced into a fixed list (FR-5).
 - **Session.** A training day: date, ordered list of blocks, free-form notes,
   optional overall feeling, optional duration. More than one session per day is
   allowed.
@@ -110,6 +138,10 @@ One vocabulary, used identically in code, UI and documentation.
   name as an alias.
 - Deleting a catalogue exercise that has history requires explicit confirmation
   and offers merging instead.
+- Logging is selective: a session records only the exercises the user chose
+  to track, not an exhaustive log of everything physically performed. An
+  exercise done but not logged has no representation and is not implied by
+  its absence.
 - Units are stored exactly as entered; conversion is a presentation concern,
   never a storage one.
 
@@ -132,6 +164,9 @@ Create today's session and add blocks, exercises and sets.
 - Every destructive action (delete set, exercise, block) is undoable from the
   same screen for at least 5 seconds.
 - Closing the app at any moment loses nothing that was entered.
+- Logging is selective by design (§3.3): the user adds only the exercises
+  they want a record of. Nothing in the flow requires accounting for every
+  exercise physically performed in the session.
 
 ### FR-2 — Blocks `[v1]`
 
@@ -149,6 +184,11 @@ Create today's session and add blocks, exercises and sets.
 - Bands are picked from a user-owned, reorderable list with free labels.
 - Free text accepts up to 40 characters and autocompletes from what has already
   been used for that exercise.
+- An exercise entry holds any number of sets in the same session (e.g. three
+  working sets at increasing load). There is no single "the load and reps"
+  field for an exercise — each set is its own record, and the heaviest one,
+  the best one, or a session total is a computation over that entry's sets
+  (§5), never a fact entered separately.
 
 ### FR-4 — Effort `[v1]`
 
@@ -165,12 +205,18 @@ Create today's session and add blocks, exercises and sets.
 - Each exercise may carry a movement pattern and muscle groups; both optional,
   but required for aggregate insights (§5.5) — the app says so when they are
   missing.
+- Every exercise has a discipline (§1.4); in v1 every exercise is Strength,
+  and there is no user-facing discipline picker — the field exists in the
+  data so a future discipline (D8) is additive, not a rework.
 - Merge duplicates from the catalogue screen.
 
 ### FR-6 — Diary / history `[v1]`
 
 - Reverse-chronological list of sessions, grouped by month.
-- Each session summarised in one line: main exercises and set count.
+- Each session summarised in one line: date, main exercises, set count, and
+  what kind of work it was (derived from the exercises logged — e.g. their
+  movement patterns or, once a second discipline exists per §1.4, their
+  discipline — never a separately-entered field).
 - Session detail view, editable after the fact.
 - Jump to a specific date.
 
@@ -183,7 +229,11 @@ Create today's session and add blocks, exercises and sets.
 
 ### FR-8 — Exercise progression `[v1]`
 
-One screen, two representations of the same thing.
+One screen, two representations of the same thing. Scoped to the Strength
+discipline (§1.4) in v1 — its metrics (e1RM, tonnage) are defined in §5 for
+`Weight` loads specifically. A future discipline's own progression metric
+(e.g. best time over a fixed swim distance) is a separate, later decision
+(D8), not an extension bolted onto these metrics.
 
 - **List:** one row per session with date, best working set, load, volume,
   effort and set count. Reverse chronological, linking to the full session.
@@ -379,19 +429,34 @@ before code.
 | ID | Decision | Status |
 |----|----------|--------|
 | D1 | Single project language for all artifacts | **Closed:** English everywhere. → ADR-0001 |
-| D2 | Target platforms | **Closed:** cross-platform, iOS and Android from a shared codebase. The concrete framework and the rest of the stack remain open → ADR-0002 |
+| D2 | Target platforms and framework | **Open** (reopened): the project's current phase is functional definition only — no platform, framework, or storage technology is committed yet (see `AGENTS.md`). Deferred to the technical-planning phase (`/speckit-plan`) and its own ADR. |
 | D3 | Effort scale | **Closed:** store RPE 1–10 in half-point steps as the canonical value; RIR is an input mode converted on entry. Chosen over a 3-level scale because trend detection needs resolution, and over storing both because one fact gets one source of truth. → ADR-0003 |
-| D4 | Default unit, and whether mixed units are allowed in history | Open. Recommendation: kg by default; store the unit as entered, convert only for display |
+| D4 | Default unit, and whether mixed units are allowed in history | **Closed** for FR-1 to FR-5: kg by default; store the unit as entered, convert only for display. → `specs/001-log-a-session/spec.md` Clarifications |
 | D5 | e1RM formula | Open. Recommendation: Epley, for simplicity and explainability; record its weakness at high reps |
-| D6 | Multiple sessions per day | Open. Recommendation: allow them; simpler model, matches reality |
+| D6 | Multiple sessions per day | **Closed** for FR-1 to FR-5: allowed; simpler model, matches reality. → `specs/001-log-a-session/spec.md` Clarifications |
 | D7 | Whether FR-13 (templates) is v1 or v1.1 | Open. Recommendation: v1.1, to keep the logging critical path clean |
+| D8 | Which exercise disciplines beyond Strength (§1.4) are in scope, and when | Open. Recommendation: MVP and v1 ship Strength only; swimming (distance + time, no load) is the first documented candidate for a second discipline, deferred to v1.1 or later pending a recorded decision — it must not be designed into the schema now, only kept representable (§1.4) |
 
 ---
 
 ## 9. Scope by phase
 
-- **v1** — FR-1 to FR-12. A complete, useful application on its own.
-- **v1.1** — FR-13 templates; extra progression metrics; a quick-log widget or
-  shortcut.
+- **MVP** — the smallest slice that closes the mission loop end to end: log a
+  set fast (FR-1 to FR-5) and see it again as evidence of progress (FR-6 to
+  FR-8). Concretely: FR-1 (log a session), FR-2 (blocks), FR-3 (sets and
+  load), FR-4 (effort), FR-5 (exercise catalogue), FR-6 (diary/history),
+  FR-7 (exercise search), FR-8 (exercise progression, Strength only). This
+  is deliberately smaller than v1 below — it excludes insights, body
+  composition, and settings/export, all of which are useful but not
+  required to prove the core loop works. FR-1 to FR-5 are already specified
+  in `specs/001-log-a-session/spec.md`; FR-6 to FR-8 are the next spec to
+  write (see the tracking issue for this decision).
+- **v1** — MVP + FR-9 (insights), FR-10 (body composition), FR-11
+  (settings), FR-12 (export/import). A complete, useful application on its
+  own, still Strength-only (§1.4).
+- **v1.1** — FR-13 templates; extra progression metrics; a quick-log widget
+  or shortcut; the first non-Strength discipline if D8 is closed in favor
+  of one (§1.4, §8).
 - **Later, only with a recorded decision** — multi-device sync, additional body
-  measurements (girths, photos), import from other apps, report export.
+  measurements (girths, photos), import from other apps, report export,
+  further exercise disciplines beyond the first one added under v1.1.
