@@ -8,6 +8,18 @@
 
 **Input**: User description: "$ARGUMENTS"
 
+## Context *(mandatory)*
+
+<!--
+  ACTION REQUIRED: One short paragraph. Why this feature, why now, and how
+  it fits with what already exists (prior specs under specs/, the domain
+  model in docs/requirements.md, decisions in docs/decisions/). A reader
+  with no other context should understand what problem this solves after
+  reading only this section.
+-->
+
+[One paragraph of context]
+
 ## User Scenarios & Testing *(mandatory)*
 
 <!--
@@ -77,6 +89,18 @@
 
 - What happens when [boundary condition]?
 - How does system handle [error scenario]?
+
+## Non-Goals *(mandatory)*
+
+<!--
+  ACTION REQUIRED: What this feature deliberately does NOT cover, even if
+  related or tempting to include. Check against docs/requirements.md §1.3
+  (project-wide non-goals) and note anything explicitly deferred to a later
+  spec or phase. A spec with an empty Non-Goals section has not had its
+  scope actually bounded.
+-->
+
+- [Explicitly excluded capability, and why]
 
 ## Requirements *(mandatory)*
 

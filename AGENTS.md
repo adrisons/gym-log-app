@@ -35,4 +35,16 @@ in their own ADR under `docs/decisions/`.
 
 This project uses spec-kit. Do not write implementation code for a use case
 before it has a `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` →
-`/speckit-tasks` cycle behind it.
+`/speckit-tasks` cycle behind it. See the `sdd-workflow` skill for the full
+sequence, including where the `spec-reviewer` and `schema-guardian`
+subagents (`.claude/agents/`) fit in.
+
+Before any commit or pull request, follow the `commit-and-pr-conventions`
+skill (Conventional Commits in English, trunk-based development, the PR
+template at `.github/pull_request_template.md`).
+
+Prefer an existing, standard, well-maintained tool or convention (spec-kit's
+own commands and templates, Conventional Commits, GitHub's native PR
+template mechanism) over defining a new project-specific one. The
+project-specific subagents and skills under `.claude/` exist only where no
+such standard already covers the need.

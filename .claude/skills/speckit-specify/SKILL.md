@@ -170,6 +170,7 @@ Given that feature description, do this:
       - [ ] All acceptance scenarios are defined
       - [ ] Edge cases are identified
       - [ ] Scope is clearly bounded
+      - [ ] Non-Goals section explicitly excludes related-but-out-of-scope capabilities
       - [ ] Dependencies and assumptions identified
 
       ## Feature Readiness
