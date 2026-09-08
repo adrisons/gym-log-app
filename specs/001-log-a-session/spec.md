@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "The logging critical path from docs/requirements.md: FR-1 (log a session), FR-2 (blocks), FR-3 (sets and load), FR-4 (effort), FR-5 (exercise catalogue). This is the smallest complete slice through the hexagonal storage port and the first spec in the build order set by docs/agent-brief.md and docs/handoff.md."
+**Input**: User description: "The logging critical path from docs/requirements.md: FR-1 (log a session), FR-2 (blocks), FR-3 (sets and load), FR-4 (effort), FR-5 (exercise catalogue). This is the smallest complete, independently valuable slice of behavior, and the first spec in the build order set by docs/agent-brief.md."
 
 ## Clarifications
 
@@ -313,8 +313,6 @@ independently verifiable without blocks, load types, or effort.
   concepts to build against (this is the first feature spec in the project;
   no prior implementation exists yet) — this spec describes required
   behavior, not remaining gaps in an existing system.
-- Platform and storage mechanics (PWA, File System Access / IndexedDB
-  adapter selection) are architectural constraints from
-  `docs/decisions/ADR-0002-revised-pwa-and-storage.md` and the project
-  constitution, not user-facing requirements of this spec — they are
-  realized in `/speckit-plan`, not here.
+- Platform and storage mechanics are not user-facing requirements of this
+  spec — they are technical choices made and confirmed in a later
+  `/speckit-plan`, not here.

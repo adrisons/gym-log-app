@@ -1,5 +1,16 @@
 # gym-log — Handoff to Claude Code
 
+> **Status note (2026-09-08).** The current project phase is functional
+> definition only: what the app does and how it should feel, with no
+> concrete technology committed yet. This file's platform decision (§1) and
+> its specific architecture mandate (§3) — including the named platform and
+> storage mechanisms — are **deferred** to a later technical-planning phase
+> and are not currently binding; they are kept below as historical context
+> for that future decision. `docs/development-principles.md` carries the
+> technology-agnostic version of the architecture practice this file
+> describes (ports, layering), which does apply now. See `AGENTS.md` for
+> the current reading order.
+
 This is the complete context needed to create the repository and start work.
 It supersedes the earlier native cross-platform documents in this project: the
 app is now a **PWA**, not a native iOS/Android build. Everything else from the
