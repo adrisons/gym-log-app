@@ -134,9 +134,10 @@ One vocabulary, used identically in code, UI and documentation.
   - `None` — for work where load does not apply.
 - **Volume** — a sum type: `Reps` | `Duration` (seconds) | `Distance` (metres).
   A 45-second plank and an 8-rep press are both valid sets.
-- **Effort** — RPE on a 1–10 scale in half-point steps, stored as the single
-  canonical value (ADR-0003). Optional: a set with no effort recorded is valid
-  and does not invalidate its load computations.
+- **Effort** — an integer level from 1 to 5, stored as the single canonical
+  value (ADR-0003). The scale's meaning is always shown in words, never the
+  bare number (§7.4). Optional: a set with no effort recorded is valid and
+  does not invalidate its load computations.
 
 ### 3.3 Domain rules
 
@@ -201,11 +202,9 @@ Create today's session and add blocks, exercises and sets.
 
 ### FR-4 — Effort `[v1]`
 
-- Record a set's effort with a one-tap control.
+- Record a set's effort with a one-tap control on a 1–5 scale (ADR-0003).
 - Recording it is optional on every set.
 - The scale always shows its meaning in words, never the number alone (§7.4).
-- Settings offer entering effort as RIR; it is converted on entry and stored as
-  RPE, keeping one source of truth.
 
 ### FR-5 — Exercise catalogue `[v1]`
 
@@ -277,8 +276,8 @@ Cards with global conclusions across the whole set of exercises.
 
 ### FR-11 — Settings `[v1]`
 
-- Default unit (kg/lb), effort input mode (RPE/RIR), quick increments, theme
-  (light / dark / system), first day of the week.
+- Default unit (kg/lb), quick increments, theme (light / dark / system),
+  first day of the week.
 - Band catalogue management.
 - Data section: export, import, delete everything (double confirmation).
 
@@ -440,7 +439,7 @@ before code.
 |----|----------|--------|
 | D1 | Single project language for all artifacts | **Closed:** English everywhere. → ADR-0001 |
 | D2 | Target platform and storage architecture | **Closed:** Progressive Web App, one web codebase; storage is one port with two adapters (File System Access API, IndexedDB) chosen at runtime via feature detection. → ADR-0002 |
-| D3 | Effort scale | **Closed:** store RPE 1–10 in half-point steps as the canonical value; RIR is an input mode converted on entry. Chosen over a 3-level scale because trend detection needs resolution, and over storing both because one fact gets one source of truth. → ADR-0003 |
+| D3 | Effort scale | **Closed:** store a single integer effort level 1–5 as the canonical value, shown with its meaning in words. Chosen over RPE 1–10 / RIR because effort feeds no computation in v1 (§5 runs on e1RM, not effort) and a coarser, one-tap scale is more likely to actually get used. → ADR-0003 |
 | D4 | Default unit, and whether mixed units are allowed in history | **Closed** for FR-1 to FR-5: kg by default; store the unit as entered, convert only for display. → `specs/001-log-a-session/spec.md` Clarifications |
 | D5 | e1RM formula | **Closed:** Epley, for simplicity and explainability; its weakness at high reps is why the rule caps use at 12 reps (§5.2). → ADR-0004 |
 | D6 | Multiple sessions per day | **Closed** for FR-1 to FR-5: allowed; simpler model, matches reality. → `specs/001-log-a-session/spec.md` Clarifications |
