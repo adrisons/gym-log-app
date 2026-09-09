@@ -1,9 +1,8 @@
 # Training Diary — Functional Requirements
 
-**Status:** draft for review. The decisions in §8 marked *open* must be closed
-before any code is written. This document is the source of truth for *what* the
-app does; the *how* lives in the stack document and in the decision records
-(ADRs).
+**Status:** all decisions in §8 are closed. This document is the source of
+truth for *what* the app does; the *how* lives in the stack document (once
+`/speckit-plan` produces it) and in the decision records (ADRs).
 
 **Project language:** English, for every artifact — code, identifiers, comments,
 commit messages and documentation (ADR-0001).
@@ -22,9 +21,12 @@ commit messages and documentation (ADR-0001).
 Three properties that override every other rule. A change that breaks one of
 them is not a change to make; it is a decision to escalate.
 
-1. **The data belongs to the user and lives on their device.** No mandatory
-   account, no backend in v1, no user content sent to third parties. Everything
-   is exportable in an open, readable format.
+1. **The user controls their data.** No mandatory account, local-first by
+   default, everything exportable in an open, readable format. Nothing leaves
+   the device without the user explicitly choosing to send it. This does not
+   prejudge what a future connected mode looks like — only that whatever form
+   it takes, it is opt-in, and a user who never activates it keeps today's
+   guarantee unchanged: nothing sent anywhere, no account required.
 2. **Logging is the critical path and always works.** Recording a set in the
    middle of the gym, offline, one-handed, must be immediate: no Save button, no
    waiting, no dialogs.
@@ -34,21 +36,24 @@ them is not a change to make; it is a decision to escalate.
 
 ### 1.3 Non-goals
 
-An explicit list of what the app is not. Anything landing here is refused or
-turned into a recorded decision.
+An explicit list of what the app is not, today. Anything landing here is
+refused or turned into a recorded decision before it's built.
 
-- Not a social network: no profiles, followers, likes or sharing.
-- Not a program prescriber: it records what you did, it does not tell you what
-  to do.
+- Not a program prescriber, for the solo user. The app records what you did;
+  it does not tell you what to do. A future opt-in mode where a human coach
+  assigns workouts to consenting members would be a separate, undecided
+  extension — not something this non-goal already permits, and not something
+  it should be read as forever excluding either.
 - Not a calorie counter or nutrition tracker.
 - Not a generative-AI coach: insights are deterministic, explainable
   computations, not generated text (§5.6).
-- Not a cloud service: no multi-device sync in v1.
+- Not a cloud service: no multi-device sync today. If sync is ever built, it
+  is its own recorded decision, explicit in the UI, and off by default.
 - Not a wearable companion: no heart-rate monitors or sensors in v1.
 
-Social and coaching ideas raised for possible future consideration are
-captured in §10 — they remain non-goals today and are not designed into
-anything above.
+Social and coaching ideas — peer comparison, coach groups, coach-assigned
+workouts — are not designed into anything above and are not scoped for any
+version. §10 records why, and what each would need before it could be.
 
 ### 1.4 Extensibility beyond strength training
 
@@ -412,7 +417,8 @@ Part of "done", not a final pass:
 
 ### 7.5 Design and platform
 
-- Both platforms are first-class targets; every screen is reviewed on both.
+- Both a narrow, one-handed phone layout and a wider layout are first-class
+  targets; every screen is reviewed at both widths (`docs/design.md` §6).
 - Design tokens are the only source of visual values, with both themes from day
   one.
 - Colours named by role, never by hue.
@@ -433,13 +439,13 @@ before code.
 | ID | Decision | Status |
 |----|----------|--------|
 | D1 | Single project language for all artifacts | **Closed:** English everywhere. → ADR-0001 |
-| D2 | Target platforms and framework | **Open** (reopened): the project's current phase is functional definition only — no platform, framework, or storage technology is committed yet (see `AGENTS.md`). Deferred to the technical-planning phase (`/speckit-plan`) and its own ADR. |
+| D2 | Target platform and storage architecture | **Closed:** Progressive Web App, one web codebase; storage is one port with two adapters (File System Access API, IndexedDB) chosen at runtime via feature detection. → ADR-0002 |
 | D3 | Effort scale | **Closed:** store RPE 1–10 in half-point steps as the canonical value; RIR is an input mode converted on entry. Chosen over a 3-level scale because trend detection needs resolution, and over storing both because one fact gets one source of truth. → ADR-0003 |
 | D4 | Default unit, and whether mixed units are allowed in history | **Closed** for FR-1 to FR-5: kg by default; store the unit as entered, convert only for display. → `specs/001-log-a-session/spec.md` Clarifications |
-| D5 | e1RM formula | Open. Recommendation: Epley, for simplicity and explainability; record its weakness at high reps |
+| D5 | e1RM formula | **Closed:** Epley, for simplicity and explainability; its weakness at high reps is why the rule caps use at 12 reps (§5.2). → ADR-0004 |
 | D6 | Multiple sessions per day | **Closed** for FR-1 to FR-5: allowed; simpler model, matches reality. → `specs/001-log-a-session/spec.md` Clarifications |
-| D7 | Whether FR-13 (templates) is v1 or v1.1 | Open. Recommendation: v1.1, to keep the logging critical path clean |
-| D8 | Which exercise disciplines beyond Strength (§1.4) are in scope, and when | Open. Recommendation: MVP and v1 ship Strength only; swimming (distance + time, no load) is the first documented candidate for a second discipline, deferred to v1.1 or later pending a recorded decision — it must not be designed into the schema now, only kept representable (§1.4) |
+| D7 | Whether FR-13 (templates) is v1 or v1.1 | **Closed:** v1.1, to keep the logging critical path clean. |
+| D8 | Which exercise disciplines beyond Strength (§1.4) are in scope, and when | **Closed:** MVP and v1 ship Strength only; swimming (distance + time, no load) is the first documented candidate for a second discipline, deferred to v1.1 or later pending its own recorded decision — it must not be designed into the schema now, only kept representable (§1.4). |
 
 ---
 
@@ -459,8 +465,8 @@ before code.
   (settings), FR-12 (export/import). A complete, useful application on its
   own, still Strength-only (§1.4).
 - **v1.1** — FR-13 templates; extra progression metrics; a quick-log widget
-  or shortcut; the first non-Strength discipline if D8 is closed in favor
-  of one (§1.4, §8).
+  or shortcut; possibly the first non-Strength discipline (§1.4, §8), pending
+  its own scoping decision.
 - **Later, only with a recorded decision** — multi-device sync, additional body
   measurements (girths, photos), import from other apps, report export,
   further exercise disciplines beyond the first one added under v1.1.
@@ -470,44 +476,40 @@ before code.
 ## 10. Future directions (not committed)
 
 Ideas raised for possible consideration well past v1.1. They are captured
-here so they aren't lost, not because they are scoped, planned, or
-compatible with this document as it stands. They are **not** requirements,
-they are **not** MVP/v1/v1.1 scope (§9), and as described they directly
-conflict with invariant 1 (§1.2 — no mandatory account, no v1 backend, no
-user content sent to third parties) and the "not a social network" /
-"not a program prescriber" non-goals (§1.3). Nothing below is designed into
-the domain model, the FRs, or any spec.
+here so they aren't lost, not because they are scoped, planned, or ready to
+build. They are **not** requirements and **not** MVP/v1/v1.1 scope (§9).
+Nothing below is designed into the domain model, the FRs, or any spec — each
+would need its own scoping decision, its own domain model work, and its own
+review against the invariants in §1.2 before a single FR gets written for it.
 
 - **Peer comparison.** Seeing a friend's activity and comparing progress
-  across exercises. This is the most direct conflict with invariant 1 and
-  the "not a social network" non-goal of the three — it requires shared
-  identity and a way for one user's data to reach another's device, which
-  today's local-first, no-backend model has no place for.
+  across exercises. Needs shared identity and a way for one user's data to
+  reach another's device — today's local-first-by-default model has no place
+  for that yet. The most demanding of the three on the connected-mode
+  invariant (§1.2): it inherently exposes one user's data to another, so it
+  would need the clearest opt-in and consent story of the three.
 - **Coach / gym-owner private groups.** A trainer creates a private group;
-  members join it (potentially under a visible username distinct from
-  their real name, for privacy); the trainer defines exercises for the
-  group so members see them recommended; the trainer can see members'
-  training data. Of the three, this has the most plausible privacy shape —
-  opt-in, scoped to a group, a coach seeing only what a member logs under
-  that group's context — but it is still fundamentally multi-user: it
-  needs accounts, a backend, and a consent/visibility model (what exactly a
-  coach can see, whether a member can leave and revoke access, whether
-  access is retroactive or only forward-looking) that does not exist today.
+  members join it (potentially under a visible username distinct from their
+  real name, for privacy); the trainer defines exercises for the group so
+  members see them recommended; the trainer can see members' training data.
+  Probably the most plausible privacy shape of the three — opt-in, scoped to
+  a group, a coach seeing only what a member logs under that group's context
+  — but still fundamentally multi-user: it needs accounts, a backend, and a
+  consent/visibility model (what exactly a coach can see, whether a member
+  can leave and revoke access, whether access is retroactive or only
+  forward-looking) that doesn't exist today.
 - **Coach-assigned workouts.** A trainer defines a workout that appears
-  directly to assigned users, who then log reps/weight against the
-  trainer's defined exercises. This runs into the "not a program
-  prescriber" non-goal directly (§1.3: "it records what you did, it does
-  not tell you what to do") — it is a different product surface
-  (prescription) layered on top of the current one (recording), not an
-  extension of it.
+  directly to assigned users, who then log reps/weight against the trainer's
+  defined exercises. For the solo user the app remains a recorder, not a
+  prescriber (§1.3) — this only becomes coherent as a distinct, opt-in coach
+  mode layered alongside that, not a change to how the app behaves for
+  someone training on their own.
 
 If any of these is ever pursued, it needs, in order: its own recorded
-decision confirming it's in scope (which necessarily means revisiting
-invariant 1 and the two non-goals above — possibly by scoping a "connected"
-mode that coexists with, rather than replaces, the current single-user
-local-first guarantees); its own domain model work (group membership,
-roles, visibility and consent rules) before any FR is written for it; and
-its own review against every invariant this document currently treats as
-non-negotiable. None of that work is started by this section — it exists
-only to record that the idea was raised and roughly why it doesn't fit
-today.
+decision confirming it's in scope, scoped as an opt-in mode that coexists
+with — rather than replaces — the current single-user, local-first-by-default
+guarantees for anyone who doesn't opt in; its own domain model work (group
+membership, roles, visibility and consent rules) before any FR is written for
+it; and its own review against every invariant in §1.2. None of that work is
+started by this section — it exists only to record that the idea was raised
+and roughly what it would take.

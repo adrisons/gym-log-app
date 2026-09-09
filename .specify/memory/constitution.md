@@ -1,22 +1,32 @@
 <!--
 Sync Impact Report
-Version change: 1.0.0 → 2.0.0
+Version change: 2.0.0 → 2.1.0
 Modified principles:
-  - III. Progressive Web App Only → REMOVED. Platform choice is a technical
-    decision deferred past this functional-definition stage.
-  - IV. Storage as a Hexagonal Port with Two Adapters → renamed and
-    generalized to IV. External Dependencies Behind Ports (no adapter
-    names, no platform APIs named).
-  - VI. Dependency-Inward Layering → unchanged in substance; cross-reference
-    to docs/development-principles.md added.
-Added sections: none
-Removed sections: none (Non-Goals, Development Workflow, Escalation,
-  Governance retained)
+  - III. Behavior-Driven Development Before Code → materially expanded.
+    Stops enumerating "FR-1 through FR-12" (FR-13 now exists); references
+    the functional-requirements set generally. Adds the discipline-neutral
+    canonical-schema rule from docs/requirements.md §1.4: strength-specific
+    computations MUST NOT be wired so that adding a second discipline forces
+    a canonical-data rework, and a new persisted field still ships with a
+    version bump + ADR + migration even when additive with a safe default.
+  - IV. External Dependencies Behind Ports → unchanged in substance.
+  - V. Dependency-Inward Layering → unchanged in substance.
+Added principles:
+  - VI. Deterministic, Traceable Insights (NON-NEGOTIABLE) — promotes
+    docs/requirements.md §5.6 and §5.7 from an oblique mention in Non-Goals
+    to a first-class principle.
+Modified sections:
+  - Non-Goals → the "social network" / "program prescriber" entries reworded
+    from an absolute refusal to "not in v1, not designed into the domain
+    model, promotable only by an ADR that explicitly re-reviews Principles
+    I–II", to stay consistent with docs/requirements.md §1.3 and the new
+    §10 (Future directions — raised, not scoped, not forever excluded).
+  - Development Workflow → adds a sentence tying feature delivery to the
+    MVP / v1 / v1.1 phase order in docs/requirements.md §9, and requires
+    each spec to state which phase it targets.
+Removed sections: none.
 Templates requiring follow-up: none.
-Deferred TODOs: the concrete platform and storage-adapter decisions removed
-  from Principle III/IV are deferred to a later technical-planning phase,
-  not lost — they are tracked as pending topics for a future `/speckit-plan`
-  and its own ADRs.
+Deferred TODOs: none.
 -->
 
 # gym-log Constitution
@@ -49,19 +59,29 @@ primary use case (S1: record a complete set in ≤ 3 taps, mid-set, in the
 gym). Anything that slows this path defeats the product.
 
 ### III. Behavior-Driven Development Before Code
-Every functional requirement (FR-1 through FR-12 in `docs/requirements.md`)
-starts as one or more Given/When/Then scenarios written in the domain's
-ubiquitous language — Session, Block, Exercise entry, Set, Load, Volume,
-Effort — never in storage or UI terms. Scenarios are written and agreed
-before the implementing code, via the spec-kit `/speckit-specify` →
-(optionally `/speckit-clarify`) → `/speckit-plan` → `/speckit-tasks` →
-`/speckit-implement` flow, not retrofitted afterward. A scenario is written
-against the domain's own behavior, independent of how it will eventually be
-stored or displayed, so that it stays valid regardless of later technical
-choices.
+Every functional requirement in `docs/requirements.md` §4 starts as one or
+more Given/When/Then scenarios written in the domain's ubiquitous language —
+Session, Block, Exercise entry, Set, Load, Volume, Effort — never in storage
+or UI terms. Scenarios are written and agreed before the implementing code,
+via the spec-kit `/speckit-specify` → (optionally `/speckit-clarify`) →
+`/speckit-plan` → `/speckit-tasks` → `/speckit-implement` flow, not
+retrofitted afterward. A scenario is written against the domain's own
+behavior, independent of how it will eventually be stored or displayed, so
+that it stays valid regardless of later technical choices.
+
+The canonical schema stays discipline-neutral (`docs/requirements.md` §1.4).
+Volume and Load already generalize beyond strength (Volume covers reps,
+duration and distance; Load has a `None` variant). Strength-specific
+computations — e1RM, tonnage (§5.2–5.3) — MUST NOT be wired so that adding a
+second discipline forces a rework of the canonical data. Any new persisted
+field on a canonical entity (for example the Exercise catalogue's
+`discipline` field) ships with a schema version bump, an ADR, and a tested
+migration even when it is additive with a safe default; being additive does
+not exempt it.
 Rationale: decouples "what the app must do" from "how it will be built,"
 which is exactly the separation this project is currently working through —
-functional definition first, technical planning later.
+functional definition first, technical planning later — and keeps a future
+second discipline from becoming a canonical-data migration crisis.
 
 ### IV. External Dependencies Behind Ports
 Anything the domain needs from outside itself — persistence, files, platform
@@ -94,16 +114,47 @@ system, and keeps a future change to "how we store data" from ever leaking
 into how a screen is built. Elaborated in
 `docs/development-principles.md`.
 
+### VI. Deterministic, Traceable Insights (NON-NEGOTIABLE)
+Every number shown to the user is defined by an explicit rule in
+`docs/requirements.md` §5, is deterministic, and is testable. An insight that
+cannot be written as an explicit rule is not built. No generative model
+produces user-facing analytical text: each insight card's wording is a fixed
+template filled with the computed numbers (§5.6), so the number shown and the
+data behind it cannot disagree. Every card carries the claim in plain words,
+the number behind it, the periods compared, and how many sessions support it,
+and links through to the raw data that produced it. No card is shown unless
+the data-sufficiency thresholds in §5.7 are met; below a threshold there is
+no approximate version — there is nothing, and the section says what is
+missing.
+Rationale: the product's promise is evidence, not vibes. A shown number that
+cannot be traced back to canonical records, or that a threshold does not
+support, is a broken promise regardless of how plausible it looks.
+
 ## Non-Goals
 
-The following are explicitly out of scope and refused unless promoted to a
-recorded decision (an ADR): a social network (profiles, followers, likes,
-sharing); a program prescriber (the app records what was done, it does not
-tell the user what to do); a calorie counter or nutrition tracker; a
-generative-AI coach (insights are deterministic, explainable computations
-per `docs/requirements.md` §5.6 — never generated prose); a cloud service
-with multi-device sync in v1; a wearable companion (heart-rate monitors or
-other sensors) in v1.
+The following are out of scope for v1, are not designed into the domain
+model, the functional requirements, or any spec, and are promotable only by a
+recorded decision (an ADR) that explicitly re-reviews Principles I and II
+before any FR is written for them:
+
+- A social network — profiles, followers, likes, sharing — and any
+  multi-user feature (peer comparison, coach/gym-owner groups,
+  coach-assigned workouts). `docs/requirements.md` §10 records these as
+  raised, not as scope; each needs shared identity and a way for one user's
+  data to reach another's device, which today's local-first-by-default model
+  has no place for. Pursuing any of them requires its own domain-model work
+  (membership, roles, visibility and consent) and its own review against
+  every invariant in `docs/requirements.md` §1.2.
+- A program prescriber for the solo user — the app records what was done, it
+  does not tell the user what to do. A future opt-in coach mode layered
+  alongside the solo experience is a separate, undecided extension, not a
+  change to how the app behaves for someone training on their own.
+
+The following are flatly out of scope and refused unless promoted to an ADR:
+a calorie counter or nutrition tracker; a generative-AI coach (insights are
+deterministic, explainable computations per Principle VI — never generated
+prose); a cloud service with multi-device sync in v1; a wearable companion
+(heart-rate monitors or other sensors) in v1.
 
 ## Development Workflow
 
@@ -111,16 +162,22 @@ No implementation code for a use case is written before it has been through
 `/speckit-specify` and, when the spec touches an open decision or a port's
 expected behavior, `/speckit-clarify`, followed by `/speckit-plan` and
 `/speckit-tasks`; `/speckit-implement` executes only after that chain exists
-for the feature in question. Definition of done for every change: typecheck,
-tests, and lint pass locally and in CI; every new behaviour has at least one
-test and every fix has a regression test that failed before the fix; no
-dependency is added that overlaps a concern already covered by an existing
-one; no literal visual value appears outside the design tokens; every new
-interactive element ships all of its states (rest, hover, pressed,
-focus-visible, disabled with a stated reason, loading); a schema or
-architecture change ships with its ADR; documentation describing the change
-is updated in the same change; no typing escape hatch is added without being
-local, loud, and commented with its reason.
+for the feature in question. Features are delivered in the phase order
+recorded in `docs/requirements.md` §9 — MVP closes the log→evidence loop
+(FR-1 to FR-8, Strength only); v1 adds insights, body composition, settings
+and export/import; v1.1 adds templates and possibly the first non-Strength
+discipline — and every spec states which phase it targets.
+
+Definition of done for every change: typecheck, tests, and lint pass locally
+and in CI; every new behaviour has at least one test and every fix has a
+regression test that failed before the fix; no dependency is added that
+overlaps a concern already covered by an existing one; no literal visual
+value appears outside the design tokens; every new interactive element ships
+all of its states (rest, hover, pressed, focus-visible, disabled with a
+stated reason, loading); a schema or architecture change ships with its ADR;
+documentation describing the change is updated in the same change; no typing
+escape hatch is added without being local, loud, and commented with its
+reason.
 
 ## Escalation
 
@@ -151,4 +208,4 @@ writing at the point it is introduced. Runtime development guidance for
 day-to-day work lives in `AGENTS.md`, `docs/agent-brief.md`, and
 `docs/development-principles.md`.
 
-**Version**: 2.0.0 | **Ratified**: 2026-09-08 | **Last Amended**: 2026-09-08
+**Version**: 2.1.0 | **Ratified**: 2026-09-08 | **Last Amended**: 2026-09-09

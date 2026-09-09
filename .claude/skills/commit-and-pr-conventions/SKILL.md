@@ -14,7 +14,7 @@ project-specific format. Every commit message, in English, per ADR-0001:
 ```
 <type>(<optional scope>): <short imperative summary>
 
-<optional body — why, not what, per docs/agent-brief.md §0 "one concern per commit">
+<optional body — why, not what; one concern per commit (constitution, Development Workflow)>
 
 <optional footer(s) — BREAKING CHANGE:, refs, Co-Authored-By:>
 ```
@@ -25,7 +25,7 @@ or feature area (e.g. `feat(domain): ...`, `fix(logging-session): ...`).
 
 - Subject line: imperative mood ("add", not "added"/"adds"), no trailing
   period, under ~72 characters.
-- One concern per commit (`docs/agent-brief.md` §0) — do not bundle an
+- One concern per commit (constitution, Development Workflow) — do not bundle an
   unrelated fix into a feature commit.
 - Reference the spec, requirement, or ADR the commit implements when it
   isn't obvious from the subject alone, e.g. `Closes FR-004` or

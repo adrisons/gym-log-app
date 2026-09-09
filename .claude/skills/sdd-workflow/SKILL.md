@@ -10,11 +10,12 @@ disable-model-invocation: false
 
 This project uses GitHub's spec-kit (the `speckit-*` skills already
 installed under `.claude/skills/`) for spec-driven development, per
-`docs/handoff.md` §4 and the project constitution's Development Workflow
-section. This skill does not replace any of that — it is a map so the right
-command gets invoked at the right time, and so the two project-specific
-review subagents (`spec-reviewer`, `schema-guardian`) get used where they
-add value that spec-kit's own commands don't cover.
+`docs/agent-brief.md` and ADR-0002 (`docs/decisions/`) and the project
+constitution's Development Workflow section. This skill does not replace any
+of that — it is a map so the right command gets invoked at the right time,
+and so the two project-specific review subagents (`spec-reviewer`,
+`schema-guardian`) get used where they add value that spec-kit's own
+commands don't cover.
 
 Always prefer the actual `speckit-*` skill for the step it owns. Do not
 hand-roll a spec, plan, or task list here — this skill only sequences.
@@ -58,8 +59,8 @@ hand-roll a spec, plan, or task list here — this skill only sequences.
    which looks across features.
 
 6. **Implement** — `/speckit-implement`. Follow the definition-of-done
-   checklist in `docs/agent-brief.md` §4 and the constitution's Development
-   Workflow section for every change. Commit and PR conventions are in the
+   checklist in the constitution's Development Workflow section for every
+   change (and the build phase order in `docs/agent-brief.md` §3). Commit and PR conventions are in the
    `commit-and-pr-conventions` skill — apply them from the first commit of
    the feature, not just at the end.
 
