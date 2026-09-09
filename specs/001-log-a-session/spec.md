@@ -27,12 +27,20 @@ the seed catalogue).
 
 ### Session 2026-09-08
 
-- Q: D4 — default unit for Weight loads? → A: kg by default; the unit is
-  stored exactly as entered and converted only for display, never in storage.
+- Q: D4 — default unit for Weight loads? → A: kg by default. (The
+  store-as-entered / convert-only-for-display rule is inert in this slice,
+  which is kg-only with no unit choice; only the "kg default" half applies
+  here. The rest matters once Settings adds kg/lb, FR-11.)
 - Q: D6 — multiple sessions per calendar day? → A: Yes — fully independent
-  second session on the same day (FR-021).
+  second session on the same day (FR-021). D6 was later extended (see
+  2026-09-09) to also cover the absence of a session lifecycle; both halves
+  are the same decision ID in `docs/requirements.md` §8.
 
 ### Session 2026-09-09
+
+All of the following were confirmed with the project owner in the session
+that regenerated this spec, and are reflected in `docs/requirements.md`
+§3.1/§3.2/§8 (D3, D6, D9), the revised ADR-0003, and the new ADR-0005.
 
 - Q: Does a session have an open/closed lifecycle, and does it auto-resume?
   → A: No. A session has no "unfinished" state. It is a dated record; its
@@ -41,8 +49,10 @@ the seed catalogue).
   session — starting a session always creates a new, independent one.
 - Q: What happens to input if the user opens the logging form and leaves
   without submitting? → A: It is kept as a single pending draft — a state
-  of the logging screen, not a persisted Session. Reopening the form
-  restores it; cancelling discards it. The draft must survive an app
+  of the logging screen, not a persisted Session. There is one way to open
+  the logging form and it always restores the pending draft if one exists;
+  to start from scratch the user first discards the draft from the form.
+  Discarding the draft discards its data. The draft must survive an app
   close/background even though it is not a Session.
 - Q: Effort scale? → A: An integer 1–5 level (ADR-0003, revised), one tap,
   optional, always shown with its meaning in words. No RIR input mode.
@@ -54,14 +64,18 @@ the seed catalogue).
   alone; `None` is not a stored load value for that test. A set with
   `Load: None` and no Volume is not stored.
 - Q: How is the survivor chosen when merging two exercises, and is merge
-  reversible? → A: The user picks which name is canonical (the other becomes
-  an alias); the surviving exercise's own defaults (load type, movement
-  pattern, unilateral flag) are kept, with no field-by-field prompt. Every
-  set from both is reassigned to the survivor. Merge is irreversible and
-  requires explicit confirmation — it is not covered by the 5-second undo.
+  reversible? → A: The user picks which of the two names is canonical, and
+  that exercise IS the survivor: its name and its own defaults (load type,
+  movement pattern, unilateral flag) are kept, with no field-by-field
+  prompt. The other exercise contributes only its name (kept as an alias of
+  the survivor) and its sets. Every set from both is reassigned to the
+  survivor. Merge is irreversible and requires explicit confirmation — it is
+  not covered by the 5-second undo.
 - Q: What happens when a rename collides with an existing exercise's name or
   alias? → A: It is not rejected outright — the app detects the duplicate
-  and offers to merge the two exercises.
+  and offers to merge the two exercises. If the user declines the merge, the
+  rename is cancelled (the exercise keeps its previous name); two exercises
+  are never left sharing a name or alias.
 - Q: What happens to the sets inside a block when the block is deleted? → A:
   Cascade — the block, its exercise entries, and their sets are removed
   together; the 5-second undo restores the whole block with its sets. A
@@ -71,19 +85,43 @@ the seed catalogue).
   Volume > 0. Quick-increment controls never drive a value negative, except
   the assisted side of the Bodyweight added-load component, which is
   negative by definition.
+- Q: How is the signed Bodyweight added/assisted component bounded, given
+  bodyweight itself is not recorded in this slice? → A: The component is
+  capped to a fixed range of −300 kg to +300 kg. A component of exactly 0
+  is treated as "no component" — it is not a distinct meaningful value.
 - Q: What if the user double-taps the confirm control? → A: A short
   debounce (~1 second) ignores an identical second confirm; after that
   window a second identical set is created normally.
 - Q: Two tabs / instances editing the same session at once? → A: Out of
   scope for this spec — a single active logging context is assumed.
   Concurrent contexts are a persistence-layer concern (build phase 2).
+- Q: If the user confirms a set that is invalid per FR-019 (no volume, and
+  Load is None or empty), what does "confirm" do? → A: Nothing is stored —
+  the confirm action is a silent no-op (or the confirm control is
+  unavailable) until the set has at least a volume or a non-None load.
+- Q: Two overlapping 5-second undo windows — a set was individually deleted
+  and is still within its own undo window when its block is deleted. What
+  does the block-undo restore? → A: The block-undo restores the block to
+  exactly the state it was in at the moment of block deletion — so a set
+  that was already (pending-)deleted comes back still deleted, with whatever
+  is left of its own undo window. The two timers are independent.
+- Q: The user merges or deletes a catalogue exercise that has an exercise
+  entry in the current unsubmitted draft. → A: The draft's exercise entry
+  is rewritten in place: on merge it now points at the survivor; on delete
+  (of an exercise with history, cascade-confirmed) the draft entry and its
+  in-progress sets are removed too. The draft is not exempt from catalogue
+  operations just because it is not yet a Session.
+- Q: Does the pre-fill (FR-008) carry effort forward from the previous set?
+  → A: No — deliberately. Pre-fill carries load and volume only; effort is
+  re-entered (or left blank) on each set.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Log a set between reps (Priority: P1)
+### User Story 1 - Start a session and log a set (Priority: P1)
 
 A user is standing in the gym, mid-workout, one hand free. They open the
-app, start (or return to) a session, add or pick an exercise, and record a
+app, open the logging form (which starts a new session, or restores the
+pending draft they left earlier), add or pick an exercise, and record a
 set — its load and how many reps (or how long, or how far) — in a few taps,
 with no save step and no waiting.
 
@@ -98,35 +136,37 @@ core value on its own.
 
 **Acceptance Scenarios**:
 
-1. **Given** the user wants to record a workout, **When** they start a new
-   session, **Then** a session is created with a date-time of that moment
+1. **Given** the user has no pending draft, **When** they open the logging
+   form, **Then** a new session is created with a date-time of that moment
    (which they can edit) and is ready to accept blocks and exercises — no
    picker, no "continue?" dialog.
 2. **Given** the user opened the logging form earlier, entered some data,
    and left without submitting, **When** they open the logging form again,
-   **Then** their earlier input is still there as a pending draft — no data
-   was lost by leaving.
-2a. **Given** a pending draft exists, **When** the user cancels the session
-    from the logging form, **Then** the draft and all its data are discarded
-    and are not recoverable.
-2b. **Given** the user already submitted a session earlier today, **When**
-    they start another session, **Then** a second, fully independent session
-    is created — the earlier one is untouched.
-3. **Given** the user is adding an exercise, **When** they open the exercise
+   **Then** their earlier input is restored as the pending draft — no data
+   was lost by leaving — and this is the only thing that opening the form
+   does when a draft exists (it does not start a competing new session).
+3. **Given** a pending draft exists, **When** the user discards it from the
+   logging form, **Then** the draft and all its data are gone and are not
+   recoverable, and the next time the form is opened a fresh session starts.
+4. **Given** the user already submitted a session earlier today, **When**
+   they open the logging form again (with no pending draft), **Then** a
+   second, fully independent session is created — the earlier one is
+   untouched.
+5. **Given** the user is adding an exercise, **When** they open the exercise
    field, **Then** they see their most-used and most-recently-used exercises
    first (seeded common exercises included on a fresh install), and can
    create a brand-new exercise from the same field.
-4. **Given** an exercise already has at least one set in the current
+6. **Given** an exercise already has at least one set in the current
    session, **When** the user adds another set to it, **Then** the new set
-   is pre-filled with the previous set's load and volume, so confirming it
-   is one tap.
-5. **Given** the user just recorded a set, **When** the set is saved,
+   is pre-filled with the previous set's load and volume (not its effort),
+   so confirming it is one tap.
+7. **Given** the user just recorded a set, **When** the set is saved,
    **Then** there is no visible "Save" control anywhere on the screen — the
    set appears recorded the instant it is confirmed.
-6. **Given** the user closes the app (backgrounds it, loses connectivity,
+8. **Given** the user closes the app (backgrounds it, loses connectivity,
    the OS kills it) immediately after entering a set, **When** they reopen
    the app, **Then** that set is still there, unchanged.
-7. **Given** the user taps the confirm control twice in quick succession on
+9. **Given** the user taps the confirm control twice in quick succession on
    a pre-filled set, **When** the second tap lands within ~1 second, **Then**
    only one set is recorded; a deliberate second identical set after that
    window records normally.
@@ -209,7 +249,8 @@ independently verifiable per load type without needing blocks or effort.
 5. **Given** a Bodyweight load, **When** the user records the set, **Then**
    they may optionally add a signed added/assisted component (e.g. `+10 kg`
    added, `−20 kg` assisted) with its unit; the assisted side is negative
-   by design.
+   by design, the value is capped to −300..+300 kg, and a component of
+   exactly 0 means "no component".
 6. **Given** a set with `Load: None` and a recorded Volume (e.g. a
    distance), **When** the set is confirmed, **Then** it is stored and
    valid — `None` does not block storage the way an empty load/volume pair
@@ -252,16 +293,22 @@ result — independently verifiable without blocks, load types, or effort.
    a different exercise, **When** the collision is detected, **Then** the
    app does not silently reject or create a duplicate — it offers to merge
    the two exercises.
+3a. **Given** the app offered a merge after a rename collision, **When** the
+    user declines it, **Then** the rename is cancelled and the exercise
+    keeps its previous name — two exercises are never left sharing a name.
 4. **Given** two catalogue entries that turn out to be duplicates, **When**
-   the user merges them, **Then** the user chooses which name is canonical
-   (the other becomes an alias), the surviving exercise's own defaults are
-   kept, and every set from both is reassigned to the survivor.
+   the user merges them, **Then** the user chooses which of the two names is
+   canonical, and that exercise is the survivor: its name and its own
+   defaults are kept, the other name becomes an alias of it, and every set
+   from both (the other exercise's included) is reassigned to it.
 5. **Given** the user initiates a merge, **When** they confirm it, **Then**
    the merge is applied immediately and is not undoable — the confirmation
    is explicit and says so; there is no 5-second window.
 6. **Given** a catalogue exercise that has recorded history, **When** the
    user tries to delete it, **Then** the app asks for explicit confirmation
-   and offers merging as an alternative.
+   and offers merging as an alternative; if the user confirms the delete
+   anyway, the exercise and all its historical exercise entries and sets are
+   removed (cascade).
 7. **Given** a fresh install with no logging history, **When** the user
    opens the exercise field, **Then** it is not empty — a seed set of
    common strength exercises is available to pick or rename, alongside the
@@ -270,12 +317,27 @@ result — independently verifiable without blocks, load types, or effort.
 ### Edge Cases
 
 - The user opens the logging form, enters data, backgrounds the app, and
-  returns much later: the pending draft is restored intact. It is not a
-  Session and does not appear anywhere a Session would (e.g. a future
-  history view) until submitted.
-- Two pending drafts cannot exist: there is a single draft slot. Starting a
-  fresh session while a draft exists either resumes that draft or requires
-  discarding it first (the app does not silently drop draft data).
+  returns much later: the pending draft is restored intact. (Forward-looking
+  note, not testable in this slice: once a history view exists in a later
+  spec, an un-submitted draft must not appear in it — it is not a Session.)
+- Two pending drafts cannot exist: there is a single draft slot. Opening the
+  logging form while a draft exists always restores that draft; there is no
+  separate "start fresh" action that competes with it. To begin a new,
+  empty session the user discards the draft first — the app never silently
+  drops draft data.
+- Confirming a set that is still invalid per FR-019 (no volume, and Load is
+  None or unset) stores nothing: the confirm action is a silent no-op, or
+  the confirm control is unavailable, until the set has a volume or a
+  non-None load.
+- Two overlapping 5-second undo windows: a set is individually deleted, and
+  before its own undo window elapses the containing block is deleted too.
+  Block-undo restores the block to exactly its state at the moment of block
+  deletion — the already-deleted set stays deleted, keeping whatever is left
+  of its own independent undo window.
+- The user merges or deletes (with cascade) a catalogue exercise that is
+  referenced by an exercise entry in the current unsubmitted draft: the
+  draft entry is rewritten in place — repointed to the survivor on merge,
+  or removed with its in-progress sets on cascade delete.
 - A set with neither load nor volume entered is not stored — a set needs at
   least one of the two, and `Load: None` does not satisfy "load present"
   (FR-019, `docs/requirements.md` §3.3).
@@ -330,10 +392,12 @@ result — independently verifiable without blocks, load types, or effort.
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST let the user start a new session, creating it
-  with a date-time of the moment the logging form is opened. The user MUST
-  be able to edit that date-time. There is no open/closed session state and
-  no auto-resume of a prior session.
+- **FR-001**: There is a single "open the logging form" action. When no
+  pending draft exists it MUST create a new session with a date-time of that
+  moment; when a pending draft exists it MUST restore that draft (FR-024)
+  and MUST NOT also start a competing session. The user MUST be able to edit
+  the session's date-time. There is no open/closed session state and no
+  auto-resume of a previously submitted session.
 - **FR-002**: The system MUST let the user add an exercise via a catalogue
   search that surfaces the most-used and most-recently-used exercises first,
   and MUST let the user create a new exercise from that same search field.
@@ -357,7 +421,8 @@ result — independently verifiable without blocks, load types, or effort.
   (e.g. "Block 2"), never as "Untitled" or blank.
 - **FR-008**: The system MUST pre-fill a new set for an exercise with the
   previous set's load and volume for that same exercise, so confirming an
-  identical set is a single tap.
+  identical set is a single tap. Effort is deliberately NOT carried forward
+  — it is re-entered or left blank on each set.
 - **FR-009**: The system MUST let the user choose a load type per exercise
   (Weight, Band, Bodyweight, Free text, or None), remember it as that
   exercise's default, and allow overriding it per individual set.
@@ -375,24 +440,31 @@ result — independently verifiable without blocks, load types, or effort.
 - **FR-014**: The system MUST support an optional signed added/assisted load
   component on a Bodyweight load (e.g. `+10 kg` added, `−20 kg` assisted),
   with its unit; the assisted component is negative by design
-  (`docs/requirements.md` §3.2).
+  (`docs/requirements.md` §3.2). The signed value MUST be capped to the
+  range −300 kg to +300 kg, and a value of exactly 0 MUST be treated as "no
+  component" rather than a distinct stored value.
 - **FR-015**: The system MUST support fully custom exercise names with no
   closed list, and MUST honor per-exercise aliases in search.
 - **FR-016**: Exercise search MUST be case- and accent-insensitive and
   tolerant of typos and partial matches.
 - **FR-017**: The system MUST let the user merge two catalogue exercises.
-  The user chooses which name becomes canonical (the other becomes an
-  alias); the surviving exercise's own defaults (load type, movement
-  pattern, unilateral flag) are kept without a field-by-field prompt; every
-  set from both is reassigned to the survivor. The merge requires explicit
-  confirmation and is not undoable.
+  The user chooses which of the two names is canonical; that exercise is the
+  survivor — its name and its own defaults (load type, movement pattern,
+  unilateral flag) are kept, with no field-by-field prompt. The other
+  exercise contributes its name as an alias of the survivor and its sets;
+  every set from both is reassigned to the survivor. The merge requires
+  explicit confirmation and is not undoable.
 - **FR-018**: The system MUST require explicit confirmation before deleting
   a catalogue exercise that has recorded history, and MUST offer merging as
-  an alternative in that confirmation.
+  an alternative in that confirmation. If the user confirms the deletion,
+  the exercise and every historical exercise entry and set that references
+  it MUST be removed (cascade).
 - **FR-019**: A set with neither load nor volume recorded MUST NOT be
   stored; a set with either one present MUST be stored. `Load: None` does
   NOT count as "load present" for this rule — a set with `Load: None` and no
-  volume MUST NOT be stored (per `docs/requirements.md` §3.3).
+  volume MUST NOT be stored (per `docs/requirements.md` §3.3). Confirming
+  such a set MUST store nothing: the confirm action is a silent no-op, or
+  the confirm control is unavailable, until the set is valid.
 - **FR-020**: Renaming a catalogue exercise MUST NOT change what any past
   set refers to — references are by identifier, never by name.
 - **FR-021**: The system MUST allow more than one session per calendar day,
@@ -401,15 +473,24 @@ result — independently verifiable without blocks, load types, or effort.
 - **FR-022**: When the user renames an exercise to a name or alias already
   used by a different exercise, the system MUST detect the collision and
   offer to merge the two exercises, rather than rejecting the rename
-  silently or creating two exercises with the same name.
+  silently or creating two exercises with the same name. If the user
+  declines the merge, the rename MUST be cancelled and the exercise MUST
+  keep its previous name.
 - **FR-023**: Deleting a block MUST cascade to its exercise entries and
   their sets; the 5-second undo (FR-004) MUST restore the block together
-  with those sets. A session with zero blocks MUST be a valid state.
+  with those sets, in the state they were in at deletion time. A session
+  with zero blocks MUST be a valid state. Where a set inside the block was
+  already within its own pending-delete undo window, block-undo MUST NOT
+  resurrect that set — the two undo timers are independent.
 - **FR-024**: If the user opens the logging form and leaves without
   submitting, the system MUST retain their input as a single pending draft
-  — a state of the logging screen, not a stored Session. Reopening the form
-  MUST restore that draft. Cancelling the session MUST discard the draft
-  and its data. At most one pending draft exists at a time.
+  — a state of the logging screen, not a stored Session, but still held in
+  durable on-device storage so it survives an app close, background, or
+  kill. Opening the logging form MUST restore that draft. Discarding the
+  draft MUST remove it and its data. At most one pending draft exists at a
+  time. A catalogue merge or cascade-delete (FR-017, FR-018) that affects
+  an exercise referenced by the draft MUST rewrite the draft in place
+  (repoint on merge; remove the entry and its in-progress sets on delete).
 - **FR-025**: When the user confirms a set, the system MUST ignore an
   identical confirmation repeated within a short debounce window (~1
   second); a subsequent identical set confirmed after that window MUST be
@@ -427,11 +508,20 @@ result — independently verifiable without blocks, load types, or effort.
 - **Logging draft**: the not-yet-submitted state of the logging screen —
   the in-progress session content a user left behind without submitting.
   There is at most one. It is UI/session-state, **not** a persisted Session
-  entity, though it MUST survive an app close (FR-024). It becomes a Session
-  only on submit; cancelling discards it.
+  entity — it does not appear where a Session would and it is not a
+  canonical record. It becomes a Session only on submit; discarding it from
+  the logging form removes it. "Not a Session" does not mean "not stored":
+  because it MUST
+  survive an app close, background, or OS kill (FR-024, FR-005), it needs a
+  durable on-device representation. That representation's shape (an
+  in-progress date-time, partial blocks/entries/sets, load-type selections)
+  is not part of the schema version and evolves independently of it —
+  losing a draft to a format change is a UX regression, not history loss.
 - **Block**: an ordered grouping within a session — optional name, a type
   (straight sets / superset / circuit), and an ordered list of exercise
-  entries. Deleting it cascades to its contents (FR-023).
+  entries. The type is a label in this slice; it imposes no cardinality
+  rule (a superset block with one exercise is valid). Deleting a block
+  cascades to its contents (FR-023).
 - **Exercise entry**: a reference to a catalogue exercise plus its order
   within the block, its notes, and its sets.
 - **Set**: one performed unit of work — a Volume (reps, duration, or
@@ -467,9 +557,10 @@ result — independently verifiable without blocks, load types, or effort.
   exercise entry, block — including a block with recorded sets) remains
   reversible for at least 5 seconds; merging exercises is the one catalogue
   action that is deliberately irreversible and is confirmed as such.
-- **SC-006**: A user who has never used the app before can complete their
-  first full session (at least one block, one exercise, three sets) without
-  external help or documentation, starting from the seeded catalogue.
+- **SC-006**: In a first-use test with at least 8 participants who have
+  never seen the app, at least 8 of 10 (≥ 80%) complete a full first
+  session (at least one block, one exercise, three sets) with no external
+  help or documentation, starting from the seeded catalogue.
 - **SC-007**: A user who opens the logging form, enters at least one full
   set's data, closes the app, and reopens it later finds their in-progress
   draft intact in 100% of tested cases.
