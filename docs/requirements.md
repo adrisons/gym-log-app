@@ -110,7 +110,10 @@ One vocabulary, used identically in code, UI and documentation.
   merge entries. A custom name is free text set by the user — e.g. "hip
   thrust con barra" and "hip thrust en máquina" are two distinct entries
   (or one entry with the other as an alias) at the user's choice, never
-  forced into a fixed list (FR-5).
+  forced into a fixed list (FR-5). The catalogue is not empty on a fresh
+  install: the app ships a seed set of common strength exercises (D9,
+  ADR-0005), which behave as ordinary entries thereafter — renameable,
+  mergeable, deletable.
 - **Session.** A training record: a date-time, an ordered list of blocks,
   free-form notes, optional overall feeling, optional duration. The date-time
   is set when the session is created (the moment the logging form is opened)
@@ -456,6 +459,7 @@ before code.
 | D6 | Multiple sessions per day, and session lifecycle | **Closed** for FR-1 to FR-5: multiple sessions per day are allowed and each is fully independent. A session has no open/closed state — its date-time is fixed at creation (when the logging form opens, user-editable) and there is no auto-resume; an unsubmitted form is kept as a single UI draft, not a Session. → `specs/001-log-a-session/spec.md` Clarifications |
 | D7 | Whether FR-13 (templates) is v1 or v1.1 | **Closed:** v1.1, to keep the logging critical path clean. |
 | D8 | Which exercise disciplines beyond Strength (§1.4) are in scope, and when | **Closed:** MVP and v1 ship Strength only; swimming (distance + time, no load) is the first documented candidate for a second discipline, deferred to v1.1 or later pending its own recorded decision — it must not be designed into the schema now, only kept representable (§1.4). |
+| D9 | Whether the app ships a seed exercise catalogue | **Closed:** yes — a seed set of common strength exercises is present from first launch so there is no empty state on the logging critical path; seed entries are ordinary editable catalogue entries and the list is app-bundle data, not persisted schema. → ADR-0005 |
 
 ---
 
