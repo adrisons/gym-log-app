@@ -50,15 +50,26 @@
 
 ## Notes
 
-- This spec targets build Phase 0 (`docs/requirements.md` §9;
-  `docs/agent-brief.md` §3), stated in the header per the constitution's
+- This spec targets build Phase 0 (`docs/agent-brief.md` §3; MVP scope is
+  `docs/requirements.md` §9), stated in the header per the constitution's
   Development Workflow requirement that every spec name its phase.
 - The `/speckit-plan` that follows is where concrete technology is chosen
-  for the first time in this project, and per `AGENTS.md` / the
-  constitution's Escalation section those choices are confirmed with the
-  project owner before the plan's tasks are implemented. FR-013 makes that
-  confirmation a traceable requirement.
-- Ready for `spec-reviewer` review, then `/speckit-clarify` if that surfaces
-  anything, then `/speckit-plan`. `schema-guardian` is not needed: this spec
-  introduces no domain entity or persisted field (the storage-port fake
-  implements an interface ADR-0002 already fixed).
+  for the first time in this project. Per `AGENTS.md` / the constitution's
+  Escalation section those choices are confirmed with the project owner
+  before the plan's tasks are implemented; this is recorded as a constraint
+  on the plan phase (Assumptions), not an FR of this spec, because it cannot
+  be checked at spec time.
+- `spec-reviewer` was run once (2026-09-10) and returned 18 findings; all
+  are resolved in this spec: design-token FRs now bind to `docs/design.md`
+  §3.1's canonical role set plus radii/durations/easings/spacing (FR-018/19)
+  and add the interactive-state convention (FR-024); the layer map records
+  `presentation/design/` and an enumerable forbidden-edge list checked
+  against the enforced config (FR-009, SC-003); branch protection is now an
+  FR (FR-002); CI invokes the documented commands (FR-003); zero-test runs
+  fail the gate (FR-004, FR-021); `docs/stack.md` adds build tool and
+  service worker and lists date/time + fuzzy-search as deferred (FR-010);
+  the storage **port interface** is an explicit Phase 0 artifact that
+  Phase 1 owns (FR-013). `schema-guardian` is not needed: no domain entity
+  or persisted field is introduced.
+- Ready for `/speckit-clarify` if anything remains open, then
+  `/speckit-plan`.

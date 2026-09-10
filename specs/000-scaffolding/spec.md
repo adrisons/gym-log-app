@@ -6,8 +6,8 @@
 
 **Status**: Draft
 
-**Targets build phase**: Phase 0 — precedes MVP (`docs/requirements.md` §9;
-`docs/agent-brief.md` §3 Phase 0)
+**Targets build phase**: Phase 0 — the scaffolding phase that precedes MVP
+(`docs/agent-brief.md` §3 Phase 0; MVP scope is `docs/requirements.md` §9)
 
 **Input**: User description: "The Phase 0 deliverable from docs/agent-brief.md §1 and §3 — the documentation scaffolding and the CI/quality gate that MUST exist before any product code. Not a user-facing feature; its users are the developers and agents building the project, and its acceptance criteria are verifiable properties of the repository."
 
@@ -131,9 +131,10 @@ runner; run a second throwaway test through the integration harness.
 
 **Acceptance Scenarios**:
 
-1. **Given** the storage port interface from ADR-0002, **When** a test
-   imports the in-memory fake, **Then** the fake satisfies that interface
-   and needs no real File System Access API or IndexedDB.
+1. **Given** the `application`-layer storage port interface (FR-013,
+   written per ADR-0002), **When** a test imports the in-memory fake,
+   **Then** the fake satisfies that interface and needs no real File System
+   Access API or IndexedDB.
 2. **Given** the shared doubles, **When** a developer looks for them,
    **Then** they are in one documented location, not scattered or
    duplicated per test file.
@@ -168,21 +169,24 @@ reading the file.
 
 **Acceptance Scenarios**:
 
-1. **Given** the concern list (PWA framework, state, storage adapter A,
-   storage adapter B, charts, navigation, test runner, lint, formatting),
-   **When** a developer reads `docs/stack.md`, **Then** each concern names
-   exactly one tool — none missing, none with two.
+1. **Given** the concern list (PWA framework, build tool / bundler, state,
+   service worker / offline precache, storage helper for the File System
+   Access API, storage helper for IndexedDB, charts, navigation, test
+   runner, lint, formatting), **When** a developer reads `docs/stack.md`,
+   **Then** each concern names exactly one tool or an explicit "none, …" —
+   none missing, none with two.
 2. **Given** `docs/stack.md`, **When** a developer looks for the boundary,
    **Then** it contains an explicit list of what may not be added without an
    ADR.
 3. **Given** ADR-0002 (one storage port, two adapters — File System Access
    API and IndexedDB), **When** a developer reads the storage section of
-   `docs/stack.md`, **Then** it is consistent with ADR-0002 and does not
-   contradict it.
-4. **Given** the constitution's rule that concrete technology choices are
-   confirmed with the project owner, **When** `docs/stack.md` is filled in,
-   **Then** the choices it records were confirmed with the owner before
-   landing (recorded in the `/speckit-plan` for this spec).
+   `docs/stack.md`, **Then** it names helper libraries only (or "none,
+   hand-written"), is consistent with ADR-0002, and does not imply the
+   adapter code is built in Phase 0.
+4. **Given** concerns a later phase needs but Phase 0 does not (date/time
+   handling, fuzzy search), **When** a developer reads `docs/stack.md`,
+   **Then** each is listed with an explicit "deferred to the Phase N spec"
+   note rather than omitted.
 
 ---
 
@@ -216,18 +220,35 @@ confirm it passes.
    light-theme and a dark-theme context, **Then** it takes its visual
    values from the tokens in both, with no literal colour at the use site
    (constitution Principle V; `docs/development-principles.md` §5).
+5. **Given** `docs/design.md` §3.1, **When** a developer inspects the
+   design-token module, **Then** it defines every colour role in that
+   section's canonical set (Canvas; Surface / surface-raised; Foreground /
+   foreground-muted / foreground-subtle; Border / border-strong; Accent /
+   accent-foreground; Focus ring; Danger / warning / success) for both
+   themes, plus a token category for radii, durations, easings, and spacing
+   (`docs/design.md` §1.2) — no role or category absent.
+6. **Given** the constitution's Definition-of-Done rule that every
+   interactive element ships all of its states, **When** a developer reads
+   `docs/testing.md` (or `docs/architecture.md`), **Then** the six required
+   states (rest, hover, pressed, focus-visible, disabled-with-reason,
+   loading) are stated as a convention every later phase's interactive
+   elements must follow, and the Focus ring token exists to support the
+   focus-visible state.
 
 ---
 
 ### Edge Cases
 
 - **CI gate on the default branch itself**: the gate runs on pull requests
-  into the default branch; a push directly to the default branch that
-  bypasses a PR is out of normal flow, but the gate configuration should
-  still run on the default branch so a bypass is caught after the fact.
+  into the default branch AND on pushes to it, and the default branch is
+  configured to require the gate's checks to pass before a merge, so a red
+  gate actually blocks the merge and a direct-push bypass is still caught.
 - **A check tool is missing or misconfigured in CI** (e.g. the linter is not
   installed on the runner): this is a red gate, not a silently-skipped
   check — an absent check is treated as a failing check.
+- **The test job collects zero tests** (a misconfigured runner, a broken
+  glob): treated as a failing check, not a pass — the same silent-pass
+  failure mode as a missing tool.
 - **The boundary rule has a gap** (a forbidden import path it does not
   catch): the Phase 0 verification deliberately tries each forbidden
   direction, direct and via a barrel, precisely to find such a gap before
@@ -236,13 +257,25 @@ confirm it passes.
   business concept (`docs/agent-brief.md` §2); the boundary rule must define
   what `shared` may import (nothing from `domain`, `application`,
   `infrastructure`, or `presentation`) so it cannot become a backdoor
-  between layers.
+  between layers, and that restriction is enforced through a barrel/index
+  path as well as a direct one.
+- **The design sub-layer**: `presentation/design/` (tokens, primitives,
+  compositions, root — `docs/agent-brief.md` §2) is where the design-token
+  module lives. `docs/architecture.md` records it as a sub-layer of
+  `presentation`, and the boundary rule governs it: `design/` may be
+  imported by the rest of `presentation` but must not import from
+  `application`, `infrastructure`, or `domain`.
 - **A concern in `docs/stack.md` legitimately needs no tool** (e.g. the
   project decides navigation is handled without a dedicated library): the
   entry is still explicit — "none, handled by X" — never blank.
+- **A concern is known but deferred to a later phase** (date/time handling,
+  fuzzy search): `docs/stack.md` lists it with an explicit "deferred to the
+  spec for Phase N" note rather than omitting it, so a later addition is a
+  filled-in reservation, not a surprise escalation.
 - **Design tokens exist but a value is undecided**: a token may carry a
-  provisional value, but every token in the set is named and present; a
-  missing token, not a provisional value, is the failure.
+  provisional value, but every role and category in the expected set
+  (`docs/design.md` §3.1 roles + radii/durations/easings/spacing) is named
+  and present; a missing token, not a provisional value, is the failure.
 - **`docs/architecture.md` and the enforced rule drift apart later**: any
   change to the layer map updates both the document and the enforcement
   configuration in the same change (constitution, Definition of Done —
@@ -258,13 +291,20 @@ confirm it passes.
   framework, or vendor name belongs in this spec.
 - **Any domain entity, value object, or rule.** Session, Block, Set, Load,
   Volume, Effort and the computation rules (`docs/requirements.md` §3, §5)
-  are Phase 1. Phase 0 defines the port interface shape only insofar as
-  ADR-0002 already fixes it, and builds its in-memory fake — no real domain
-  logic.
-- **Any real storage adapter.** The File System Access API and IndexedDB
-  adapters, the schema version, and migrate/refuse behaviour are Phase 2.
-  Phase 0 delivers only the in-memory fake and the shared contract's
-  test scaffolding.
+  are Phase 1 — no real domain logic here. Phase 0 DOES write the storage
+  **port interface** in the `application` layer, stated in domain terms
+  per ADR-0002 (e.g. save a session, load sessions in a range), because
+  the in-memory fake (FR-014) and the integration harness (FR-016) need a
+  concrete interface to satisfy and wire. Phase 1 owns that interface
+  thereafter and MAY reshape it as the domain takes form; Phase 0 only
+  establishes a first version and its fake.
+- **Any real storage adapter.** The `infrastructure` adapters for the File
+  System Access API and for IndexedDB, the schema version, and
+  migrate/refuse behaviour are Phase 2. Phase 0 delivers only the port
+  interface, its in-memory fake, and the shared contract's test
+  scaffolding. In `docs/stack.md`, the storage entries name any helper
+  *library* per adapter (or "none, hand-written") — they do not imply the
+  adapter code is built in Phase 0.
 - **Any screen or UI beyond a placeholder.** The logging screen and every
   other screen are Phase 3+. Phase 0's app is an empty shell.
 - **The seed catalogue contents.** ADR-0005's seed exercise list is a later
@@ -281,18 +321,21 @@ confirm it passes.
 
 ### Functional Requirements
 
-- **FR-001**: The repository MUST provide a CI pipeline that runs, on every
-  pull request, a type check, the test suite, and a lint check, and reports
-  a combined failure if any of the three fails.
-- **FR-002**: A pull request whose combined gate is failing MUST NOT be
-  mergeable into the default branch; a passing gate is a precondition for
-  merge.
-- **FR-003**: The type check, test, and lint commands MUST be runnable
-  locally with the same result they produce in CI, and MUST be documented
-  (in `README.md` or a doc it links) so a developer can run them without
-  reading the CI configuration.
-- **FR-004**: A missing or misconfigured check tool in CI MUST surface as a
-  failing gate, never as a skipped or silently-passing check.
+- **FR-001**: The repository MUST provide a CI pipeline that runs a type
+  check, the test suite, and a lint check on every pull request and on every
+  push to the default branch. The gate is green only if all three checks are
+  green ("combined"); it is red if any one of them is red.
+- **FR-002**: The default branch MUST be configured to require the gate's
+  three checks to pass before a change can be merged, so a red gate actually
+  blocks the merge (not merely reports).
+- **FR-003**: The type check, test, and lint commands MUST be documented (in
+  `README.md` or a doc it links). CI MUST invoke those same documented
+  commands — not merely the same tools — so a developer running them locally
+  gets the same pass/fail outcome CI does, with no "passes locally, fails in
+  CI" gap for these three checks.
+- **FR-004**: A missing or misconfigured check tool in CI, or a test run
+  that collects zero tests, MUST surface as a failing gate, never as a
+  skipped or silently-passing check.
 - **FR-005**: The repository MUST enforce the dependency-inward layer rule
   (constitution Principle V; `docs/development-principles.md` §3)
   mechanically, such that an import from an outer layer into code that
@@ -301,32 +344,43 @@ confirm it passes.
   written as a direct path or routed through a barrel/index file.
 - **FR-007**: The layer rule MUST define and enforce what the `shared` layer
   may import (nothing from `domain`, `application`, `infrastructure`, or
-  `presentation`).
+  `presentation`), and that restriction MUST hold through a barrel/index
+  path as well as a direct import, the same as FR-006.
 - **FR-008**: Phase 0 completion MUST be verified by adding a deliberate
   illegal import for each forbidden direction — direct and via a barrel —
   confirming the build fails for each, and then removing them.
 - **FR-009**: The repository MUST contain `docs/architecture.md` stating the
-  layer map (`domain` / `application` / `infrastructure` / `presentation` /
-  `shared`) and the dependency-inward rule, and the enforced configuration
-  MUST match that document.
+  layer map (`domain` / `application` / `infrastructure` / `presentation`,
+  with `presentation/design/` as a sub-layer, plus `shared`) and the
+  dependency-inward rule. The document MUST list the forbidden import edges
+  in a fixed, enumerable form (e.g. a table: source layer → forbidden
+  target), and the enforced configuration MUST cover exactly that set — a
+  test or check compares the enforced edges against the documented set and
+  fails on any difference.
 - **FR-010**: The repository MUST contain `docs/stack.md` naming exactly one
-  tool for each of: PWA framework, state management, storage adapter for the
-  File System Access API, storage adapter for IndexedDB, charts, navigation,
-  test runner, lint, and formatting — with no concern left blank (an
-  explicit "none, handled by X" is permitted; a blank is not).
+  tool for each of: PWA framework, build tool / bundler, state management,
+  service worker / offline app-shell precache, storage helper for the File
+  System Access API, storage helper for IndexedDB, charts, navigation, test
+  runner, lint, and formatting — with no concern left blank (an explicit
+  "none, hand-written" or "none, handled by X" is permitted; a blank is
+  not). Concerns known to be needed by a later phase but not Phase 0
+  (date/time handling, fuzzy search) MUST be listed with an explicit
+  "deferred to the Phase N spec" note rather than omitted.
 - **FR-011**: `docs/stack.md` MUST contain an explicit list of additions
   that require an ADR before they may be introduced (constitution,
   Escalation; "one dependency per concern").
 - **FR-012**: `docs/stack.md` MUST be consistent with ADR-0002 (one storage
   port; two adapters — File System Access API and IndexedDB — selected at
-  runtime).
-- **FR-013**: The technology choices recorded in `docs/stack.md` MUST have
-  been confirmed with the project owner before landing, and that
-  confirmation MUST be traceable (recorded in the `/speckit-plan` for this
-  spec).
-- **FR-014**: The repository MUST provide an in-memory fake of the storage
-  port defined by ADR-0002, satisfying the same interface, usable in tests
-  with no real File System Access API or IndexedDB.
+  runtime). The storage entries name helper libraries only; the adapter
+  code itself is Phase 2.
+- **FR-013**: The repository MUST provide the `application`-layer storage
+  **port interface**, expressed in domain terms per ADR-0002 (e.g. save a
+  session, load sessions in a date range). It is a first version that
+  Phase 1 owns and may reshape; Phase 0 does not add domain logic behind
+  it.
+- **FR-014**: The repository MUST provide an in-memory fake that satisfies
+  the FR-013 port interface, usable in tests with no real File System Access
+  API or IndexedDB.
 - **FR-015**: The shared test doubles MUST live in one documented location
   and be importable from there; tests MUST NOT need to define their own copy
   of a shared double.
@@ -336,42 +390,64 @@ confirm it passes.
 - **FR-017**: The repository MUST contain `docs/testing.md` describing the
   test pyramid, naming the shared doubles and their location, and showing
   how a test is written in this project.
-- **FR-018**: The repository MUST provide a design-token module defining
-  tokens for both a light and a dark theme, present from the first commit of
-  the app shell (constitution Principle V); colours MUST be named by role,
-  not by hue.
-- **FR-019**: Every token in the design-token set MUST be named and present;
-  a token MAY carry a provisional value, but no token may be absent.
+- **FR-018**: The repository MUST provide a design-token module, present
+  from the first commit of the app shell (constitution Principle V), that
+  defines — for both a light and a dark theme — every colour role in
+  `docs/design.md` §3.1's canonical set (Canvas; Surface / surface-raised;
+  Foreground / foreground-muted / foreground-subtle; Border / border-strong;
+  Accent / accent-foreground; Focus ring; Danger / warning / success), plus
+  a token category for radii, durations, easings, and spacing
+  (`docs/design.md` §1.2). Colours are consumed by role name, never by hue.
+- **FR-019**: Every role and category in the FR-018 expected set MUST be
+  named and present in the module; a token MAY carry a provisional value,
+  but no role or category may be absent. This expected set is the check for
+  "a token is missing".
 - **FR-020**: The repository MUST provide an app shell that launches via a
   documented start command and serves a placeholder view, containing no
   domain entity, no persistence call, and no screen beyond the placeholder.
 - **FR-021**: The repository MUST provide a smoke test that confirms the app
-  shell renders its entry point, and that smoke test MUST run under the same
-  test runner named in `docs/stack.md` and be part of the CI test check.
+  shell renders its entry point; it MUST run under the test runner named in
+  `docs/stack.md` and be part of the CI test check. The CI test job MUST
+  therefore never be a zero-test run in Phase 0.
 - **FR-022**: The placeholder view MUST take its visual values from the
   design tokens in both light and dark contexts, with no literal colour at
   the use site (`docs/development-principles.md` §5).
 - **FR-023**: Any later change to the layer map MUST update both
-  `docs/architecture.md` and the enforcement configuration in the same
-  change (constitution, Definition of Done).
+  `docs/architecture.md` (including its forbidden-edge list, FR-009) and the
+  enforcement configuration in the same change (constitution, Definition of
+  Done).
+- **FR-024**: `docs/testing.md` (or `docs/architecture.md`) MUST state, as a
+  convention every later phase follows, that each interactive element ships
+  all six of its states — rest, hover, pressed, focus-visible,
+  disabled-with-a-stated-reason, loading (constitution, Definition of Done)
+  — and note that the Focus ring token (FR-018) exists to serve the
+  focus-visible state. Phase 0 builds no interactive element itself.
 
 ### Key Entities *(artifacts this spec governs)*
 
 - **`docs/stack.md`**: the single record of one-tool-per-concern plus the
   "not without an ADR" boundary. Consistent with ADR-0002 on storage.
-- **`docs/architecture.md`**: the layer map and dependency-inward rule, in
-  prose, kept in lockstep with the enforced configuration.
+- **`docs/architecture.md`**: the layer map (`domain` / `application` /
+  `infrastructure` / `presentation` with `presentation/design/` sub-layer,
+  plus `shared`), the dependency-inward rule, and an enumerable
+  forbidden-edge list kept in lockstep with the enforced configuration.
+- **Storage port interface** (`application` layer): a first version of the
+  domain-term persistence interface per ADR-0002; owned by Phase 1
+  thereafter.
 - **`docs/testing.md`**: the test pyramid, the shared doubles and their
   location, and the "how a test is written here" guide.
-- **CI pipeline definition**: runs typecheck + test + lint on every PR;
-  combined red on any failure or missing tool; blocks merge when red.
+- **CI pipeline definition**: runs typecheck + test + lint on every PR and
+  every push to the default branch; green only if all three are green; red
+  on any failure, missing tool, or zero-test run; the default branch
+  requires these checks so a red gate blocks the merge.
 - **Boundary-lint configuration**: mechanical enforcement of the layer map,
   including barrel-path coverage and the `shared`-layer import rule.
 - **In-memory storage-port fake**: satisfies the ADR-0002 port interface;
   the test-only implementation used by Phases 1–3.
 - **Integration-test harness**: the standard composition wiring with fakes
   substituted, reusable across integration tests.
-- **Design-token module**: named tokens for light and dark themes, roles not
+- **Design-token module**: every `docs/design.md` §3.1 colour role plus
+  radii/durations/easings/spacing categories, light and dark, roles not
   hues, complete set from day one.
 - **App shell + smoke test**: an empty launching app and a test that
   confirms it comes up; the attach point for Phase 3.
@@ -386,31 +462,36 @@ confirm it passes.
 - **SC-002**: A deliberate illegal import fails the build in 100% of the
   forbidden directions tried, tested both as a direct import and via a
   barrel file, and a legal import passes.
-- **SC-003**: The layer map in `docs/architecture.md` and the enforced
-  configuration describe the same rule, verified by inspection with zero
-  discrepancies.
-- **SC-004**: `docs/stack.md` names exactly one tool for 100% of the listed
-  concerns (0 blank, 0 doubled) and contains the "not without an ADR" list.
+- **SC-003**: The forbidden-edge list in `docs/architecture.md` and the set
+  of edges the enforcement configuration actually rejects are identical — a
+  check compares them and reports zero difference.
+- **SC-004**: `docs/stack.md` names exactly one tool (or an explicit "none,
+  …" / "deferred to Phase N") for 100% of the listed concerns — 0 blank, 0
+  doubled — and contains the "not without an ADR" list.
 - **SC-005**: A test can store and read back a value through the in-memory
-  storage-port fake with no real storage API present, and a second test runs
-  through the integration harness — both green under the project test
-  runner.
-- **SC-006**: From a clean clone, following only the documented setup and
-  start commands, the app launches and serves a placeholder, and the smoke
-  test passes — reproduced by someone who did not set up the repository.
+  fake of the FR-013 port with no real storage API present, and a second
+  test runs through the integration harness — both green under the project
+  test runner.
+- **SC-006**: A clean clone plus only the commands written in the setup doc
+  is sufficient to launch the app to a placeholder and pass the smoke test —
+  no undocumented step is required (verified by following the doc verbatim).
 - **SC-007**: The placeholder renders correctly in both light and dark theme
   contexts drawing only on design tokens; a grep for literal colour values
-  outside the token module returns nothing.
+  outside the token module returns nothing, and every FR-018 role/category
+  is present in the module.
 - **SC-008**: `docs/stack.md`, `docs/architecture.md`, and `docs/testing.md`
-  all exist and each covers the content required by its FRs — verified by a
-  checklist review.
+  all exist and each covers the content required by its FRs (FR-009..FR-012,
+  FR-017, FR-024) — verified by a checklist review.
 
 ## Assumptions
 
 - **`/speckit-plan` chooses the tools.** This spec assumes the immediately
-  following `/speckit-plan` selects every concrete tool for `docs/stack.md`
-  and that those choices are confirmed with the project owner before the
-  plan's tasks are implemented (`AGENTS.md`; constitution, Escalation).
+  following `/speckit-plan` selects every concrete tool for `docs/stack.md`.
+  Per `AGENTS.md` and the constitution's Escalation section, each of those
+  choices MUST be confirmed with the project owner before the plan's tasks
+  are implemented, and that confirmation MUST be recorded in the plan (this
+  is a constraint on the plan phase, not a property of this spec that can be
+  checked at spec time).
 - **Default branch and PR flow.** The project uses a pull-request workflow
   into a default branch (trunk-based development, per the
   `commit-and-pr-conventions` skill); the CI gate attaches to that flow.
