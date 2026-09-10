@@ -99,9 +99,13 @@ no feature surface.
 | IV. External Dependencies Behind Ports | The storage port interface is written in `application` in domain terms (FR-013); its only Phase 0 implementation is the in-memory fake (FR-014). No other external dependency is reached from domain/application. Composition happens in exactly one root. | PASS |
 | V. Dependency-Inward Layering | `docs/architecture.md` records the layer map incl. `presentation/design/`; `eslint-plugin-boundaries` enforces it and is verified with deliberate illegal imports, direct and via barrel (FR-008). Design tokens are the only visual-value source, light + dark from the first shell commit (FR-018). | PASS |
 | VI. Deterministic, Traceable Insights | No insights in Phase 0. Charts library is named but unused. | PASS (n/a) |
-| Escalation — concrete technology choices | This is the sanctioned phase for them. Every choice is listed in research.md for owner approval before tasks run (spec Assumptions). No outbound call, no online-only feature, no second library for a covered concern, no schema change. | PASS, pending owner sign-off on the stack |
+| Escalation — concrete technology choices | This is the sanctioned phase for them. Every choice is listed in research.md; the project owner approved the full stack as proposed on 2026-09-10 (recorded here per the Assumptions constraint). No outbound call, no online-only feature, no second library for a covered concern, no schema change. | PASS |
 
 No violations. Complexity Tracking table is empty.
+
+**Owner sign-off**: the project owner approved every tool in
+[research.md](./research.md) as proposed on 2026-09-10, with no changes.
+`docs/stack.md` is written to match.
 
 ## Project Structure
 
