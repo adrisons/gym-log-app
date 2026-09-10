@@ -94,10 +94,11 @@ everything the five stories build on.
       `application-ports` (`src/application/ports/*`), `infrastructure`,
       `presentation`, `presentation-design` (`src/presentation/design/*`),
       `shared`, and `composition-root` (`src/presentation/main.tsx`).
-- [ ] T010 In `eslint.config.js`, add the `boundaries/element-types` rule
-      encoding the forbidden-edge table from data-model.md §3 exactly:
-      `domain` → nothing internal; `application` → `domain` only;
-      `infrastructure` → `application` + `domain`; `presentation` →
+- [ ] T010 In `eslint.config.js`, add the `boundaries/element-types` rule,
+      building its options from the shared `eslint.boundaries.js` module
+      (see T024) which encodes the forbidden-edge table from data-model.md
+      §3 exactly: `domain` → nothing internal; `application` → `domain`
+      only; `infrastructure` → `application` + `domain`; `presentation` →
       `application` + `presentation-design`; `presentation-design` →
       nothing internal; `shared` → nothing internal; `composition-root` →
       all. Default `disallow`.
@@ -123,8 +124,10 @@ everything the five stories build on.
       setup-node 20 with cache, `npm ci`, then `npm run typecheck`,
       `npm run lint`, `npm run test:unit`, `npx playwright install --with-deps`
       + `npm run test:e2e`. Fail the job if any step fails. Do NOT use
-      `continue-on-error`. Add a `--reporter` that fails on zero collected
-      tests, or a guard step asserting Vitest collected > 0 tests (FR-004).
+      `continue-on-error`. Run Vitest with `--passWithNoTests=false` (its
+      real flag — a zero-test collection then fails the step) to satisfy
+      FR-004's zero-test case; set it in the `test:unit` script or
+      `vite.config.ts` test config. (A1 from /speckit-analyze)
 - [ ] T016 Document the checks in `README.md`: a "Development" section
       listing the exact commands from T008 and stating CI runs the same
       ones (FR-003). Note Node 20, `npm ci`, `npm run dev`.
@@ -201,12 +204,14 @@ drift between doc and config.
 - [ ] T023 [US2] In `docs/architecture.md`, add the **forbidden-edge table**
       verbatim from data-model.md §3 (source layer → MUST NOT import), as
       the enumerable form the enforcement is checked against. (FR-009)
-- [ ] T024 [P] [US2] Create `test/boundaries/edge-set.test.ts` — a Vitest
-      test that reads the `boundaries/element-types` config from
-      `eslint.config.js` (import it) and asserts the set of disallowed
-      (from, to) pairs it produces equals the forbidden-edge set declared in
-      a small fixture that mirrors `docs/architecture.md`'s table; fail on
-      any difference. (FR-009, SC-003)
+- [ ] T024 [P] [US2] Extract the layer matrix into a shared module
+      `eslint.boundaries.js` (exports the allowed-import map / forbidden-edge
+      list as plain data); `eslint.config.js` (T010) imports it to build the
+      `boundaries/element-types` options, so config and doc-check read one
+      source. Then create `test/boundaries/edge-set.test.ts` — a Vitest test
+      that imports `eslint.boundaries.js` and asserts its forbidden-edge set
+      equals a fixture mirroring `docs/architecture.md`'s table exactly;
+      fail on any difference. (FR-009, SC-003; U1 from /speckit-analyze)
 - [ ] T025 [US2] Create `test/boundaries/README.md` (or
       `illegal-import.md`) — the manual procedure for FR-008: for each
       forbidden edge, the exact illegal `import` line to add (direct form
@@ -315,11 +320,14 @@ dark from tokens only.
       worker registers (`navigator.serviceWorker.ready`), run once in
       Chromium and once in WebKit. This is the FR-021 smoke test and part of
       `npm run test:e2e` → CI.
-- [ ] T040 [US5] Add a lint rule (ESLint `no-restricted-syntax` or a small
-      custom rule) banning hex/`rgb(`/`hsl(` colour literals in `src/`
-      outside `src/presentation/design/`; wire it into `eslint.config.js`.
-      Verify `grep -RInE '#[0-9a-fA-F]{3,8}|rgb\(|hsl\('
-      src/ --exclude-dir=design` is empty (SC-007).
+- [ ] T040 [US5] The binding check for "no literal colours outside the
+      token module" (SC-007) is a grep, wired into CI as its own step (or a
+      Vitest test): `grep -RInE '#[0-9a-fA-F]{3,8}|rgb\(|hsl\('
+      src/ --exclude-dir=design` MUST return nothing (non-zero exit fails
+      the step). Additionally add a best-effort ESLint
+      `no-restricted-syntax` rule flagging obvious hex/`rgb(`/`hsl(` string
+      literals in `src/` outside `src/presentation/design/`. (U2 from
+      /speckit-analyze)
 
 **Checkpoint**: `npm run dev` serves the placeholder; `npm run test:e2e`
 smoke passes in both browsers; tokens-only rendering verified (SC-006,
