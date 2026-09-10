@@ -29,7 +29,7 @@ constitution, Escalation).
 
 ## Technical Context
 
-**Language/Version**: TypeScript 5.x (strict), targeting ES2022; Node 20 LTS
+**Language/Version**: TypeScript 5.x (strict), targeting ES2022; Node 24 LTS
 for tooling/CI.
 
 **Primary Dependencies** (proposed — see research.md for rationale and

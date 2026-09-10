@@ -5,7 +5,7 @@ holds. Each step maps to FRs / success criteria in [spec.md](./spec.md).
 
 ## Prerequisites
 
-- Node 20 LTS, a clean clone, no prior `node_modules`.
+- Node 24 LTS, a clean clone, no prior `node_modules`.
 
 ## 1. The app launches from a clean clone (FR-020, SC-006)
 

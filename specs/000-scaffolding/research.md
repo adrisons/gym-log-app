@@ -17,7 +17,7 @@ complexity that a solo maintainer would not want to own).
 ## 1. Language — TypeScript 5.x, strict
 
 **Decision**: TypeScript, `strict: true`, `noUncheckedIndexedAccess`,
-targeting ES2022. Node 20 LTS for tooling and CI only.
+targeting ES2022. Node 24 LTS for tooling and CI only.
 
 **Rationale**: the domain rules in `docs/requirements.md` §3/§5 are
 sum-types and invariants (Load, Volume, Effort) that a structural type

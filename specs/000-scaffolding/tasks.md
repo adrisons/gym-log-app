@@ -38,7 +38,7 @@ repo root, per plan.md "Project Structure".
 buildable repository.
 
 - [ ] T001 Initialize the Node project: `package.json` (name `gym-log`,
-      `"type": "module"`, private), `.nvmrc` / `engines` pinning Node 20,
+      `"type": "module"`, private), `.nvmrc` / `engines` pinning Node 24,
       `.gitignore` already covers `node_modules/` `dist/` — add `coverage/`
       and `playwright-report/`.
 - [ ] T002 Add and pin dependencies from research.md: `react`, `react-dom`,
@@ -121,7 +121,7 @@ everything the five stories build on.
       `@testing-library/jest-dom` matchers, `afterEach(cleanup)`.
 - [ ] T015 Create `.github/workflows/ci.yml` — one workflow, triggers
       `pull_request` and `push` to the default branch. Jobs/steps: checkout,
-      setup-node 20 with cache, `npm ci`, then `npm run typecheck`,
+      setup-node 24 with cache, `npm ci`, then `npm run typecheck`,
       `npm run lint`, `npm run test:unit`, `npx playwright install --with-deps`
       + `npm run test:e2e`. Fail the job if any step fails. Do NOT use
       `continue-on-error`. Run Vitest with `--passWithNoTests=false` (its
@@ -130,7 +130,7 @@ everything the five stories build on.
       `vite.config.ts` test config. (A1 from /speckit-analyze)
 - [ ] T016 Document the checks in `README.md`: a "Development" section
       listing the exact commands from T008 and stating CI runs the same
-      ones (FR-003). Note Node 20, `npm ci`, `npm run dev`.
+      ones (FR-003). Note Node 24, `npm ci`, `npm run dev`.
 
 **Checkpoint**: `npm run lint` runs the boundary rule; CI workflow is
 present; the port interface and barrel exist. Enforcement is not yet
