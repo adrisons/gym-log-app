@@ -110,10 +110,17 @@ One vocabulary, used identically in code, UI and documentation.
   merge entries. A custom name is free text set by the user — e.g. "hip
   thrust con barra" and "hip thrust en máquina" are two distinct entries
   (or one entry with the other as an alias) at the user's choice, never
-  forced into a fixed list (FR-5).
-- **Session.** A training day: date, ordered list of blocks, free-form notes,
-  optional overall feeling, optional duration. More than one session per day is
-  allowed.
+  forced into a fixed list (FR-5). The catalogue is not empty on a fresh
+  install: the app ships a seed set of common strength exercises (D9,
+  ADR-0005), which behave as ordinary entries thereafter — renameable,
+  mergeable, deletable.
+- **Session.** A training record: a date-time, an ordered list of blocks,
+  free-form notes, optional overall feeling, optional duration. The date-time
+  is set when the session is created (the moment the logging form is opened)
+  and the user may edit it. A session has no open/closed lifecycle state — it
+  is not "in progress" or "finished", it is just a dated record that the user
+  keeps adding to or stops adding to. More than one session per day is
+  allowed, and each is fully independent.
 - **Block.** An ordered grouping inside a session: optional name ("Superset A",
   "Legs"), type (straight sets / superset / circuit), and an ordered list of
   exercise entries.
@@ -134,9 +141,10 @@ One vocabulary, used identically in code, UI and documentation.
   - `None` — for work where load does not apply.
 - **Volume** — a sum type: `Reps` | `Duration` (seconds) | `Distance` (metres).
   A 45-second plank and an 8-rep press are both valid sets.
-- **Effort** — RPE on a 1–10 scale in half-point steps, stored as the single
-  canonical value (ADR-0003). Optional: a set with no effort recorded is valid
-  and does not invalidate its load computations.
+- **Effort** — an integer level from 1 to 5, stored as the single canonical
+  value (ADR-0003). The scale's meaning is always shown in words, never the
+  bare number (§7.4). Optional: a set with no effort recorded is valid and
+  does not invalidate its load computations.
 
 ### 3.3 Domain rules
 
@@ -163,10 +171,17 @@ first version; `[v1.1]` and `[later]` are subsequent scope (§9).
 
 ### FR-1 — Log a session `[v1]`
 
-Create today's session and add blocks, exercises and sets.
+Create a session and add blocks, exercises and sets.
 
-- On open, an unfinished session from today is resumed; otherwise a new one
-  starts in a single tap.
+- Starting a new session creates it with a date-time of the moment the
+  logging form is opened; the user can edit that date-time. There is no
+  open/closed session state and no auto-resume of a prior session — each new
+  session is independent (D6).
+- If the user opens the logging form and leaves without submitting, their
+  in-progress input is kept as a single pending draft (a state of the
+  logging screen, not a stored Session). Reopening the form restores that
+  draft — so locking the phone mid-entry and coming back later works.
+  Cancelling the session discards the draft and its data.
 - Adding an exercise opens the catalogue search with most-used and recent
   entries first; a new exercise can be created from the same field.
 - Every change persists automatically. There is no Save button.
@@ -201,11 +216,9 @@ Create today's session and add blocks, exercises and sets.
 
 ### FR-4 — Effort `[v1]`
 
-- Record a set's effort with a one-tap control.
+- Record a set's effort with a one-tap control on a 1–5 scale (ADR-0003).
 - Recording it is optional on every set.
 - The scale always shows its meaning in words, never the number alone (§7.4).
-- Settings offer entering effort as RIR; it is converted on entry and stored as
-  RPE, keeping one source of truth.
 
 ### FR-5 — Exercise catalogue `[v1]`
 
@@ -277,8 +290,8 @@ Cards with global conclusions across the whole set of exercises.
 
 ### FR-11 — Settings `[v1]`
 
-- Default unit (kg/lb), effort input mode (RPE/RIR), quick increments, theme
-  (light / dark / system), first day of the week.
+- Default unit (kg/lb), quick increments, theme (light / dark / system),
+  first day of the week.
 - Band catalogue management.
 - Data section: export, import, delete everything (double confirmation).
 
@@ -440,12 +453,13 @@ before code.
 |----|----------|--------|
 | D1 | Single project language for all artifacts | **Closed:** English everywhere. → ADR-0001 |
 | D2 | Target platform and storage architecture | **Closed:** Progressive Web App, one web codebase; storage is one port with two adapters (File System Access API, IndexedDB) chosen at runtime via feature detection. → ADR-0002 |
-| D3 | Effort scale | **Closed:** store RPE 1–10 in half-point steps as the canonical value; RIR is an input mode converted on entry. Chosen over a 3-level scale because trend detection needs resolution, and over storing both because one fact gets one source of truth. → ADR-0003 |
+| D3 | Effort scale | **Closed:** store a single integer effort level 1–5 as the canonical value, shown with its meaning in words. Chosen over RPE 1–10 / RIR because effort feeds no computation in v1 (§5 runs on e1RM, not effort) and a coarser, one-tap scale is more likely to actually get used. → ADR-0003 |
 | D4 | Default unit, and whether mixed units are allowed in history | **Closed** for FR-1 to FR-5: kg by default; store the unit as entered, convert only for display. → `specs/001-log-a-session/spec.md` Clarifications |
 | D5 | e1RM formula | **Closed:** Epley, for simplicity and explainability; its weakness at high reps is why the rule caps use at 12 reps (§5.2). → ADR-0004 |
-| D6 | Multiple sessions per day | **Closed** for FR-1 to FR-5: allowed; simpler model, matches reality. → `specs/001-log-a-session/spec.md` Clarifications |
+| D6 | Multiple sessions per day, and session lifecycle | **Closed** for FR-1 to FR-5: multiple sessions per day are allowed and each is fully independent. A session has no open/closed state — its date-time is fixed at creation (when the logging form opens, user-editable) and there is no auto-resume; an unsubmitted form is kept as a single UI draft, not a Session. → `specs/001-log-a-session/spec.md` Clarifications |
 | D7 | Whether FR-13 (templates) is v1 or v1.1 | **Closed:** v1.1, to keep the logging critical path clean. |
 | D8 | Which exercise disciplines beyond Strength (§1.4) are in scope, and when | **Closed:** MVP and v1 ship Strength only; swimming (distance + time, no load) is the first documented candidate for a second discipline, deferred to v1.1 or later pending its own recorded decision — it must not be designed into the schema now, only kept representable (§1.4). |
+| D9 | Whether the app ships a seed exercise catalogue | **Closed:** yes — a seed set of common strength exercises is present from first launch so there is no empty state on the logging critical path; seed entries are ordinary editable catalogue entries and the list is app-bundle data, not persisted schema. → ADR-0005 |
 
 ---
 
