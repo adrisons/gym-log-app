@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-11
 
-**Status**: Reviewed
+**Status**: Planned
 
 **Input**: User description: "Diary, search and progression (Phase 4,
 MVP-closing). Covers docs/requirements.md FR-6 (Diary/history: reverse-
@@ -293,8 +293,12 @@ marked as personal records.
 - **FR-009**: Search MUST tolerate typos and partial matches: a query that
   is a substring or prefix of a name or alias (case/accent-insensitive per
   FR-008) MUST match, and a query within one single-character edit
-  (insertion, deletion, or substitution) of a name, alias, or one of their
-  substrings/prefixes MUST also match.
+  (insertion, deletion, or substitution) of a name, an alias, or any one
+  whitespace-delimited word within a name or alias, MUST also match (so a
+  typo in one word of a multi-word name, e.g. "squta" against "Barbell
+  squat", still matches). Plan-phase research.md §1 records why this
+  whole-string-or-whole-word scope (not arbitrary substrings) is the
+  precise, testable boundary intended here.
 - **FR-010**: Search MUST return results in under 100ms for a catalogue of
   up to 500 exercises.
 - **FR-011**: The search index MUST be derived from `listExercises` and
