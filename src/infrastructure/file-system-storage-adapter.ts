@@ -73,6 +73,7 @@ export class FileSystemStorageAdapter implements StoragePort {
   readonly #getHandle: FileSystemHandleProvider;
   readonly #db: GymLogDatabase;
   #root: FileSystemDirectoryHandle | undefined;
+  #permissionVerified = false;
   #schemaCheck: Promise<void> | undefined;
   readonly #overlay = new Map<string, OverlayEntry>();
 
@@ -84,10 +85,25 @@ export class FileSystemStorageAdapter implements StoragePort {
     this.#db = db;
   }
 
-  /** Returns the already-acquired handle, if any — never calls `getHandle()`. Real permission loss on an existing handle still throws. */
+  /**
+   * Returns the already-acquired handle, if any — never calls
+   * `getHandle()`. Checks permission at most once per adapter instance
+   * (research.md §2: "on every later *launch*" — a launch is one adapter
+   * instance's lifetime, not every individual operation, which is what
+   * this used to do: querying permission on literally every read/write
+   * call reproducibly crashed CI's Chromium under this suite's restart
+   * simulation, calling it many times per scenario). Once verified, later
+   * calls reuse `#root` without re-querying. Real permission loss is
+   * still caught — once — on this instance's first use, whether the
+   * handle came from a fresh `getHandle()` acquisition or the persisted
+   * cache.
+   */
   async #tryDirectoryHandle(): Promise<FileSystemDirectoryHandle | undefined> {
     if (this.#root) {
-      await this.#assertPermission(this.#root);
+      if (!this.#permissionVerified) {
+        await this.#assertPermission(this.#root);
+        this.#permissionVerified = true;
+      }
       return this.#root;
     }
     const cached = await this.#db.fileSystemHandle.get(
@@ -95,6 +111,7 @@ export class FileSystemStorageAdapter implements StoragePort {
     );
     if (!cached) return undefined;
     await this.#assertPermission(cached.value);
+    this.#permissionVerified = true;
     this.#root = cached.value;
     return this.#root;
   }
