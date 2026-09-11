@@ -3,7 +3,9 @@ import { createHarness } from '../support';
 import {
   openLoggingForm,
   createExercise,
+  renameExerciseWithCollisionCheck,
 } from '../../src/application/logging/use-cases';
+import type { SessionId } from '../../src/domain/ids';
 import {
   addExerciseEntry,
   addSet,
@@ -156,5 +158,139 @@ describe('Logging flow (US2 Independent Test)', () => {
     await storage.saveDraft(restored);
 
     expect(restored).toEqual(beforeDelete);
+  });
+});
+
+// spec.md User Story 4 Independent Test, extended per Acceptance Scenario
+// US4-4: rename-collision -> decline -> original name kept; rename-collision
+// -> accept-elsewhere's-merge -> survivor keeps its own defaults, loser's
+// name becomes an alias, every one of the loser's sets (across sessions
+// *and* the current draft) now references the survivor.
+describe('Logging flow (US4 Independent Test)', () => {
+  it('rename-collision decline keeps the original name', async () => {
+    const { storage } = createHarness();
+    const target = await createExercise(storage, {
+      canonicalName: 'Glute bridge',
+    });
+    await createExercise(storage, { canonicalName: 'Hip thrust' });
+
+    const result = await renameExerciseWithCollisionCheck(
+      storage,
+      target.id,
+      'Hip thrust',
+    );
+
+    expect(result.status).toBe('collision');
+    // Declining is simply not calling mergeExercises — the rename never
+    // touched storage, so the original name is still there.
+    expect((await storage.getExercise(target.id))?.canonicalName).toBe(
+      'Glute bridge',
+    );
+  });
+
+  it('rename-collision accept: survivor keeps its own defaults, loser becomes an alias, every set (session + draft) reassigns', async () => {
+    const { storage } = createHarness();
+    const draft = await openLoggingForm(storage);
+    const survivor = await createExercise(storage, {
+      canonicalName: 'Hip thrust',
+      defaultLoadType: 'band',
+    });
+    const loser = await createExercise(storage, {
+      canonicalName: 'Glute bridge',
+      defaultLoadType: 'weight',
+    });
+
+    // A session set referencing the loser.
+    const sessionWithLoser = {
+      id: 'sess-1' as SessionId,
+      dateTime: '2026-09-01T00:00:00.000Z',
+      notes: '',
+      blocks: [
+        {
+          type: 'straightSets' as const,
+          exercises: [
+            {
+              exerciseId: loser.id,
+              notes: '',
+              sets: [
+                {
+                  load: { kind: 'none' as const },
+                  volume: { kind: 'reps' as const, count: 5 },
+                  setKind: 'working' as const,
+                  completed: true,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    await storage.saveSession(sessionWithLoser);
+
+    // The current draft also references the loser.
+    const draftWithLoser = addExerciseEntry(draft, loser.id);
+    await storage.saveDraft(draftWithLoser);
+
+    const result = await renameExerciseWithCollisionCheck(
+      storage,
+      loser.id,
+      'Hip thrust',
+    );
+    expect(result.status).toBe('collision');
+    if (result.status !== 'collision') throw new Error('unreachable');
+
+    await storage.mergeExercises(result.collidesWith.id, loser.id);
+
+    const survivorReloaded = await storage.getExercise(survivor.id);
+    expect(survivorReloaded?.defaultLoadType).toBe('band'); // kept its own defaults
+    expect(survivorReloaded?.aliases).toContain('Glute bridge');
+    expect(await storage.getExercise(loser.id)).toBeUndefined();
+
+    const sessionReloaded = await storage.getSession(sessionWithLoser.id);
+    expect(sessionReloaded?.blocks[0]?.exercises[0]?.exerciseId).toBe(
+      survivor.id,
+    );
+
+    const draftReloaded = await storage.getDraft();
+    expect(draftReloaded?.blocks[0]?.exercises[0]?.exerciseId).toBe(
+      survivor.id,
+    );
+  });
+
+  it('delete-with-history cascades across every historical entry and set', async () => {
+    const { storage } = createHarness();
+    const exercise = await createExercise(storage, { canonicalName: 'Row' });
+    const session = {
+      id: 'sess-2' as SessionId,
+      dateTime: '2026-09-01T00:00:00.000Z',
+      notes: '',
+      blocks: [
+        {
+          type: 'straightSets' as const,
+          exercises: [
+            {
+              exerciseId: exercise.id,
+              notes: '',
+              sets: [
+                {
+                  load: { kind: 'none' as const },
+                  volume: { kind: 'reps' as const, count: 5 },
+                  setKind: 'working' as const,
+                  completed: true,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    await storage.saveSession(session);
+
+    await storage.deleteExerciseCascade(exercise.id);
+
+    expect(await storage.getExercise(exercise.id)).toBeUndefined();
+    expect(
+      (await storage.getSession(session.id))?.blocks[0]?.exercises,
+    ).toEqual([]);
   });
 });

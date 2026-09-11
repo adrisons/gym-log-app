@@ -37,8 +37,14 @@ import {
   recordLoadTypeDefault as recordLoadTypeDefaultUseCase,
   suggestFreeTextLoads as suggestFreeTextLoadsUseCase,
   saveBandLabels as saveBandLabelsUseCase,
+  renameExerciseWithCollisionCheck as renameExerciseWithCollisionCheckUseCase,
+  mergeExercises as mergeExercisesUseCase,
+  deleteExerciseCascade as deleteExerciseCascadeUseCase,
 } from '@/application/logging/use-cases';
-import type { CreateExerciseInput } from '@/application/logging/use-cases';
+import type {
+  CreateExerciseInput,
+  RenameExerciseResult,
+} from '@/application/logging/use-cases';
 import type { Load } from '@/domain/load';
 import {
   addExerciseEntry as addExerciseEntryToDraft,
@@ -120,6 +126,19 @@ export interface LoggingSessionState {
   deleteExerciseEntry: (blockId: string, entryId: string) => Promise<void>;
   deleteSet: (blockId: string, entryId: string, setId: string) => Promise<void>;
   undo: (id: string) => Promise<void>;
+  renameExerciseWithCollisionCheck: (
+    exerciseId: ExerciseId,
+    newName: string,
+  ) => Promise<RenameExerciseResult>;
+  mergeExercises: (
+    survivorId: ExerciseId,
+    loserId: ExerciseId,
+  ) => Promise<void>;
+  deleteExerciseCascade: (
+    exerciseId: ExerciseId,
+    hasHistory: boolean,
+    confirmed: boolean,
+  ) => Promise<void>;
 }
 
 export const useLoggingSession = create<LoggingSessionState>((set, get) => {
@@ -331,6 +350,58 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
         undoStack: state.undoStack.filter((e) => e.id !== id),
       }));
       await storage.saveDraft(restored);
+    },
+
+    renameExerciseWithCollisionCheck: async (exerciseId, newName) => {
+      const { storage } = get();
+      if (!storage) {
+        throw new Error('useLoggingSession: not configured yet.');
+      }
+      const result = await renameExerciseWithCollisionCheckUseCase(
+        storage,
+        exerciseId,
+        newName,
+      );
+      if (result.status === 'renamed') {
+        set((state) => ({
+          catalogue: state.catalogue.map((exercise) =>
+            exercise.id === exerciseId ? result.exercise : exercise,
+          ),
+        }));
+      }
+      return result;
+    },
+
+    // Merge/cascade-delete repoint or prune the stored draft too
+    // (contracts/storage-port-extension.md §1) — this store's own
+    // in-memory `draft` copy is stale once that happens server-side, so
+    // both actions re-fetch draft + catalogue from storage afterward
+    // rather than trying to replicate the repoint/prune logic locally.
+    mergeExercises: async (survivorId, loserId) => {
+      const { storage } = get();
+      if (!storage) return;
+      await mergeExercisesUseCase(storage, survivorId, loserId);
+      const [draft, catalogue] = await Promise.all([
+        storage.getDraft(),
+        storage.listExercises(),
+      ]);
+      set({ draft, catalogue });
+    },
+
+    deleteExerciseCascade: async (exerciseId, hasHistory, confirmed) => {
+      const { storage } = get();
+      if (!storage) return;
+      await deleteExerciseCascadeUseCase(
+        storage,
+        exerciseId,
+        hasHistory,
+        confirmed,
+      );
+      const [draft, catalogue] = await Promise.all([
+        storage.getDraft(),
+        storage.listExercises(),
+      ]);
+      set({ draft, catalogue });
     },
   };
 });

@@ -9,7 +9,12 @@ import {
   suggestFreeTextLoads,
   listBandLabels,
   saveBandLabels,
+  renameExerciseWithCollisionCheck,
+  mergeExercises,
+  deleteExerciseCascade,
 } from '@/application/logging/use-cases';
+import { StorageError } from '@/application/errors';
+import { ExerciseDeleteConfirmationRequiredError } from '@/domain/errors';
 import { createDraft } from '@/application/logging/draft';
 import type { Exercise } from '@/domain/exercise';
 import type { Session } from '@/domain/session';
@@ -286,5 +291,113 @@ describe('listBandLabels/saveBandLabels (FR-011)', () => {
     const storage = new InMemoryStorage();
     await saveBandLabels(storage, ['Red', 'Blue']);
     expect(await listBandLabels(storage)).toEqual(['Red', 'Blue']);
+  });
+});
+
+describe('renameExerciseWithCollisionCheck (FR-020, FR-022)', () => {
+  it('renames cleanly when the new name is unused', async () => {
+    const storage = new InMemoryStorage();
+    const exercise = await createExercise(storage, {
+      canonicalName: 'Glute bridge',
+    });
+
+    const result = await renameExerciseWithCollisionCheck(
+      storage,
+      exercise.id,
+      'Hip thrust',
+    );
+
+    expect(result.status).toBe('renamed');
+    expect((await storage.getExercise(exercise.id))?.canonicalName).toBe(
+      'Hip thrust',
+    );
+  });
+
+  it('returns a collision, without renaming, case/accent-insensitively (Acceptance Scenario US4-3)', async () => {
+    const storage = new InMemoryStorage();
+    const target = await createExercise(storage, {
+      canonicalName: 'Glute bridge',
+    });
+    await createExercise(storage, { canonicalName: 'Hip Thrúst' });
+
+    const result = await renameExerciseWithCollisionCheck(
+      storage,
+      target.id,
+      'hip thrust',
+    );
+
+    expect(result.status).toBe('collision');
+    expect((await storage.getExercise(target.id))?.canonicalName).toBe(
+      'Glute bridge',
+    );
+  });
+
+  it('detects a collision against an alias too', async () => {
+    const storage = new InMemoryStorage();
+    const target = await createExercise(storage, { canonicalName: 'Squat' });
+    const other = await createExercise(storage, { canonicalName: 'Row' });
+    await storage.saveExercise({ ...other, aliases: ['Bent-over row'] });
+
+    const result = await renameExerciseWithCollisionCheck(
+      storage,
+      target.id,
+      'Bent-over row',
+    );
+
+    expect(result.status).toBe('collision');
+  });
+});
+
+describe('mergeExercises (FR-017, FR-019)', () => {
+  it('delegates to StoragePort.mergeExercises', async () => {
+    const storage = new InMemoryStorage();
+    const survivor = await createExercise(storage, { canonicalName: 'Squat' });
+    const loser = await createExercise(storage, { canonicalName: 'Squats' });
+
+    await mergeExercises(storage, survivor.id, loser.id);
+
+    expect(await storage.getExercise(loser.id)).toBeUndefined();
+    expect((await storage.getExercise(survivor.id))?.aliases).toContain(
+      'Squats',
+    );
+  });
+
+  it('surfaces the port rejection for identical/nonexistent ids unchanged', async () => {
+    const storage = new InMemoryStorage();
+    const exercise = await createExercise(storage, { canonicalName: 'Squat' });
+
+    await expect(
+      mergeExercises(storage, exercise.id, exercise.id),
+    ).rejects.toThrow(StorageError);
+  });
+});
+
+describe('deleteExerciseCascade (FR-018)', () => {
+  it('throws ExerciseDeleteConfirmationRequiredError, without calling the port, when history exists and unconfirmed', async () => {
+    const storage = new InMemoryStorage();
+    const exercise = await createExercise(storage, { canonicalName: 'Squat' });
+
+    await expect(
+      deleteExerciseCascade(storage, exercise.id, true, false),
+    ).rejects.toThrow(ExerciseDeleteConfirmationRequiredError);
+    expect(await storage.getExercise(exercise.id)).toEqual(exercise);
+  });
+
+  it('calls StoragePort.deleteExerciseCascade when confirmed', async () => {
+    const storage = new InMemoryStorage();
+    const exercise = await createExercise(storage, { canonicalName: 'Squat' });
+
+    await deleteExerciseCascade(storage, exercise.id, true, true);
+
+    expect(await storage.getExercise(exercise.id)).toBeUndefined();
+  });
+
+  it('calls StoragePort.deleteExerciseCascade when there is no history, without needing confirmation', async () => {
+    const storage = new InMemoryStorage();
+    const exercise = await createExercise(storage, { canonicalName: 'Squat' });
+
+    await deleteExerciseCascade(storage, exercise.id, false, false);
+
+    expect(await storage.getExercise(exercise.id)).toBeUndefined();
   });
 });

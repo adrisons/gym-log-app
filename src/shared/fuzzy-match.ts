@@ -13,7 +13,8 @@
  * against "Barbell squat").
  */
 
-function normalize(value: string): string {
+/** Lowercase + diacritic-stripped, for case/accent-insensitive comparison (also used for rename-collision detection, FR-022). */
+export function normalize(value: string): string {
   return value
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')

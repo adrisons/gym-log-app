@@ -13,7 +13,8 @@ import type {
 } from '@/application/ports/storage-port';
 import { createDraft, draftToSession } from '@/application/logging/draft';
 import { newSessionId, newExerciseId } from '@/application/logging/ids';
-import { matchExercise } from '@/shared/fuzzy-match';
+import { matchExercise, normalize } from '@/shared/fuzzy-match';
+import { renameExercise, deleteExercise } from '@/domain/exercise';
 import type { Exercise } from '@/domain/exercise';
 import type { Session } from '@/domain/session';
 import type { ExerciseId } from '@/domain/ids';
@@ -29,6 +30,8 @@ import type { Load } from '@/domain/load';
 export type { Exercise };
 /** Re-exported for the same reason as `Exercise` above — `LoadTypePicker` (US3) needs `Load['kind']`. */
 export type { Load };
+/** Re-exported for the same reason — `ExerciseCataloguePanel` (US4) needs `ExerciseId` for its `onMerge` callback. */
+export type { ExerciseId };
 
 function isSameLocalDay(isoA: string, isoB: string): boolean {
   const a = new Date(isoA);
@@ -225,4 +228,76 @@ export async function saveBandLabels(
   labels: string[],
 ): Promise<void> {
   await storage.saveBandLabels(labels);
+}
+
+export type RenameExerciseResult =
+  | { status: 'renamed'; exercise: Exercise }
+  | { status: 'collision'; collidesWith: Exercise };
+
+/**
+ * FR-020, FR-022: renames a catalogue exercise. Detects a collision
+ * (case/accent-insensitive, against every other exercise's name *and*
+ * aliases) rather than rejecting silently or creating a duplicate —
+ * returns `{ status: 'collision', collidesWith }` without renaming, so
+ * the caller can offer a merge (Acceptance Scenario US4-3). Never
+ * auto-merges.
+ */
+export async function renameExerciseWithCollisionCheck(
+  storage: StoragePort,
+  exerciseId: ExerciseId,
+  newName: string,
+): Promise<RenameExerciseResult> {
+  const exercise = await storage.getExercise(exerciseId);
+  if (!exercise) {
+    throw new Error(
+      `renameExerciseWithCollisionCheck: no Exercise with id ${exerciseId}.`,
+    );
+  }
+
+  const normalizedNew = normalize(newName);
+  const catalogue = await storage.listExercises();
+  const collidesWith = catalogue.find(
+    (candidate) =>
+      candidate.id !== exerciseId &&
+      [candidate.canonicalName, ...candidate.aliases].some(
+        (name) => normalize(name) === normalizedNew,
+      ),
+  );
+  if (collidesWith) {
+    return { status: 'collision', collidesWith };
+  }
+
+  const renamed = renameExercise(exercise, newName);
+  await storage.saveExercise(renamed);
+  return { status: 'renamed', exercise: renamed };
+}
+
+/**
+ * FR-017, FR-019: thin wrapper over `StoragePort.mergeExercises` — the
+ * domain-local half (`mergeExerciseIdentities`) plus cross-session
+ * reassignment already live at the port (spec 002's finalized split).
+ */
+export async function mergeExercises(
+  storage: StoragePort,
+  survivorId: ExerciseId,
+  loserId: ExerciseId,
+): Promise<void> {
+  await storage.mergeExercises(survivorId, loserId);
+}
+
+/**
+ * FR-018: deletes a catalogue exercise, cascading to its historical
+ * entries/sets. Calls domain `deleteExercise` first — throws
+ * `ExerciseDeleteConfirmationRequiredError` (unconfirmed + history),
+ * without touching the port, so the caller can map that to the
+ * confirm-or-merge dialog.
+ */
+export async function deleteExerciseCascade(
+  storage: StoragePort,
+  exerciseId: ExerciseId,
+  hasHistory: boolean,
+  confirmed: boolean,
+): Promise<void> {
+  deleteExercise(hasHistory, confirmed);
+  await storage.deleteExerciseCascade(exerciseId);
 }

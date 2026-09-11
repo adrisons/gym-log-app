@@ -22,6 +22,7 @@ describe('ExerciseSearchField (FR-002, FR-015, FR-016)', () => {
         search={search}
         onSelectExercise={() => {}}
         onCreateExercise={() => {}}
+        onManageExercise={() => {}}
       />,
     );
 
@@ -38,6 +39,7 @@ describe('ExerciseSearchField (FR-002, FR-015, FR-016)', () => {
         search={search}
         onSelectExercise={() => {}}
         onCreateExercise={() => {}}
+        onManageExercise={() => {}}
       />,
     );
 
@@ -54,6 +56,7 @@ describe('ExerciseSearchField (FR-002, FR-015, FR-016)', () => {
         search={search}
         onSelectExercise={onSelectExercise}
         onCreateExercise={() => {}}
+        onManageExercise={() => {}}
       />,
     );
 
@@ -70,6 +73,7 @@ describe('ExerciseSearchField (FR-002, FR-015, FR-016)', () => {
         search={search}
         onSelectExercise={() => {}}
         onCreateExercise={onCreateExercise}
+        onManageExercise={() => {}}
       />,
     );
 
@@ -77,5 +81,24 @@ describe('ExerciseSearchField (FR-002, FR-015, FR-016)', () => {
     await userEvent.click(screen.getByText('Create "Hip thrust"'));
 
     expect(onCreateExercise).toHaveBeenCalledWith('Hip thrust');
+  });
+
+  it('manage calls onManageExercise for that result', async () => {
+    const search = vi.fn(() => [squat]);
+    const onManageExercise = vi.fn();
+    render(
+      <ExerciseSearchField
+        search={search}
+        onSelectExercise={() => {}}
+        onCreateExercise={() => {}}
+        onManageExercise={onManageExercise}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /manage back squat/i }),
+    );
+
+    expect(onManageExercise).toHaveBeenCalledWith(squat);
   });
 });

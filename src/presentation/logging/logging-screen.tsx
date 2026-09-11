@@ -14,18 +14,20 @@
  * user-visible/manageable (create, rename, reorder, delete-with-undo),
  * replacing US1's flat list.
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLoggingSession } from '@/application/logging/logging-store';
 import {
   toBlockViewModel,
   toSetSummaryViewModel,
 } from '@/application/logging/view-models';
+import type { Exercise } from '@/application/logging/use-cases';
 import { SessionDateTimeField } from './session-date-time-field';
 import { ExerciseSearchField } from './exercise-search-field';
 import { SetRow } from './set-row';
 import { BlockCard } from './block-card';
 import { ExerciseEntryCard } from './exercise-entry-card';
 import { UndoToast } from './undo-toast';
+import { ExerciseCataloguePanel } from './exercise-catalogue-panel';
 import './logging.css';
 
 const UNDO_MESSAGES = {
@@ -61,6 +63,18 @@ export function LoggingScreen() {
   const deleteExerciseEntry = useLoggingSession((s) => s.deleteExerciseEntry);
   const deleteSet = useLoggingSession((s) => s.deleteSet);
   const undo = useLoggingSession((s) => s.undo);
+  const sessions = useLoggingSession((s) => s.sessions);
+  const renameExerciseWithCollisionCheck = useLoggingSession(
+    (s) => s.renameExerciseWithCollisionCheck,
+  );
+  const mergeExercises = useLoggingSession((s) => s.mergeExercises);
+  const deleteExerciseCascade = useLoggingSession(
+    (s) => s.deleteExerciseCascade,
+  );
+
+  const [managingExercise, setManagingExercise] = useState<
+    Exercise | undefined
+  >(undefined);
 
   useEffect(() => {
     void initialize();
@@ -88,7 +102,41 @@ export function LoggingScreen() {
             await addExerciseEntry(exercise.id);
           })();
         }}
+        onManageExercise={setManagingExercise}
       />
+
+      {managingExercise &&
+        (() => {
+          const hasHistory = sessions.some((session) =>
+            session.blocks.some((block) =>
+              block.exercises.some(
+                (entry) => entry.exerciseId === managingExercise.id,
+              ),
+            ),
+          );
+          return (
+            <ExerciseCataloguePanel
+              exercise={managingExercise}
+              hasHistory={hasHistory}
+              search={searchExercises}
+              onRename={(newName) =>
+                renameExerciseWithCollisionCheck(managingExercise.id, newName)
+              }
+              onMerge={(survivorId, loserId) =>
+                void mergeExercises(survivorId, loserId)
+              }
+              onDeleteConfirm={() => {
+                void deleteExerciseCascade(
+                  managingExercise.id,
+                  hasHistory,
+                  true,
+                );
+                setManagingExercise(undefined);
+              }}
+              onClose={() => setManagingExercise(undefined)}
+            />
+          );
+        })()}
 
       <button
         type="button"

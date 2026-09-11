@@ -14,12 +14,15 @@ export interface ExerciseSearchFieldProps {
   search: (query: string) => Exercise[];
   onSelectExercise: (exercise: Exercise) => void;
   onCreateExercise: (name: string) => void;
+  /** FR-017/FR-018/FR-020: opens `ExerciseCataloguePanel` for this result. */
+  onManageExercise: (exercise: Exercise) => void;
 }
 
 export function ExerciseSearchField({
   search,
   onSelectExercise,
   onCreateExercise,
+  onManageExercise,
 }: ExerciseSearchFieldProps) {
   const [query, setQuery] = useState('');
   const trimmed = query.trim();
@@ -39,7 +42,7 @@ export function ExerciseSearchField({
       </label>
       <ul className="exercise-search-field__results" role="listbox">
         {results.map((exercise) => (
-          <li key={exercise.id}>
+          <li key={exercise.id} className="set-row__inputs">
             <button
               type="button"
               className="logging-button"
@@ -49,6 +52,14 @@ export function ExerciseSearchField({
               }}
             >
               {exercise.canonicalName}
+            </button>
+            <button
+              type="button"
+              className="logging-button"
+              aria-label={`Manage ${exercise.canonicalName}`}
+              onClick={() => onManageExercise(exercise)}
+            >
+              Manage
             </button>
           </li>
         ))}
