@@ -51,8 +51,21 @@ export interface ContractResult {
 
 type MakeAdapter = () => Promise<StoragePort>;
 
-/** Produces a fresh, isolated persisted store, returning a `MakeAdapter` bound to it — every call the returned function makes points at that same store, simulating a restart. */
-type StoreFactory = () => Promise<MakeAdapter>;
+/**
+ * Produces a fresh, isolated persisted store, returning a `MakeAdapter`
+ * bound to it — every call the returned function makes points at that
+ * same store, simulating a restart. `dispose` (if given) is called once
+ * the scenario finishes, win or lose — e.g. closing an IndexedDB
+ * connection opened for this scenario's own handle cache. Every scenario
+ * gets its own store, so leaving `dispose` out accumulates one open
+ * connection per scenario for the suite's lifetime; harnesses running
+ * many scenarios in one page session (spec 003 research.md §3) should
+ * always provide it.
+ */
+type StoreFactory = () => Promise<{
+  makeAdapter: MakeAdapter;
+  dispose?: () => void | Promise<void>;
+}>;
 
 interface Scenario {
   name: string;
@@ -542,8 +555,8 @@ export async function runStorageAdapterContract(
   const passed: string[] = [];
   const failed: ContractFailure[] = [];
   for (const scenario of CONTRACT_SCENARIOS) {
+    const { makeAdapter, dispose } = await createStore();
     try {
-      const makeAdapter = await createStore();
       await scenario.run(makeAdapter);
       passed.push(scenario.name);
     } catch (error) {
@@ -551,6 +564,8 @@ export async function runStorageAdapterContract(
         scenario: scenario.name,
         error: error instanceof Error ? error.message : String(error),
       });
+    } finally {
+      await dispose?.();
     }
   }
   return { passed, failed };

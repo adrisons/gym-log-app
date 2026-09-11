@@ -14,9 +14,12 @@
  * staying fully automatable. Production's composition root
  * (`src/presentation/main.tsx`) still calls `showDirectoryPicker()`.
  *
- * Every `runStorageAdapterContract` call gets its own uniquely named Dexie
- * database (and, for File System, its own OPFS subdirectory) so scenarios
- * — and separate `__runContractSuite` calls — never see each other's data.
+ * Every scenario gets its own uniquely named Dexie database (and, for File
+ * System, its own OPFS subdirectory) so scenarios — and separate
+ * `__runContractSuite` calls — never see each other's data; each store's
+ * `dispose` closes that Dexie connection (and removes the OPFS
+ * subdirectory) once its scenario finishes, so a 15-scenario run never
+ * holds more than one connection open at a time.
  */
 import {
   runStorageAdapterContract,
@@ -35,20 +38,32 @@ function uniqueName(prefix: string): string {
 async function runIndexedDb(): Promise<ContractResult> {
   return runStorageAdapterContract(async () => {
     const db = new GymLogDatabase(uniqueName('contract-idb'));
-    return async (): Promise<StoragePort> => new IndexedDbStorageAdapter(db);
+    return {
+      makeAdapter: async (): Promise<StoragePort> =>
+        new IndexedDbStorageAdapter(db),
+      dispose: () => db.close(),
+    };
   });
 }
 
 async function runFileSystem(): Promise<ContractResult> {
   return runStorageAdapterContract(async () => {
     const opfsRoot = await navigator.storage.getDirectory();
-    const storeDir = await opfsRoot.getDirectoryHandle(
-      uniqueName('contract-fs'),
-      { create: true },
-    );
+    const dirName = uniqueName('contract-fs');
+    const storeDir = await opfsRoot.getDirectoryHandle(dirName, {
+      create: true,
+    });
     const db = new GymLogDatabase(uniqueName('contract-fs-handles'));
-    return async (): Promise<StoragePort> =>
-      new FileSystemStorageAdapter(async () => storeDir, db);
+    return {
+      makeAdapter: async (): Promise<StoragePort> =>
+        new FileSystemStorageAdapter(async () => storeDir, db),
+      dispose: async () => {
+        db.close();
+        await opfsRoot
+          .removeEntry(dirName, { recursive: true })
+          .catch(() => undefined);
+      },
+    };
   });
 }
 
@@ -85,6 +100,8 @@ window.__runPermissionLossTest = async () => {
       isStorageError: error instanceof StorageError,
       kind: error instanceof StorageError ? error.kind : undefined,
     };
+  } finally {
+    db.close();
   }
 };
 
