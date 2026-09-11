@@ -41,6 +41,8 @@ naming the import, then delete the probe file.
 |---|---|---|---|---|
 | 7 | `presentation` → `application` (barrel) | `src/presentation/__p.tsx` | `import type { StoragePort } from '../application'` | ✅ PASSED |
 | 8 | `infrastructure` → `application-ports` | `src/infrastructure/__p.ts` | `import type { StoragePort } from '../application/ports/storage-port'` | ✅ PASSED |
+| 9 | `composition-root` (`src/presentation/main.tsx`) → `domain` + `infrastructure` + `shared` | `src/presentation/main.tsx` | three imports, one per layer | ✅ PASSED (2026-09-11, after the composition-root fix below) |
+| 10 | `presentation` (ordinary file, same folder as the composition root) → `infrastructure` | `src/presentation/other.tsx` | `import { CONSTANT } from '../infrastructure/placeholder'` | ✅ FAILED — confirms the composition-root's broad access does not leak to sibling files |
 
 ## Notes
 
@@ -55,3 +57,15 @@ naming the import, then delete the probe file.
   import — an import of a non-existent path also resolves to "unknown" and
   is silently skipped, which looks identical to a working rule from the
   command's exit code alone. Always probe against a file that exists.
+- Cases 9/10 caught a second real bug (2026-09-11): a
+  `composition-root` **element** descriptor for `src/presentation/main.tsx`
+  never actually classifies as `composition-root` — element patterns match
+  folders, not files, so `main.tsx` always resolved to plain `presentation`
+  regardless of descriptor order, `partialMatch: false`, or `exclusive:
+  true`. This was invisible until a real probe against `main.tsx` was run
+  (case 9 initially FAILED with "no policy allowing... presentation →
+  domain/infrastructure/shared"). Fixed by dropping the element descriptor
+  for `composition-root` and instead granting its policy via a file-path
+  selector (`from: { file: { path: 'src/presentation/main.tsx' } }`) — see
+  `docs/architecture.md` "Composition-root classification" and the inline
+  comment in `eslint.boundaries.js`.

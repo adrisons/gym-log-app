@@ -21,18 +21,33 @@
  *                          Imports nothing internal.
  *   composition-root     — the single wiring point (src/presentation/main.tsx).
  *                          May import: everything.
+ *
+ * `composition-root` is NOT one of the `elements` descriptors below:
+ * eslint-plugin-boundaries' element patterns match folders (path prefixes),
+ * not individual files — a `pattern: 'src/presentation/main.tsx'` descriptor
+ * never wins over the broader `src/presentation` folder pattern it's nested
+ * inside, so `main.tsx` would classify as plain `presentation` regardless
+ * (confirmed by direct probe; `exclusive`/`partialMatch: false` do not
+ * change this, since the mismatch is that a *folder* matcher never yields
+ * to a more specific *file* pattern nested inside it). Instead,
+ * `dependencyPolicies()` below grants `main.tsx` its "may import everything"
+ * policy via a file-path selector (`from: { file: { path } }`), independent
+ * of element classification. `composition-root` stays in `allowedImports`
+ * and `forbiddenEdges()` purely as the documented/tested edge-set entry
+ * (docs/architecture.md, test/boundaries/edge-set.test.ts).
+ *
+ * COMPOSITION_ROOT_PATH is that same file's path (Micromatch pattern).
  */
+export const COMPOSITION_ROOT_PATH = 'src/presentation/main.tsx';
 
 /**
  * Element descriptors for `settings['boundaries/elements']`. Order matters:
- * the composition root (a single file) and the design sub-layer are matched
- * before the broader `presentation` pattern; `ports` before the broader
- * `application` pattern.
+ * the design sub-layer is matched before the broader `presentation`
+ * pattern; `ports` before the broader `application` pattern.
  *
- * @type {{ type: string, pattern: string | string[], mode?: 'file' | 'folder' }[]}
+ * @type {{ type: string, pattern: string | string[] }[]}
  */
 export const elements = [
-  { type: 'composition-root', pattern: 'src/presentation/main.tsx' },
   { type: 'presentation-design', pattern: 'src/presentation/design' },
   { type: 'presentation', pattern: 'src/presentation' },
   { type: 'application-ports', pattern: 'src/application/ports' },
@@ -68,7 +83,10 @@ export const allowedImports = {
   ],
 };
 
-const allTypes = elements.map((e) => e.type);
+// Derived from allowedImports, not `elements`: composition-root is a
+// documented/tested type (edge-set table, forbidden-edge set) but is not an
+// `elements` descriptor — see the note on COMPOSITION_ROOT_PATH above.
+const allTypes = Object.keys(allowedImports);
 
 /**
  * The forbidden-edge set: every (from, to) pair that is NOT allowed
@@ -95,13 +113,23 @@ export function forbiddenEdges() {
  * `default: 'disallow'` forbids the rest. Intra-layer imports (from === to)
  * are permitted by the plugin without an explicit policy.
  *
- * @returns {{ from: { element: { type: string } }, allow: { to: { element: { type: string } } }[] }[]}
+ * `composition-root` is not an `elements` descriptor (see the note above),
+ * so its policy is keyed on a file-path selector matching
+ * COMPOSITION_ROOT_PATH exactly instead of an element type — this is what
+ * actually grants src/presentation/main.tsx its "may import everything"
+ * permission, independent of how that file classifies as an element
+ * (it classifies as plain `presentation`).
+ *
+ * @returns {({ from: { element: { type: string } }, allow: { to: { element: { type: string } } }[] } | { from: { file: { path: string } }, allow: { to: { element: { type: string } } }[] })[]}
  */
 export function dependencyPolicies() {
   return allTypes
     .filter((from) => (allowedImports[from] ?? []).length > 0)
     .map((from) => ({
-      from: { element: { type: from } },
+      from:
+        from === 'composition-root'
+          ? { file: { path: COMPOSITION_ROOT_PATH } }
+          : { element: { type: from } },
       allow: (allowedImports[from] ?? []).map((to) => ({
         to: { element: { type: to } },
       })),

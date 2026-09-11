@@ -72,6 +72,24 @@ treated as "external" or "unknown" and the rule never evaluates it — this is
 why `eslint-plugin-import` + `eslint-import-resolver-typescript` are
 installed alongside `eslint-plugin-boundaries` (`docs/stack.md`).
 
+## Composition-root classification
+
+`eslint-plugin-boundaries` element descriptors (`settings['boundaries/elements']`)
+match **folders** (path prefixes), not individual files — a descriptor like
+`{ type: 'composition-root', pattern: 'src/presentation/main.tsx' }` never
+wins over the broader `src/presentation` folder pattern it's nested inside,
+so the file would classify as plain `presentation` regardless of descriptor
+order, `partialMatch: false`, or `exclusive: true` (confirmed by direct
+probe against the plugin's matcher). Because of this, `composition-root` is
+**not** one of the `elements` descriptors in `eslint.boundaries.js` at all.
+Instead, its "may import everything" policy is granted through a
+`boundaries/dependencies` policy keyed on a **file-path selector**
+(`from: { file: { path: 'src/presentation/main.tsx' } }`) rather than an
+element-type selector — independent of how the file classifies as an
+element. `composition-root` still appears in the forbidden-edge table above
+and in `allowedImports`/`forbiddenEdges()` purely as the documented/tested
+edge-set entry; `eslint.boundaries.js` has the full explanation inline.
+
 ## Design tokens
 
 Design tokens (`src/presentation/design/tokens.css` + `tokens.ts`) are the
