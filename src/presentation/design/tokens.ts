@@ -34,7 +34,9 @@ export type TokenName =
   | '--space-3'
   | '--space-4'
   | '--space-5'
-  | '--space-6';
+  | '--space-6'
+  | '--font-ui'
+  | '--font-mono';
 
 /**
  * Returns a `var(--token-name)` reference for use in inline styles or

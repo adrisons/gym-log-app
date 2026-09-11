@@ -5,11 +5,12 @@
  * src/ (SC-007, enforced by scripts/check-no-color-literals.sh + an ESLint
  * no-restricted-syntax rule).
  *
- * Values here are provisional (Phase 0 scope, spec 000 FR-018) — the exact
- * palette is a docs/design.md concern for a later pass. What matters now is
- * that every token role from specs/000-scaffolding/data-model.md §2 exists,
- * for both light and dark, so nothing built against these names has to
- * change shape later.
+ * Values here are the approved visual identity ("Electric", refined) —
+ * chosen through a design exploration outside the codebase (three initial
+ * directions, a fusion of two, then two refinement passes) and confirmed by
+ * the project owner. Every token role from
+ * specs/000-scaffolding/data-model.md §2 is present, for both light and
+ * dark, matching docs/design.md §3.1's role vocabulary exactly.
  *
  * Theme mechanism (data-model.md §2 "Theme mechanism"):
  *   :root                        — light values (default).
@@ -21,26 +22,31 @@
  */
 
 :root {
-  /* Colour roles — docs/design.md §3.1 */
-  --color-canvas: #f7f7f8;
+  /* Colour roles — docs/design.md §3.1. Cool neutrals, one electric-blue
+     accent reserved for primary actions and current selection; danger/
+     warning/success stay visibly distinct from the accent hue. */
+  --color-canvas: #f3f4f6;
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
-  --color-foreground: #1a1a1e;
-  --color-foreground-muted: #4c4c53;
-  --color-foreground-subtle: #7a7a82;
-  --color-border: #e2e2e6;
-  --color-border-strong: #c7c7cf;
-  --color-accent: #3457d5;
+  --color-foreground: #14161a;
+  --color-foreground-muted: #5b6070;
+  --color-foreground-subtle: #8a8f9e;
+  --color-border: #dcdee4;
+  --color-border-strong: #c3c6d0;
+  --color-accent: #2f5bff;
   --color-accent-foreground: #ffffff;
-  --color-focus-ring: #3457d5;
-  --color-danger: #b3261e;
-  --color-warning: #8a5a00;
-  --color-success: #1e6b3e;
+  --color-focus-ring: #2f5bff;
+  --color-danger: #d0342c;
+  --color-warning: #b5560f;
+  --color-success: #1f9d55;
 
-  /* Radii */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 16px;
+  /* Radii — square by default (a deliberate part of this identity: cards,
+     fields, and the block-progress grid are hard-edged); only controls the
+     user directly taps get a small radius, so "tappable" reads distinctly
+     from "structural". */
+  --radius-sm: 6px;
+  --radius-md: 6px;
+  --radius-lg: 6px;
 
   /* Durations — named categories, not magic numbers (docs/design.md rule 2) */
   --duration-instant: 80ms;
@@ -59,67 +65,77 @@
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
+
+  /* Typography — docs/design.md §1.2: one legible humanist/geometric
+     typeface for everything read at length, one tabular-figure monospace
+     reserved for numbers that must align in a column (loads, reps, dates)
+     so digits don't visually jitter as they change. No more than two type
+     roles; loaded via Google Fonts in index.html. */
+  --font-ui: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-canvas: #17171a;
-    --color-surface: #1f1f23;
-    --color-surface-raised: #28282d;
-    --color-foreground: #f0f0f2;
-    --color-foreground-muted: #b8b8c0;
-    --color-foreground-subtle: #86868f;
-    --color-border: #333338;
-    --color-border-strong: #47474e;
-    --color-accent: #7f9bff;
-    --color-accent-foreground: #0f1220;
-    --color-focus-ring: #7f9bff;
-    --color-danger: #ff6b64;
-    --color-warning: #e3a63e;
-    --color-success: #4fbf78;
+    --color-canvas: #0e0f12;
+    --color-surface: #17181e;
+    --color-surface-raised: #1d1f27;
+    --color-foreground: #e7e9ee;
+    --color-foreground-muted: #9aa0b3;
+    --color-foreground-subtle: #656b7d;
+    --color-border: #262a35;
+    --color-border-strong: #363c4a;
+    --color-accent: #7e9cff;
+    --color-accent-foreground: #0a0e1f;
+    --color-focus-ring: #7e9cff;
+    --color-danger: #e5766f;
+    --color-warning: #e08a4a;
+    --color-success: #4fd583;
   }
 }
 
 :root[data-theme='dark'] {
-  --color-canvas: #17171a;
-  --color-surface: #1f1f23;
-  --color-surface-raised: #28282d;
-  --color-foreground: #f0f0f2;
-  --color-foreground-muted: #b8b8c0;
-  --color-foreground-subtle: #86868f;
-  --color-border: #333338;
-  --color-border-strong: #47474e;
-  --color-accent: #7f9bff;
-  --color-accent-foreground: #0f1220;
-  --color-focus-ring: #7f9bff;
-  --color-danger: #ff6b64;
-  --color-warning: #e3a63e;
-  --color-success: #4fbf78;
+  --color-canvas: #0e0f12;
+  --color-surface: #17181e;
+  --color-surface-raised: #1d1f27;
+  --color-foreground: #e7e9ee;
+  --color-foreground-muted: #9aa0b3;
+  --color-foreground-subtle: #656b7d;
+  --color-border: #262a35;
+  --color-border-strong: #363c4a;
+  --color-accent: #7e9cff;
+  --color-accent-foreground: #0a0e1f;
+  --color-focus-ring: #7e9cff;
+  --color-danger: #e5766f;
+  --color-warning: #e08a4a;
+  --color-success: #4fd583;
 }
 
 /* A minimal reset — the browser's default body margin would otherwise
    overflow a 100vh shell and leave an unthemed sliver visible around it
    (most noticeable in dark mode). Not a token itself, but belongs here:
    this file is the one stylesheet always loaded first (index.html), before
-   any component styles. */
+   any component styles. Sets the base typeface here too, since every piece
+   of UI text inherits it unless a component opts into --font-mono. */
 body {
   margin: 0;
+  font-family: var(--font-ui);
 }
 
 /* An explicit light choice always wins over the OS preference. */
 :root[data-theme='light'] {
-  --color-canvas: #f7f7f8;
+  --color-canvas: #f3f4f6;
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
-  --color-foreground: #1a1a1e;
-  --color-foreground-muted: #4c4c53;
-  --color-foreground-subtle: #7a7a82;
-  --color-border: #e2e2e6;
-  --color-border-strong: #c7c7cf;
-  --color-accent: #3457d5;
+  --color-foreground: #14161a;
+  --color-foreground-muted: #5b6070;
+  --color-foreground-subtle: #8a8f9e;
+  --color-border: #dcdee4;
+  --color-border-strong: #c3c6d0;
+  --color-accent: #2f5bff;
   --color-accent-foreground: #ffffff;
-  --color-focus-ring: #3457d5;
-  --color-danger: #b3261e;
-  --color-warning: #8a5a00;
-  --color-success: #1e6b3e;
+  --color-focus-ring: #2f5bff;
+  --color-danger: #d0342c;
+  --color-warning: #b5560f;
+  --color-success: #1f9d55;
 }

@@ -82,9 +82,21 @@ interface follows these:
 - **Imagery**: none. No illustrations, no mascots, no stock photography —
   the interface is entirely typographic and numeric. Nothing competes with
   the number the user is trying to read at a glance.
-- **Corners and edges** favor a consistent, gentle rounding on interactive
-  surfaces over sharp rectangles — a small, deliberate softness, not a
-  stylistic flourish that changes screen to screen.
+- **Corners and edges**: structural surfaces (cards, panels, the layout
+  grid) are square — a deliberate, consistent hard edge, not softened.
+  Only elements the user directly taps (buttons, the active input) carry a
+  small, consistent radius, so "this is interactive" reads at a glance
+  against an otherwise square system, rather than rounding being a general
+  stylistic softness applied everywhere alike.
+
+**Visual identity, decided**: the concrete values realizing the criteria
+above (palette, the two type roles, the interactive-vs-structural radius
+split) were chosen through a design exploration and confirmed by the
+project owner; they live as tokens in
+`src/presentation/design/tokens.css`/`tokens.ts`, never here (§7). Section
+headings and primary titles use the heavier weight, uppercase, in the
+approved identity — this is the "type" and "hierarchy through weight, not
+repetition" criteria above expressed concretely, not a new criterion.
 
 ---
 
