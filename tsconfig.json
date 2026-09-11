@@ -32,12 +32,6 @@
       "@/*": ["src/*"]
     }
   },
-  "include": [
-    "src",
-    "test",
-    "*.config.ts",
-    "eslint.config.js",
-    "eslint.boundaries.js"
-  ],
+  "include": ["src", "test", "*.config.ts"],
   "exclude": ["node_modules", "dist", "coverage", "playwright-report"]
 }
