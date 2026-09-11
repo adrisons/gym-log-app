@@ -41,6 +41,7 @@ export function createLoad(load: Load): Load {
       return { kind: 'bodyweight' };
     }
     if (
+      !Number.isFinite(component) ||
       component < BODYWEIGHT_COMPONENT_MIN ||
       component > BODYWEIGHT_COMPONENT_MAX
     ) {

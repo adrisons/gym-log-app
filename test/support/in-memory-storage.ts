@@ -174,10 +174,19 @@ export class InMemoryStorage implements StoragePort {
     this.#schemaVersion = 0;
   }
 
-  // The fake intentionally does not interpret LoggingDraft's shape beyond
-  // what merge/cascade repointing requires (FR-025) — it only looks for an
-  // `exerciseId` field at the top level, the minimal convention this
-  // phase's tests exercise. Spec 001 owns the draft's real shape.
+  // LIMITATION, by design (FR-025; contracts/storage-port.md "LoggingDraft's
+  // shape is intentionally NOT specified here"): a real LoggingDraft will
+  // contain partial blocks/entries/sets, not a flat `exerciseId` — this
+  // spec (002) deliberately does not define that nested shape, so this
+  // fake cannot walk it. These three helpers only repoint/prune a
+  // top-level `exerciseId` convention, sufficient for this phase's own
+  // round-trip tests but NOT a general nested-draft implementation. Spec
+  // 001, which owns LoggingDraft's real shape, MUST replace this logic
+  // (and re-verify merge/cascade against its real nested structure) before
+  // relying on draft repoint/prune for an actual in-progress logging
+  // screen — treat this as a documented placeholder, not full compliance
+  // with the "merge/cascade also touches the draft" contract rule for any
+  // shape beyond the flat one exercised here.
   #referencesExercise(draft: LoggingDraft, exerciseId: ExerciseId): boolean {
     return draft['exerciseId'] === exerciseId;
   }

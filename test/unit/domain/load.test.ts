@@ -55,6 +55,21 @@ describe('Load (FR-007)', () => {
     ).toThrow(InvalidLoadError);
   });
 
+  it('rejects a non-finite bodyweight component — NaN is not "in range" (red)', () => {
+    // Regression: `NaN < -300` and `NaN > 300` both evaluate false, so a
+    // bounds check alone lets NaN through unless finiteness is checked
+    // explicitly first.
+    expect(() =>
+      createLoad({ kind: 'bodyweight', addedOrAssistedKg: Number.NaN }),
+    ).toThrow(InvalidLoadError);
+    expect(() =>
+      createLoad({
+        kind: 'bodyweight',
+        addedOrAssistedKg: Number.POSITIVE_INFINITY,
+      }),
+    ).toThrow(InvalidLoadError);
+  });
+
   it('accepts the boundary values -300 and +300 (green)', () => {
     expect(createLoad({ kind: 'bodyweight', addedOrAssistedKg: 300 })).toEqual({
       kind: 'bodyweight',

@@ -97,6 +97,23 @@ describe('InMemoryStorage (StoragePort fake)', () => {
       await storage.deleteSession(inRange.id);
       expect(await storage.getSession(inRange.id)).toBeUndefined();
     });
+
+    it('compares parsed instants, not raw ISO 8601 strings, across mixed UTC offsets (regression)', async () => {
+      // A session at 20:00+02:00 is 18:00Z — inside a 17:00Z..19:00Z range
+      // when compared as instants, but would wrongly sort outside it under
+      // naive lexicographic string comparison.
+      const mixedOffset = makeSession({
+        id: 'sess-mixed-offset' as SessionId,
+        dateTime: '2026-09-10T20:00:00.000+02:00',
+      });
+      await storage.saveSession(mixedOffset);
+
+      const listed = await storage.listSessions({
+        from: '2026-09-10T17:00:00.000Z',
+        to: '2026-09-10T19:00:00.000Z',
+      });
+      expect(listed).toEqual([mixedOffset]);
+    });
   });
 
   describe('Exercise catalogue', () => {

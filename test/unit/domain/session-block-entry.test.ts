@@ -79,10 +79,16 @@ describe('Empty lists are valid (§3.3; FR-017)', () => {
 // FR-018: order is list position alone — no separate stored "order" field.
 describe('Order is list position only (§3.3; FR-018)', () => {
   it('has no separate order field on Block, ExerciseEntry, or Set', () => {
+    const set = createSet({
+      volume: createVolume({ kind: 'reps', count: 5 }),
+      load: createLoad({ kind: 'none' }),
+      setKind: 'working',
+      completed: true,
+    });
     const entry: ExerciseEntry = {
       exerciseId: 'ex-1' as ExerciseId,
       notes: '',
-      sets: [],
+      sets: [set],
     };
     const block = createBlock({ type: 'straightSets', exercises: [entry] });
     const session = createSession({
@@ -94,9 +100,11 @@ describe('Order is list position only (§3.3; FR-018)', () => {
     expect('order' in block).toBe(false);
     expect('order' in entry).toBe(false);
     expect('order' in session).toBe(false);
+    expect('order' in set).toBe(false);
     // Position within the array is the only record of order.
     expect(session.blocks.indexOf(block)).toBe(0);
     expect(block.exercises.indexOf(entry)).toBe(0);
+    expect(entry.sets.indexOf(set)).toBe(0);
   });
 });
 

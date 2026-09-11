@@ -138,3 +138,16 @@ acknowledged here, at the port boundary, rather than silently absent.
 
 `exportAll`/`importAll` (FR-12, a later phase) remain out of this
 interface, per spec 000's original note — still true, not revisited here.
+
+### Known limitation of the Phase 1 fake's draft repoint/prune (tracked, not blocking)
+
+The in-memory fake's `mergeExercises`/`deleteExerciseCascade` implement
+draft repoint/prune only against a flat top-level `exerciseId` convention —
+sufficient to round-trip this phase's own tests, but not a real
+implementation of "walk a `LoggingDraft`'s nested blocks/entries/sets,"
+since this spec deliberately does not define that nested shape (see above).
+Spec 001, which does define `LoggingDraft`'s real shape, MUST replace this
+logic and re-verify merge/cascade against it (`test/support/in-memory-storage.ts`'s
+own doc comment on these helpers carries the same note) before a real
+logging screen can rely on draft repoint/prune surviving a merge or
+cascade-delete.
