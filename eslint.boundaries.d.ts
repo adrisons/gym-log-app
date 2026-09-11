@@ -23,4 +23,7 @@ export declare function dependencyPolicies(): (
       from: { file: { path: string } };
       allow: { to: { element: { type: string } } }[];
     }
+  | {
+      disallow: { to: { file: { path: string } } };
+    }
 )[];

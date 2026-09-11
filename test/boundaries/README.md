@@ -39,10 +39,30 @@ naming the import, then delete the probe file.
 
 | # | From → To | Probe file | Import | Result |
 |---|---|---|---|---|
-| 7 | `presentation` → `application` (barrel) | `src/presentation/__p.tsx` | `import type { StoragePort } from '../application'` | ✅ PASSED |
+| 7 | `presentation` → `application` (barrel), a legitimate export | `src/presentation/__p.tsx` | `import { StorageError } from '../application'` | ✅ PASSED |
 | 8 | `infrastructure` → `application-ports` | `src/infrastructure/__p.ts` | `import type { StoragePort } from '../application/ports/storage-port'` | ✅ PASSED |
 | 9 | `composition-root` (`src/presentation/main.tsx`) → `domain` + `infrastructure` + `shared` | `src/presentation/main.tsx` | three imports, one per layer | ✅ PASSED (2026-09-11, after the composition-root fix below) |
 | 10 | `presentation` (ordinary file, same folder as the composition root) → `infrastructure` | `src/presentation/other.tsx` | `import { CONSTANT } from '../infrastructure/placeholder'` | ✅ FAILED — confirms the composition-root's broad access does not leak to sibling files |
+| 11 | `presentation` → `application-ports` (direct) | `src/presentation/__p.tsx` | `import type { StoragePort } from '../application/ports/storage-port'` | ✅ FAILED — presentation must never see a persistence type directly |
+| 12 | `presentation` (sibling of `main.tsx`) → `composition-root` (`src/presentation/main.tsx`) | `src/presentation/__p.tsx` | `import { probe } from './main'` | ✅ FAILED — the composition root may be an entry point only, never a module another file imports for its exports |
+| 13 | `presentation`, ordinary intra-layer import (control — must pass) | two files in `src/presentation/` | one imports the other, neither is `main.tsx` | ✅ PASSED |
+
+## The application barrel is restricted, not just the direct port import
+
+`src/application/index.ts` re-exports only `StorageError` — none of the
+`ports/storage-port.ts` types (`StoragePort`, `SessionRecord`,
+`ExerciseRecord`, `SessionId`, `ExerciseId`, `DateRange`). Case 7 above
+(`presentation` → `application` barrel, importing `StorageError`) passes
+because that export is legitimate; a hypothetical `import type {
+StoragePort } from '../application'` is not blocked by the boundary
+*lint* rule (the plugin classifies the dependency by the imported file —
+`application` — not by where the re-exported symbol actually originates),
+but IS caught by `npm run typecheck` (`tsc`) with `TS2305: Module
+"../application" has no exported member 'StoragePort'`, since the barrel
+no longer re-exports it. Both checks are mandatory in CI (constitution
+Definition of Done), so the bypass is closed either way — but this is a
+reminder that the boundary rule alone does not follow a re-export's real
+origin; keeping barrels narrow is what closes the gap.
 
 ## Notes
 
@@ -69,3 +89,24 @@ naming the import, then delete the probe file.
   selector (`from: { file: { path: 'src/presentation/main.tsx' } }`) — see
   `docs/architecture.md` "Composition-root classification" and the inline
   comment in `eslint.boundaries.js`.
+- Case 12 caught a third real bug (2026-09-11, found via PR #3 code review):
+  because `main.tsx` classifies as plain `presentation`, a `presentation`
+  sibling importing it was an "internal" (same-element) dependency, which
+  `eslint-plugin-boundaries` skips before policies run *unless*
+  `checkInternals: true` is set on the rule (eslint.config.js). Without it,
+  the universal disallow-`main.tsx` policy in `eslint.boundaries.js` never
+  fired — a sibling could freely `import './main'` and trigger its
+  mount/service-worker side effects. Fixed by adding `checkInternals: true`
+  and an explicit `allow` entry for each type's own-type target (no longer
+  free once internals are checked), plus the universal disallow policy
+  listed last so it overrides the `presentation` self-import allow for
+  `main.tsx` specifically (policies evaluate in order; the last match
+  wins).
+- Case 11/case-7-barrel-note (also from the same review pass) caught a
+  fourth real bug: `allowedImports.presentation` included
+  `application-ports`, letting `presentation` import `StoragePort` directly
+  — contradicting the port's own contract JSDoc
+  (`src/application/ports/storage-port.ts`) and
+  `docs/development-principles.md`. Removed `application-ports` from
+  `presentation`'s allow-list; see "The application barrel is restricted"
+  above for the related barrel-narrowing fix.

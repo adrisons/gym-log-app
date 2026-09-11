@@ -69,7 +69,12 @@ export const allowedImports = {
   application: ['application-ports', 'domain'],
   'application-ports': ['domain'],
   infrastructure: ['application', 'application-ports', 'domain'],
-  presentation: ['application', 'application-ports', 'presentation-design'],
+  // NOT application-ports: presentation must never see a persistence type
+  // (StoragePort et al.) directly — only application's use cases/view
+  // models, which is what actually calls the port. See the port contract's
+  // own JSDoc (src/application/ports/storage-port.ts) and
+  // docs/development-principles.md.
+  presentation: ['application', 'presentation-design'],
   'presentation-design': [],
   shared: [],
   'composition-root': [
@@ -109,9 +114,16 @@ export function forbiddenEdges() {
 
 /**
  * `policies` for the `boundaries/dependencies` rule. One allow-policy per
- * source type listing the target types it may import; the rule's
- * `default: 'disallow'` forbids the rest. Intra-layer imports (from === to)
- * are permitted by the plugin without an explicit policy.
+ * source type listing the target types it may import (its own type plus
+ * `allowedImports[type]`); the rule's `default: 'disallow'` forbids the
+ * rest. The rule runs with `checkInternals: true` (eslint.config.js) so
+ * that same-element ("internal") dependencies are policy-checked too — that
+ * is what lets the final disallow entry below actually fire for a
+ * `presentation` sibling importing the composition root; without
+ * `checkInternals`, the plugin would skip that pair before policies ever
+ * run, because both files classify as the same element type. This also
+ * means every type's own-type target must now be listed explicitly (it is
+ * no longer given for free).
  *
  * `composition-root` is not an `elements` descriptor (see the note above),
  * so its policy is keyed on a file-path selector matching
@@ -120,18 +132,30 @@ export function forbiddenEdges() {
  * permission, independent of how that file classifies as an element
  * (it classifies as plain `presentation`).
  *
- * @returns {({ from: { element: { type: string } }, allow: { to: { element: { type: string } } }[] } | { from: { file: { path: string } }, allow: { to: { element: { type: string } } }[] })[]}
+ * The final entry is a universal disallow (no `from`, applies to every
+ * source) blocking any import of COMPOSITION_ROOT_PATH — the composition
+ * root may be the app's entry point only, never a module another file
+ * (including a `presentation` sibling) pulls in for its exports; doing so
+ * would run its mount/service-worker side effects. It is listed last so it
+ * overrides the `presentation` self-import allow above for this one
+ * target file (policies are evaluated in order and the last match wins).
+ *
+ * @returns {({ from: { element: { type: string } }, allow: { to: { element: { type: string } } }[] } | { from: { file: { path: string } }, allow: { to: { element: { type: string } } }[] } | { disallow: { to: { file: { path: string } } } })[]}
  */
 export function dependencyPolicies() {
-  return allTypes
-    .filter((from) => (allowedImports[from] ?? []).length > 0)
-    .map((from) => ({
-      from:
-        from === 'composition-root'
-          ? { file: { path: COMPOSITION_ROOT_PATH } }
-          : { element: { type: from } },
-      allow: (allowedImports[from] ?? []).map((to) => ({
-        to: { element: { type: to } },
-      })),
-    }));
+  /** @type {({ from: { element: { type: string } }, allow: { to: { element: { type: string } } }[] } | { from: { file: { path: string } }, allow: { to: { element: { type: string } } }[] })[]} */
+  const allowPolicies = allTypes.map((from) => ({
+    from:
+      from === 'composition-root'
+        ? { file: { path: COMPOSITION_ROOT_PATH } }
+        : { element: { type: from } },
+    allow: [from, ...(allowedImports[from] ?? [])].map((to) => ({
+      to: { element: { type: to } },
+    })),
+  }));
+
+  return [
+    ...allowPolicies,
+    { disallow: { to: { file: { path: COMPOSITION_ROOT_PATH } } } },
+  ];
 }

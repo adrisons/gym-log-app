@@ -64,6 +64,16 @@ export default tseslint.config(
         'error',
         {
           default: 'disallow',
+          // main.tsx (the composition root) classifies as plain
+          // `presentation` for element purposes (see
+          // eslint.boundaries.js "Composition-root classification"), so a
+          // sibling file importing it would otherwise be an "internal"
+          // same-element dependency, which the plugin skips by default
+          // regardless of policies. checkInternals forces every import —
+          // including same-layer ones — through the policies below, which
+          // is what lets the universal disallow-composition-root policy
+          // actually fire (docs/architecture.md, presentation → main.tsx).
+          checkInternals: true,
           policies: dependencyPolicies(),
         },
       ],

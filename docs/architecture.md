@@ -43,7 +43,7 @@ maintained by hand independently of it.
 | `application` | `domain`, `application-ports` | `infrastructure`, `presentation`, `presentation-design`, `shared`, `composition-root` |
 | `application-ports` | `domain` | `application`, `infrastructure`, `presentation`, `presentation-design`, `shared`, `composition-root` |
 | `infrastructure` | `application`, `application-ports`, `domain` | `presentation`, `presentation-design`, `shared`, `composition-root` |
-| `presentation` | `application`, `application-ports`, `presentation-design` | `infrastructure`, `domain`, `shared`, `composition-root` |
+| `presentation` | `application`, `presentation-design` | `application-ports`, `infrastructure`, `domain`, `shared`, `composition-root` |
 | `presentation-design` | (nothing internal) | everything else, including the rest of `presentation` |
 | `shared` | (nothing internal) | everything else |
 | `composition-root` (`src/presentation/main.tsx`) | all layers | — the single wiring point |
