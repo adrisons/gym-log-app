@@ -3,13 +3,13 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// The `theme-color` / manifest colours here are provisional placeholders for
-// Phase 0. The design-token module (src/presentation/design/) is the source
-// of truth for visual values; these are duplicated only because a web app
-// manifest cannot read CSS custom properties. Keep them in sync by hand, or
-// generate them from the tokens in a later phase.
-const MANIFEST_BACKGROUND = '#ffffff';
-const MANIFEST_THEME = '#1a1a1a';
+// These mirror the light-theme --color-canvas / --color-accent tokens
+// (src/presentation/design/tokens.css). The design-token module is the
+// source of truth for visual values; these are duplicated only because a
+// web app manifest cannot read CSS custom properties. Keep them in sync by
+// hand, or generate them from the tokens in a later phase.
+const MANIFEST_BACKGROUND = '#f3f4f6';
+const MANIFEST_THEME = '#2f5bff';
 
 export default defineConfig({
   resolve: {

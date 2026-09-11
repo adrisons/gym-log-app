@@ -52,16 +52,23 @@ const EXPECTED_NON_COLOR_TOKENS = [
   '--space-6',
 ] as const;
 
+// Typography tokens — docs/design.md §1.2. Unlike color, these don't vary
+// by theme, so they're expected in the light :root block only, never
+// duplicated into the dark/light-override blocks below.
+const EXPECTED_TYPE_TOKENS = ['--font-ui', '--font-mono'] as const;
+
 const ALL_EXPECTED_TOKENS: readonly string[] = [
   ...EXPECTED_COLOR_TOKENS,
   ...EXPECTED_NON_COLOR_TOKENS,
+  ...EXPECTED_TYPE_TOKENS,
 ];
 
 /** The literal union of every name in the fixture above, for the
  * compile-time equality assertion against TokenName. */
 type ExpectedTokenName =
   | (typeof EXPECTED_COLOR_TOKENS)[number]
-  | (typeof EXPECTED_NON_COLOR_TOKENS)[number];
+  | (typeof EXPECTED_NON_COLOR_TOKENS)[number]
+  | (typeof EXPECTED_TYPE_TOKENS)[number];
 
 /**
  * Compile-time bidirectional type equality: true only if A and B have
