@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-11
 
-**Status**: Draft
+**Status**: Reviewed — passed spec-reviewer + schema-guardian; no plan.md/tasks.md yet
 
 **Input**: User description: "Domain model and ports (Phase 1). Entities,
 value objects, domain rules (docs/requirements.md §3.3), and the finalized
