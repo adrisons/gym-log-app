@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/fresh-browser-test';
 import { CONTRACT_SCENARIOS } from '../contract/storage-adapter-contract';
 
 // spec 003 US1-US4 (contracts/storage-adapters.md): the shared contract
@@ -8,10 +8,10 @@ import { CONTRACT_SCENARIOS } from '../contract/storage-adapter-contract';
 // production feature-detection fallback WebKit/iOS Safari takes
 // (spec 003 FR-004).
 //
-// One page.evaluate() per scenario, not one call for the whole suite —
-// see runOneScenario's doc comment in storage-adapter-contract.ts for why
-// (a reproducible CI-only browser crash on the File System Access
-// sibling spec's single giant page.evaluate() call).
+// One page.evaluate() per scenario, not one call for the whole suite,
+// AND a fresh browser process per test (fixtures/fresh-browser-test.ts) —
+// see that file's doc comment for why (a reproducible CI-only browser
+// crash on the File System Access sibling spec).
 
 for (const scenario of CONTRACT_SCENARIOS) {
   test(`IndexedDbStorageAdapter: ${scenario.name}`, async ({ page }) => {

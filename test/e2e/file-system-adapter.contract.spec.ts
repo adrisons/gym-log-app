@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/fresh-browser-test';
 import { CONTRACT_SCENARIOS } from '../contract/storage-adapter-contract';
 
 // spec 003 US1-US4 (contracts/storage-adapters.md): the shared contract
@@ -7,15 +7,17 @@ import { CONTRACT_SCENARIOS } from '../contract/storage-adapter-contract';
 // matching FR-004's production feature-detection fallback (a `webkit`
 // project run of this file would be un-runnable, not merely skipped).
 //
-// One page.evaluate() per scenario, not one call for the whole suite —
-// CI's chromium crashed reproducibly (3/3, not a flake) on a single
-// giant page.evaluate() running all ~15 scenarios in one browser-side
-// call ("Target page, context or browser has been closed", Chromium
-// crashpad visible in the browser logs), never reproduced locally on
-// either the default headless-shell binary or the full
-// Chrome-for-Testing build. Splitting per scenario gives the CDP
-// protocol a boundary per scenario; see runOneScenario's doc comment in
-// storage-adapter-contract.ts.
+// One page.evaluate() per scenario, AND a fresh browser process per test
+// (fixtures/fresh-browser-test.ts) — CI's chromium crashed reproducibly,
+// repeatedly, across several different mitigations ("Target page,
+// context or browser has been closed", Chromium crashpad visible in the
+// browser logs), never reproduced locally. Splitting into one Playwright
+// test per scenario showed the crash isn't one specific scenario's
+// fault: once the shared browser process crashed, every later test in
+// that worker failed identically, even ones whose own logic never ran —
+// pointing at the browser *process* itself, not this suite's code. A
+// fresh browser per test removes whatever accumulates across repeated
+// OPFS directory creation over many page loads in this CI container.
 
 for (const scenario of CONTRACT_SCENARIOS) {
   test(`FileSystemStorageAdapter: ${scenario.name}`, async ({
