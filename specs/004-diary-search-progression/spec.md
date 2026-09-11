@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-11
 
-**Status**: Draft
+**Status**: Reviewed
 
 **Input**: User description: "Diary, search and progression (Phase 4,
 MVP-closing). Covers docs/requirements.md FR-6 (Diary/history: reverse-
@@ -262,15 +262,20 @@ marked as personal records.
 ### Functional Requirements
 
 - **FR-001**: The system MUST provide a diary/history screen listing every
-  Session from `StoragePort.listSessions`, ordered reverse-chronologically
-  by `dateTime`, grouped under headings by calendar month.
+  stored Session (queried via `StoragePort.listSessions` with a `DateRange`
+  wide enough to cover every stored session — see Assumptions), ordered
+  reverse-chronologically by `dateTime`, grouped under headings by calendar
+  month.
 - **FR-002**: Each Session in the diary list MUST be summarized in one
   line showing: its date, its main exercises (the catalogue exercises
   referenced by its ExerciseEntries), its total Set count, and a kind-of-
   work label derived from the exercises logged (e.g. their movement
   patterns) — never a field entered separately when logging.
 - **FR-003**: The diary screen MUST let the user jump to a specific date,
-  navigating the list to the sessions at or nearest that date.
+  navigating the list to the session at that date, or, if none exists, the
+  nearest session dated after it; if no session exists on or after that
+  date, the nearest session before it; if the diary has no sessions at all,
+  FR-006's empty state applies and jump-to-date has nothing to navigate to.
 - **FR-004**: Selecting a Session from the diary list MUST open a session
   detail view showing every Block, ExerciseEntry and Set as logged.
 - **FR-005**: The session detail view MUST be editable after the fact — any
@@ -285,9 +290,11 @@ marked as personal records.
 - **FR-008**: Search MUST be case-insensitive and accent-insensitive (e.g.
   "sentadilla" matches "Sentadilla"; a query without diacritics matches a
   name that has them, and vice versa).
-- **FR-009**: Search MUST tolerate typos and partial matches (e.g. a
-  one-character-off query, or a prefix/substring of the full name, still
-  matches).
+- **FR-009**: Search MUST tolerate typos and partial matches: a query that
+  is a substring or prefix of a name or alias (case/accent-insensitive per
+  FR-008) MUST match, and a query within one single-character edit
+  (insertion, deletion, or substitution) of a name, alias, or one of their
+  substrings/prefixes MUST also match.
 - **FR-010**: Search MUST return results in under 100ms for a catalogue of
   up to 500 exercises.
 - **FR-011**: The search index MUST be derived from `listExercises` and
@@ -307,12 +314,17 @@ marked as personal records.
   Set for that exercise in that session (its load and volume), that best
   set's effort if recorded, and the count of Sets logged for that exercise
   in that session.
-- **FR-015**: "Best working set" for FR-014 and the personal-record marking
-  in FR-018 MUST be computed only over working sets (`setKind: 'working'`
-  or `'toFailure'`, per `docs/requirements.md` §5.1's working-set
-  definition — excluding `warmUp`) for that exercise in that session, using
-  the exercise's currently-selected chart metric to rank them when more
-  than one qualifies.
+- **FR-015**: "Best working set" (FR-014's list row, and the per-set case of
+  personal-record marking in FR-020) MUST be computed only over working
+  sets (`setKind: 'working'` or `'toFailure'`, per `docs/requirements.md`
+  §5.1's working-set definition — excluding `warmUp`) for that exercise in
+  that session, using this fixed ranking, independent of the chart's
+  currently-selected metric (FR-016): (1) the working set with the highest
+  estimated 1RM among those eligible per FR-017; if none are eligible, (2)
+  the working set with the highest numeric load value (`Weight` value, or
+  `Bodyweight`'s numeric added-load component); if no set has a numeric
+  load, (3) the working set with the highest rep count. This ranking is
+  used identically whichever chart metric is currently selected.
 - **FR-016**: The progression screen's chart representation MUST plot one
   metric over time, selectable among: estimated 1RM, top load, session
   tonnage, and reps at a fixed load.
@@ -328,18 +340,25 @@ marked as personal records.
   labelled accordingly when shown.
 - **FR-019**: The chart MUST support a selectable range of 3 months, 6
   months, 12 months, and all time, filtering which sessions' data points
-  are plotted.
+  are plotted; "all time" MUST include every stored session for that
+  exercise, with no earliest-date cutoff.
 - **FR-020**: Personal records MUST be marked visually in both the list and
-  chart representations — a session whose value for the currently selected
-  metric is the best (to date, at or before that session's date) among that
-  exercise's history is marked.
-- **FR-021**: For an Exercise whose logged Sets use only `Band` or
-  `FreeText` loads (no `Weight` or `Bodyweight` sets), the progression
-  screen MUST NOT offer or compute an estimated-1RM metric; it MUST instead
-  offer the metrics that do apply (tonnage-as-total-reps per FR-018, reps
-  at a fixed load where the load value matches exactly) and MUST show a
-  one-sentence explanation of why estimated 1RM is unavailable for this
-  exercise.
+  chart representations. A session is marked as a personal record for the
+  currently-selected metric when its value for that metric (its e1RM per
+  FR-017, its FR-015 best-working-set's load for top load, its tonnage per
+  FR-018, or its reps at the selected fixed load) equals the single highest
+  value for that metric across the exercise's **entire** history (all
+  sessions, regardless of the chart's currently selected range) — the
+  all-time maximum, not a running/progressive record; every session tied
+  for that maximum is marked.
+- **FR-021**: For an Exercise whose logged history contains zero working
+  sets eligible for estimated 1RM under FR-017 (i.e. every set is `Band`,
+  `FreeText`, or `Bodyweight` with no numeric added load, or falls outside
+  the 1-12 rep range), the progression screen MUST NOT offer or compute an
+  estimated-1RM metric; it MUST instead offer the metrics that do apply
+  (tonnage-as-total-reps per FR-018, reps at a fixed load where the load
+  value matches exactly) and MUST show a one-sentence explanation of why
+  estimated 1RM is unavailable for this exercise.
 - **FR-022**: When an Exercise's logged history includes both metric-
   eligible sets (Weight/Bodyweight-with-numeric-load) and ineligible ones
   (Band/FreeText) across different sessions, the estimated-1RM metric MUST
@@ -379,15 +398,23 @@ concepts with no persisted shape of their own:
 - **SC-003**: For an exercise logged with numeric Weight/Bodyweight loads
   across multiple sessions, its progression chart's e1RM values match a
   hand-computed Epley-formula result exactly, for every valid working set.
-- **SC-004**: An exercise logged only with Band or free-text loads never
-  shows a numeric estimated-1RM value anywhere, and always shows the
-  one-sentence explanation instead.
-- **SC-005**: 100% of personal records (the best value for the selected
-  metric across an exercise's full history) are visually marked in both the
-  progression list and chart.
+- **SC-004**: An exercise with no e1RM-eligible working set anywhere in its
+  history (FR-021) never shows a numeric estimated-1RM value anywhere, and
+  always shows the one-sentence explanation instead.
+- **SC-005**: 100% of personal records (the all-time-highest value for the
+  selected metric across an exercise's full history, per FR-020) are
+  visually marked in both the progression list and chart.
 
 ## Assumptions
 
+- `StoragePort.listSessions` (`src/application/ports/storage-port.ts`)
+  takes a mandatory `DateRange`; there is no unbounded "list all" overload.
+  Every "every Session" (FR-001) or "all time" (FR-019) requirement in this
+  spec is satisfied by the application layer passing a `DateRange` wide
+  enough to cover all stored data (e.g. from the epoch, or from the
+  earliest plausible session date, through the current date) — an
+  implementation technique, not a new port method or a change to
+  `listSessions`'s existing signature.
 - "Main exercises" in a diary summary (FR-6) means every distinct catalogue
   Exercise referenced by the session's ExerciseEntries — for a session with
   many exercises, the presentation layer may truncate the displayed list
