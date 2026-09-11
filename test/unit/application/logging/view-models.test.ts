@@ -5,8 +5,12 @@ import {
   formatVolume,
   formatEffort,
   toSetSummaryViewModel,
+  toExerciseEntryViewModel,
+  toBlockViewModel,
 } from '@/application/logging/view-models';
-import type { DraftSet } from '@/application/logging/draft';
+import type { DraftSet, DraftBlock } from '@/application/logging/draft';
+import type { Exercise } from '@/domain/exercise';
+import type { ExerciseId } from '@/domain/ids';
 
 describe('view-models formatters (data-model.md "View models")', () => {
   it('formatLoad renders every load kind', () => {
@@ -69,5 +73,51 @@ describe('view-models formatters (data-model.md "View models")', () => {
     };
     const vm = toSetSummaryViewModel(set);
     expect(vm.effortLabel).toBe('3 — Moderate');
+  });
+});
+
+describe('toExerciseEntryViewModel / toBlockViewModel (FR-007)', () => {
+  const exercise: Exercise = {
+    id: 'ex-1' as ExerciseId,
+    canonicalName: 'Back squat',
+    aliases: [],
+    defaultLoadType: 'weight',
+    unilateral: false,
+    discipline: 'Strength',
+  };
+
+  it('resolves the exercise name from the catalogue', () => {
+    const vm = toExerciseEntryViewModel(
+      { id: 'entry-1', exerciseId: exercise.id, notes: '', sets: [] },
+      [exercise],
+    );
+    expect(vm.exerciseName).toBe('Back squat');
+  });
+
+  it('falls back to a generic name if the exercise is not in the catalogue', () => {
+    const vm = toExerciseEntryViewModel(
+      { id: 'entry-1', exerciseId: exercise.id, notes: '', sets: [] },
+      [],
+    );
+    expect(vm.exerciseName).toBe('Exercise');
+  });
+
+  it('an unnamed block falls back to "Block N" from its position, never "Untitled" (FR-007)', () => {
+    const block: DraftBlock = {
+      id: 'block-1',
+      type: 'straightSets',
+      exercises: [],
+    };
+    expect(toBlockViewModel(block, 1, []).displayName).toBe('Block 2');
+  });
+
+  it('a named block keeps its name', () => {
+    const block: DraftBlock = {
+      id: 'block-1',
+      name: 'Squats',
+      type: 'straightSets',
+      exercises: [],
+    };
+    expect(toBlockViewModel(block, 0, []).displayName).toBe('Squats');
   });
 });

@@ -4,7 +4,13 @@ import {
   openLoggingForm,
   createExercise,
 } from '../../src/application/logging/use-cases';
-import { addExerciseEntry, addSet } from '../../src/application/logging/draft';
+import {
+  addExerciseEntry,
+  addSet,
+  addBlock,
+  moveExerciseAcrossBlocks,
+  deleteBlock,
+} from '../../src/application/logging/draft';
 import type { AddSetInput } from '../../src/application/logging/draft';
 
 // spec.md User Story 1 Independent Test: through createHarness() (the real
@@ -105,5 +111,50 @@ describe('Logging flow (US3 Independent Test)', () => {
     const sets = reloaded?.blocks[0]?.exercises[0]?.sets ?? [];
     expect(sets).toHaveLength(5);
     expect(sets.map((s) => s.load)).toEqual(inputs.map((i) => i.load));
+  });
+});
+
+// spec.md User Story 2 Independent Test: two blocks, move an exercise
+// between them, delete a block with sets, undo it within the window, and
+// confirm the draft matches the pre-deletion state exactly.
+describe('Logging flow (US2 Independent Test)', () => {
+  it('moves an exercise across blocks, then delete+undo restores a block with sets exactly', async () => {
+    const { storage } = createHarness();
+    let draft = await openLoggingForm(storage);
+    const exercise = await createExercise(storage, { canonicalName: 'Row' });
+
+    draft = addBlock(draft, 'A', 'straightSets');
+    draft = addBlock(draft, 'B', 'straightSets');
+    const blockAId = draft.blocks[0]!.id;
+    const blockBId = draft.blocks[1]!.id;
+
+    draft = addExerciseEntry(draft, exercise.id);
+    // addExerciseEntry appends to the last block (B); move it to A instead.
+    const entryId = draft.blocks[1]!.exercises[0]!.id;
+    draft = moveExerciseAcrossBlocks(draft, blockBId, entryId, blockAId);
+    expect(draft.blocks[0]?.exercises).toHaveLength(1);
+    expect(draft.blocks[1]?.exercises).toHaveLength(0);
+
+    draft = addSet(
+      draft,
+      blockAId,
+      entryId,
+      {
+        volume: { kind: 'reps', count: 5 },
+        load: { kind: 'none' },
+        setKind: 'working',
+      },
+      Date.now(),
+      undefined,
+    );
+    const beforeDelete = draft;
+
+    const { draft: afterDelete, undo } = deleteBlock(draft, blockAId);
+    expect(afterDelete.blocks).toHaveLength(1);
+
+    const restored = undo.restore(afterDelete);
+    await storage.saveDraft(restored);
+
+    expect(restored).toEqual(beforeDelete);
   });
 });

@@ -44,20 +44,23 @@ import {
   addExerciseEntry as addExerciseEntryToDraft,
   addSet as addSetToDraft,
   prefillNextSet as prefillNextSetFromDraft,
+  addBlock as addBlockToDraft,
+  renameBlock as renameBlockInDraft,
+  reorderBlockExercise as reorderBlockExerciseInDraft,
+  moveExerciseAcrossBlocks as moveExerciseAcrossBlocksInDraft,
+  deleteBlock as deleteBlockFromDraft,
+  deleteExerciseEntry as deleteExerciseEntryFromDraft,
+  deleteSet as deleteSetFromDraft,
 } from '@/application/logging/draft';
-import type { AddSetInput, SetPrefill } from '@/application/logging/draft';
+import type {
+  AddSetInput,
+  SetPrefill,
+  DraftBlock,
+  UndoEntry,
+  DeleteResult,
+} from '@/application/logging/draft';
 
-/**
- * data-model.md "Undo". Never persisted — an app close during the 5-second
- * window doesn't need to restore it (spec.md's own edge case: the
- * deletion is already final by then).
- */
-export interface UndoEntry {
-  id: string;
-  kind: 'block' | 'exerciseEntry' | 'set';
-  restore: (draft: LoggingDraft) => LoggingDraft;
-  expiresAt: number;
-}
+export type { UndoEntry };
 
 const FULL_RANGE = {
   from: '0000-01-01T00:00:00.000Z',
@@ -97,111 +100,237 @@ export interface LoggingSessionState {
   ) => Promise<void>;
   suggestFreeTextLoads: (exerciseId: ExerciseId) => string[];
   saveBandLabels: (labels: string[]) => Promise<void>;
+  addBlock: (
+    name: string | undefined,
+    type: DraftBlock['type'],
+  ) => Promise<void>;
+  renameBlock: (blockId: string, name: string | undefined) => Promise<void>;
+  reorderBlockExercise: (
+    blockId: string,
+    fromIndex: number,
+    toIndex: number,
+  ) => Promise<void>;
+  moveExerciseAcrossBlocks: (
+    fromBlockId: string,
+    entryId: string,
+    toBlockId: string,
+    toIndex?: number,
+  ) => Promise<void>;
+  deleteBlock: (blockId: string) => Promise<void>;
+  deleteExerciseEntry: (blockId: string, entryId: string) => Promise<void>;
+  deleteSet: (blockId: string, entryId: string, setId: string) => Promise<void>;
+  undo: (id: string) => Promise<void>;
 }
 
-export const useLoggingSession = create<LoggingSessionState>((set, get) => ({
-  storage: undefined,
-  draft: undefined,
-  undoStack: [],
-  catalogue: [],
-  sessions: [],
-  bandLabels: [],
-  lastConfirmedAt: {},
-
-  configure: (storage) => set({ storage }),
-
-  initialize: async () => {
-    const { storage } = get();
-    if (!storage) return;
-    const [draft, catalogue, sessions, bandLabels] = await Promise.all([
-      openLoggingForm(storage),
-      storage.listExercises(),
-      storage.listSessions(FULL_RANGE),
-      storage.listBandLabels(),
-    ]);
-    set({ draft, catalogue, sessions, bandLabels });
-  },
-
-  setSessionDateTime: async (iso) => {
+export const useLoggingSession = create<LoggingSessionState>((set, get) => {
+  /**
+   * Shared by `deleteBlock`/`deleteExerciseEntry`/`deleteSet`: applies the
+   * draft change immediately (Principle II — never held pending), persists
+   * it, pushes the resulting `UndoEntry`, and schedules its own removal
+   * from `undoStack` once its 5-second window elapses (FR-004/FR-023).
+   */
+  const applyDelete = async (
+    operation: (draft: LoggingDraft) => DeleteResult,
+  ): Promise<void> => {
     const { storage, draft: current } = get();
     if (!storage || !current) return;
-    const updated = touch({ ...current, dateTime: iso });
-    set({ draft: updated });
-    await storage.saveDraft(updated);
-  },
-
-  addExerciseEntry: async (exerciseId) => {
-    const { storage, draft: current } = get();
-    if (!storage || !current) return;
-    const updated = touch(addExerciseEntryToDraft(current, exerciseId));
-    set({ draft: updated });
-    await storage.saveDraft(updated);
-  },
-
-  addSet: async (blockId, entryId, input) => {
-    const { storage, draft: current, lastConfirmedAt } = get();
-    if (!storage || !current) return;
-    const nowMs = Date.now();
-    const lastConfirmedAtMs = lastConfirmedAt[entryId];
-    const result = addSetToDraft(
-      current,
-      blockId,
-      entryId,
-      input,
-      nowMs,
-      lastConfirmedAtMs,
+    const { draft: updated, undo: undoEntry } = operation(current);
+    if (updated === current) return; // id didn't resolve — noopUndo, nothing to push
+    const touched = touch(updated);
+    set((state) => ({
+      draft: touched,
+      undoStack: [...state.undoStack, undoEntry],
+    }));
+    await storage.saveDraft(touched);
+    setTimeout(
+      () => {
+        set((state) => ({
+          undoStack: state.undoStack.filter((e) => e.id !== undoEntry.id),
+        }));
+      },
+      Math.max(0, undoEntry.expiresAt - Date.now()),
     );
-    if (result === current) return; // FR-025: debounced no-op
+  };
 
-    const updated = touch(result);
-    set((state) => ({
-      draft: updated,
-      lastConfirmedAt: { ...state.lastConfirmedAt, [entryId]: nowMs },
-    }));
-    await storage.saveDraft(updated);
-  },
+  return {
+    storage: undefined,
+    draft: undefined,
+    undoStack: [],
+    catalogue: [],
+    sessions: [],
+    bandLabels: [],
+    lastConfirmedAt: {},
 
-  prefillNextSet: (blockId, entryId) => {
-    const current = get().draft;
-    if (!current) return undefined;
-    return prefillNextSetFromDraft(current, blockId, entryId);
-  },
+    configure: (storage) => set({ storage }),
 
-  searchExercises: (query) => {
-    const { catalogue, sessions } = get();
-    return searchExercisesUseCase(query, catalogue, sessions);
-  },
+    initialize: async () => {
+      const { storage } = get();
+      if (!storage) return;
+      const [draft, catalogue, sessions, bandLabels] = await Promise.all([
+        openLoggingForm(storage),
+        storage.listExercises(),
+        storage.listSessions(FULL_RANGE),
+        storage.listBandLabels(),
+      ]);
+      set({ draft, catalogue, sessions, bandLabels });
+    },
 
-  createExercise: async (input) => {
-    const { storage } = get();
-    if (!storage) throw new Error('useLoggingSession: not configured yet.');
-    const exercise = await createExerciseUseCase(storage, input);
-    set((state) => ({ catalogue: [...state.catalogue, exercise] }));
-    return exercise;
-  },
+    setSessionDateTime: async (iso) => {
+      const { storage, draft: current } = get();
+      if (!storage || !current) return;
+      const updated = touch({ ...current, dateTime: iso });
+      set({ draft: updated });
+      await storage.saveDraft(updated);
+    },
 
-  recordLoadTypeDefault: async (exerciseId, loadType) => {
-    const { storage } = get();
-    if (!storage) return;
-    await recordLoadTypeDefaultUseCase(storage, exerciseId, loadType);
-    set((state) => ({
-      catalogue: state.catalogue.map((exercise) =>
-        exercise.id === exerciseId
-          ? { ...exercise, defaultLoadType: loadType }
-          : exercise,
-      ),
-    }));
-  },
+    addExerciseEntry: async (exerciseId) => {
+      const { storage, draft: current } = get();
+      if (!storage || !current) return;
+      const updated = touch(addExerciseEntryToDraft(current, exerciseId));
+      set({ draft: updated });
+      await storage.saveDraft(updated);
+    },
 
-  suggestFreeTextLoads: (exerciseId) => {
-    const { sessions } = get();
-    return suggestFreeTextLoadsUseCase(exerciseId, sessions);
-  },
+    addSet: async (blockId, entryId, input) => {
+      const { storage, draft: current, lastConfirmedAt } = get();
+      if (!storage || !current) return;
+      const nowMs = Date.now();
+      const lastConfirmedAtMs = lastConfirmedAt[entryId];
+      const result = addSetToDraft(
+        current,
+        blockId,
+        entryId,
+        input,
+        nowMs,
+        lastConfirmedAtMs,
+      );
+      if (result === current) return; // FR-025: debounced no-op
 
-  saveBandLabels: async (labels) => {
-    const { storage } = get();
-    if (!storage) return;
-    set({ bandLabels: labels });
-    await saveBandLabelsUseCase(storage, labels);
-  },
-}));
+      const updated = touch(result);
+      set((state) => ({
+        draft: updated,
+        lastConfirmedAt: { ...state.lastConfirmedAt, [entryId]: nowMs },
+      }));
+      await storage.saveDraft(updated);
+    },
+
+    prefillNextSet: (blockId, entryId) => {
+      const current = get().draft;
+      if (!current) return undefined;
+      return prefillNextSetFromDraft(current, blockId, entryId);
+    },
+
+    searchExercises: (query) => {
+      const { catalogue, sessions } = get();
+      return searchExercisesUseCase(query, catalogue, sessions);
+    },
+
+    createExercise: async (input) => {
+      const { storage } = get();
+      if (!storage) throw new Error('useLoggingSession: not configured yet.');
+      const exercise = await createExerciseUseCase(storage, input);
+      set((state) => ({ catalogue: [...state.catalogue, exercise] }));
+      return exercise;
+    },
+
+    recordLoadTypeDefault: async (exerciseId, loadType) => {
+      const { storage } = get();
+      if (!storage) return;
+      await recordLoadTypeDefaultUseCase(storage, exerciseId, loadType);
+      set((state) => ({
+        catalogue: state.catalogue.map((exercise) =>
+          exercise.id === exerciseId
+            ? { ...exercise, defaultLoadType: loadType }
+            : exercise,
+        ),
+      }));
+    },
+
+    suggestFreeTextLoads: (exerciseId) => {
+      const { sessions } = get();
+      return suggestFreeTextLoadsUseCase(exerciseId, sessions);
+    },
+
+    saveBandLabels: async (labels) => {
+      const { storage } = get();
+      if (!storage) return;
+      set({ bandLabels: labels });
+      await saveBandLabelsUseCase(storage, labels);
+    },
+
+    addBlock: async (name, type) => {
+      const { storage, draft: current } = get();
+      if (!storage || !current) return;
+      const updated = touch(addBlockToDraft(current, name, type));
+      set({ draft: updated });
+      await storage.saveDraft(updated);
+    },
+
+    renameBlock: async (blockId, name) => {
+      const { storage, draft: current } = get();
+      if (!storage || !current) return;
+      const updated = touch(renameBlockInDraft(current, blockId, name));
+      set({ draft: updated });
+      await storage.saveDraft(updated);
+    },
+
+    reorderBlockExercise: async (blockId, fromIndex, toIndex) => {
+      const { storage, draft: current } = get();
+      if (!storage || !current) return;
+      const updated = touch(
+        reorderBlockExerciseInDraft(current, blockId, fromIndex, toIndex),
+      );
+      set({ draft: updated });
+      await storage.saveDraft(updated);
+    },
+
+    moveExerciseAcrossBlocks: async (
+      fromBlockId,
+      entryId,
+      toBlockId,
+      toIndex,
+    ) => {
+      const { storage, draft: current } = get();
+      if (!storage || !current) return;
+      const updated = touch(
+        moveExerciseAcrossBlocksInDraft(
+          current,
+          fromBlockId,
+          entryId,
+          toBlockId,
+          toIndex,
+        ),
+      );
+      set({ draft: updated });
+      await storage.saveDraft(updated);
+    },
+
+    deleteBlock: async (blockId) => {
+      await applyDelete((draft) => deleteBlockFromDraft(draft, blockId));
+    },
+
+    deleteExerciseEntry: async (blockId, entryId) => {
+      await applyDelete((draft) =>
+        deleteExerciseEntryFromDraft(draft, blockId, entryId),
+      );
+    },
+
+    deleteSet: async (blockId, entryId, setId) => {
+      await applyDelete((draft) =>
+        deleteSetFromDraft(draft, blockId, entryId, setId),
+      );
+    },
+
+    undo: async (id) => {
+      const { storage, draft: current, undoStack } = get();
+      const entry = undoStack.find((e) => e.id === id);
+      if (!storage || !current || !entry) return;
+      const restored = touch(entry.restore(current));
+      set((state) => ({
+        draft: restored,
+        undoStack: state.undoStack.filter((e) => e.id !== id),
+      }));
+      await storage.saveDraft(restored);
+    },
+  };
+});

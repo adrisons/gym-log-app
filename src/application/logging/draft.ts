@@ -153,6 +153,20 @@ export interface SetPrefill {
 }
 
 /**
+ * data-model.md "Undo" (FR-004/FR-023). Never persisted — an app close
+ * during the 5-second window doesn't need to restore it (spec.md's own
+ * edge case: the deletion is already final by then). Defined here, not in
+ * `logging-store.ts`, so `use-cases.ts` (which produces these) doesn't
+ * need to import the store module.
+ */
+export interface UndoEntry {
+  id: string;
+  kind: 'block' | 'exerciseEntry' | 'set';
+  restore: (draft: LoggingDraft) => LoggingDraft;
+  expiresAt: number;
+}
+
+/**
  * The entry's last set's volume/load, for pre-filling a new set (FR-008).
  * `undefined` for an entry with no sets yet. Effort is deliberately never
  * carried forward (spec.md Clarifications, 2026-09-09) — it is re-entered
@@ -245,5 +259,247 @@ export function addSet(
             ),
           },
     ),
+  };
+}
+
+/** FR-006: appends a new block, unnamed when `name` is omitted. */
+export function addBlock(
+  draft: LoggingDraft,
+  name: string | undefined,
+  type: DraftBlock['type'],
+): LoggingDraft {
+  const block: DraftBlock = {
+    id: newId(),
+    ...(name !== undefined ? { name } : {}),
+    type,
+    exercises: [],
+  };
+  return { ...draft, blocks: [...draft.blocks, block] };
+}
+
+/**
+ * FR-006: renames a block, or clears its name (back to the FR-007
+ * position-based fallback) when `name` is `undefined`.
+ */
+function withoutName(block: DraftBlock): DraftBlock {
+  const rest: DraftBlock = {
+    id: block.id,
+    type: block.type,
+    exercises: block.exercises,
+  };
+  return rest;
+}
+
+export function renameBlock(
+  draft: LoggingDraft,
+  blockId: string,
+  name: string | undefined,
+): LoggingDraft {
+  return {
+    ...draft,
+    blocks: draft.blocks.map((block) =>
+      block.id !== blockId
+        ? block
+        : name !== undefined
+          ? { ...block, name }
+          : withoutName(block),
+    ),
+  };
+}
+
+/** FR-006: moves an exercise entry within one block, by list position. */
+export function reorderBlockExercise(
+  draft: LoggingDraft,
+  blockId: string,
+  fromIndex: number,
+  toIndex: number,
+): LoggingDraft {
+  return {
+    ...draft,
+    blocks: draft.blocks.map((block) => {
+      if (block.id !== blockId) return block;
+      const exercises = [...block.exercises];
+      const [moved] = exercises.splice(fromIndex, 1);
+      if (!moved) return block;
+      exercises.splice(toIndex, 0, moved);
+      return { ...block, exercises };
+    }),
+  };
+}
+
+/**
+ * FR-006: moves an exercise entry from one block to another, preserving
+ * its already-recorded sets intact (spec.md Acceptance Scenario US2-3).
+ * Appends to the end of the target block's exercises unless `toIndex` is
+ * given.
+ */
+export function moveExerciseAcrossBlocks(
+  draft: LoggingDraft,
+  fromBlockId: string,
+  entryId: string,
+  toBlockId: string,
+  toIndex?: number,
+): LoggingDraft {
+  const fromBlock = draft.blocks.find((b) => b.id === fromBlockId);
+  const entry = fromBlock?.exercises.find((e) => e.id === entryId);
+  if (!entry) return draft;
+
+  return {
+    ...draft,
+    blocks: draft.blocks.map((block) => {
+      if (block.id === fromBlockId) {
+        return {
+          ...block,
+          exercises: block.exercises.filter((e) => e.id !== entryId),
+        };
+      }
+      if (block.id === toBlockId) {
+        const exercises = [...block.exercises];
+        exercises.splice(toIndex ?? exercises.length, 0, entry);
+        return { ...block, exercises };
+      }
+      return block;
+    }),
+  };
+}
+
+const UNDO_WINDOW_MS = 5000;
+
+export interface DeleteResult {
+  draft: LoggingDraft;
+  undo: UndoEntry;
+}
+
+/** A no-op `UndoEntry`, already expired — used when the target id doesn't resolve. */
+function noopUndo(id: string, kind: UndoEntry['kind']): UndoEntry {
+  return { id, kind, restore: (d) => d, expiresAt: 0 };
+}
+
+/**
+ * FR-004, FR-023: deletes a block, cascading to its exercise entries/sets
+ * by construction (they're nested). `restore` re-inserts the exact same
+ * block at its original index, clamped to the list's current length if it
+ * has since shrunk (spec.md: reordering during an open undo window must
+ * not crash).
+ */
+export function deleteBlock(
+  draft: LoggingDraft,
+  blockId: string,
+): DeleteResult {
+  const index = draft.blocks.findIndex((b) => b.id === blockId);
+  if (index === -1) return { draft, undo: noopUndo(blockId, 'block') };
+  const removed = draft.blocks[index]!;
+
+  const restore = (d: LoggingDraft): LoggingDraft => {
+    const blocks = [...d.blocks];
+    blocks.splice(Math.min(index, blocks.length), 0, removed);
+    return { ...d, blocks };
+  };
+
+  return {
+    draft: { ...draft, blocks: draft.blocks.filter((b) => b.id !== blockId) },
+    undo: {
+      id: blockId,
+      kind: 'block',
+      restore,
+      expiresAt: Date.now() + UNDO_WINDOW_MS,
+    },
+  };
+}
+
+/** FR-004: deletes one exercise entry from a block, with the same restore-at-original-index contract as `deleteBlock`. */
+export function deleteExerciseEntry(
+  draft: LoggingDraft,
+  blockId: string,
+  entryId: string,
+): DeleteResult {
+  const block = draft.blocks.find((b) => b.id === blockId);
+  const index = block ? block.exercises.findIndex((e) => e.id === entryId) : -1;
+  if (!block || index === -1) {
+    return { draft, undo: noopUndo(entryId, 'exerciseEntry') };
+  }
+  const removed = block.exercises[index]!;
+
+  const restore = (d: LoggingDraft): LoggingDraft => ({
+    ...d,
+    blocks: d.blocks.map((b) => {
+      if (b.id !== blockId) return b;
+      const exercises = [...b.exercises];
+      exercises.splice(Math.min(index, exercises.length), 0, removed);
+      return { ...b, exercises };
+    }),
+  });
+
+  return {
+    draft: {
+      ...draft,
+      blocks: draft.blocks.map((b) =>
+        b.id !== blockId
+          ? b
+          : { ...b, exercises: b.exercises.filter((e) => e.id !== entryId) },
+      ),
+    },
+    undo: {
+      id: entryId,
+      kind: 'exerciseEntry',
+      restore,
+      expiresAt: Date.now() + UNDO_WINDOW_MS,
+    },
+  };
+}
+
+/** FR-004: deletes one set from an exercise entry, with the same restore-at-original-index contract as `deleteBlock`. */
+export function deleteSet(
+  draft: LoggingDraft,
+  blockId: string,
+  entryId: string,
+  setId: string,
+): DeleteResult {
+  const entry = findEntry(draft, blockId, entryId);
+  const index = entry ? entry.sets.findIndex((s) => s.id === setId) : -1;
+  if (!entry || index === -1) {
+    return { draft, undo: noopUndo(setId, 'set') };
+  }
+  const removed = entry.sets[index]!;
+
+  const restore = (d: LoggingDraft): LoggingDraft => ({
+    ...d,
+    blocks: d.blocks.map((b) =>
+      b.id !== blockId
+        ? b
+        : {
+            ...b,
+            exercises: b.exercises.map((e) => {
+              if (e.id !== entryId) return e;
+              const sets = [...e.sets];
+              sets.splice(Math.min(index, sets.length), 0, removed);
+              return { ...e, sets };
+            }),
+          },
+    ),
+  });
+
+  return {
+    draft: {
+      ...draft,
+      blocks: draft.blocks.map((b) =>
+        b.id !== blockId
+          ? b
+          : {
+              ...b,
+              exercises: b.exercises.map((e) =>
+                e.id !== entryId
+                  ? e
+                  : { ...e, sets: e.sets.filter((s) => s.id !== setId) },
+              ),
+            },
+      ),
+    },
+    undo: {
+      id: setId,
+      kind: 'set',
+      restore,
+      expiresAt: Date.now() + UNDO_WINDOW_MS,
+    },
   };
 }

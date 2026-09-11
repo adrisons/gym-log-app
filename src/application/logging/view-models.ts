@@ -1,15 +1,18 @@
 /**
  * Presentation-facing formatting (data-model.md "View models") — keeps
  * `Load`/`Volume`'s raw discriminated unions and effort's number+word
- * pairing out of `presentation/` components. `toBlockViewModel`/
- * `toExerciseEntryViewModel` (FR-007's "Block N" fallback) are added by
- * User Story 2's tasks, once blocks are user-visible.
+ * pairing out of `presentation/` components.
  */
 
 import type { Load } from '@/domain/load';
 import type { Volume } from '@/domain/volume';
 import type { Effort } from '@/domain/effort';
-import type { DraftSet } from '@/application/logging/draft';
+import type { Exercise } from '@/domain/exercise';
+import type {
+  DraftSet,
+  DraftExerciseEntry,
+  DraftBlock,
+} from '@/application/logging/draft';
 
 /**
  * Word label shown next to every effort number, never a bare digit
@@ -75,5 +78,50 @@ export function toSetSummaryViewModel(set: DraftSet): SetSummaryViewModel {
     volumeLabel: formatVolume(set.volume),
     ...(effortLabel !== undefined ? { effortLabel } : {}),
     setKind: set.setKind,
+  };
+}
+
+export interface ExerciseEntryViewModel {
+  id: string;
+  exerciseName: string;
+  sets: SetSummaryViewModel[];
+}
+
+/** Resolves the entry's exercise name from the catalogue, never stored redundantly. */
+export function toExerciseEntryViewModel(
+  entry: DraftExerciseEntry,
+  catalogue: Exercise[],
+): ExerciseEntryViewModel {
+  const exercise = catalogue.find((e) => e.id === entry.exerciseId);
+  return {
+    id: entry.id,
+    exerciseName: exercise?.canonicalName ?? 'Exercise',
+    sets: entry.sets.map(toSetSummaryViewModel),
+  };
+}
+
+export interface BlockViewModel {
+  id: string;
+  displayName: string;
+  type: 'straightSets' | 'superset' | 'circuit';
+  entries: ExerciseEntryViewModel[];
+}
+
+/**
+ * FR-007: an unnamed block's `displayName` falls back to its position
+ * ("Block N"), computed here once rather than per component.
+ */
+export function toBlockViewModel(
+  block: DraftBlock,
+  index: number,
+  catalogue: Exercise[],
+): BlockViewModel {
+  return {
+    id: block.id,
+    displayName: block.name ?? `Block ${index + 1}`,
+    type: block.type,
+    entries: block.exercises.map((entry) =>
+      toExerciseEntryViewModel(entry, catalogue),
+    ),
   };
 }

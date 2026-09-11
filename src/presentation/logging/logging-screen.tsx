@@ -10,21 +10,34 @@
  * (`docs/architecture.md`'s table), so every store action already knows
  * which port to use (`logging-store.ts`).
  *
- * US1 scope: a flat exercise-entry/set list, no block chrome yet (US2
- * adds `BlockList`/`BlockCard` and swaps this screen to render through
- * them instead).
+ * US2: renders through `BlockCard`/`ExerciseEntryCard` — blocks are now
+ * user-visible/manageable (create, rename, reorder, delete-with-undo),
+ * replacing US1's flat list.
  */
 import { useEffect } from 'react';
 import { useLoggingSession } from '@/application/logging/logging-store';
-import { toSetSummaryViewModel } from '@/application/logging/view-models';
+import {
+  toBlockViewModel,
+  toSetSummaryViewModel,
+} from '@/application/logging/view-models';
 import { SessionDateTimeField } from './session-date-time-field';
 import { ExerciseSearchField } from './exercise-search-field';
 import { SetRow } from './set-row';
+import { BlockCard } from './block-card';
+import { ExerciseEntryCard } from './exercise-entry-card';
+import { UndoToast } from './undo-toast';
 import './logging.css';
+
+const UNDO_MESSAGES = {
+  block: 'Block deleted',
+  exerciseEntry: 'Exercise deleted',
+  set: 'Set deleted',
+} as const;
 
 export function LoggingScreen() {
   const draft = useLoggingSession((s) => s.draft);
   const catalogue = useLoggingSession((s) => s.catalogue);
+  const undoStack = useLoggingSession((s) => s.undoStack);
   const initialize = useLoggingSession((s) => s.initialize);
   const setSessionDateTime = useLoggingSession((s) => s.setSessionDateTime);
   const addExerciseEntry = useLoggingSession((s) => s.addExerciseEntry);
@@ -38,6 +51,16 @@ export function LoggingScreen() {
   );
   const suggestFreeTextLoads = useLoggingSession((s) => s.suggestFreeTextLoads);
   const saveBandLabels = useLoggingSession((s) => s.saveBandLabels);
+  const addBlock = useLoggingSession((s) => s.addBlock);
+  const renameBlock = useLoggingSession((s) => s.renameBlock);
+  const reorderBlockExercise = useLoggingSession((s) => s.reorderBlockExercise);
+  const moveExerciseAcrossBlocks = useLoggingSession(
+    (s) => s.moveExerciseAcrossBlocks,
+  );
+  const deleteBlock = useLoggingSession((s) => s.deleteBlock);
+  const deleteExerciseEntry = useLoggingSession((s) => s.deleteExerciseEntry);
+  const deleteSet = useLoggingSession((s) => s.deleteSet);
+  const undo = useLoggingSession((s) => s.undo);
 
   useEffect(() => {
     void initialize();
@@ -66,41 +89,112 @@ export function LoggingScreen() {
           })();
         }}
       />
-      <ul className="set-list">
-        {draft.blocks.flatMap((block) =>
-          block.exercises.map((entry) => {
-            const exercise = catalogue.find((e) => e.id === entry.exerciseId);
-            return (
-              <li key={entry.id}>
-                <h2>{exercise?.canonicalName ?? 'Exercise'}</h2>
-                <ul className="set-list">
-                  {entry.sets.map((set) => {
-                    const vm = toSetSummaryViewModel(set);
-                    return (
-                      <li key={vm.id} className="set-summary">
-                        <span>{vm.loadLabel}</span>
-                        <span>{vm.volumeLabel}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <SetRow
-                  key={`${entry.id}-${entry.sets.length}`}
-                  prefill={prefillNextSet(block.id, entry.id)}
-                  defaultLoadKind={exercise?.defaultLoadType ?? 'none'}
-                  bandLabels={bandLabels}
-                  freeTextSuggestions={suggestFreeTextLoads(entry.exerciseId)}
-                  onConfirm={(input) => void addSet(block.id, entry.id, input)}
-                  onLoadTypeChange={(kind) =>
-                    void recordLoadTypeDefault(entry.exerciseId, kind)
+
+      <button
+        type="button"
+        className="logging-button"
+        onClick={() => void addBlock(undefined, 'straightSets')}
+      >
+        Add block
+      </button>
+
+      {draft.blocks.map((block, blockIndex) => {
+        const blockVm = toBlockViewModel(block, blockIndex, catalogue);
+        const otherBlocks = draft.blocks
+          .map((b, i) => toBlockViewModel(b, i, catalogue))
+          .filter((vm) => vm.id !== block.id)
+          .map((vm) => ({ id: vm.id, displayName: vm.displayName }));
+
+        return (
+          <BlockCard
+            key={block.id}
+            displayName={blockVm.displayName}
+            hasName={block.name !== undefined}
+            onRename={(name) => void renameBlock(block.id, name)}
+            onDelete={() => void deleteBlock(block.id)}
+          >
+            {block.exercises.map((entry, entryIndex) => {
+              const entryVm = blockVm.entries[entryIndex]!;
+              return (
+                <ExerciseEntryCard
+                  key={entry.id}
+                  exerciseName={entryVm.exerciseName}
+                  canMoveUp={entryIndex > 0}
+                  canMoveDown={entryIndex < block.exercises.length - 1}
+                  onMoveUp={() =>
+                    void reorderBlockExercise(
+                      block.id,
+                      entryIndex,
+                      entryIndex - 1,
+                    )
                   }
-                  onSaveBandLabels={(labels) => void saveBandLabels(labels)}
-                />
-              </li>
-            );
-          }),
-        )}
-      </ul>
+                  onMoveDown={() =>
+                    void reorderBlockExercise(
+                      block.id,
+                      entryIndex,
+                      entryIndex + 1,
+                    )
+                  }
+                  otherBlocks={otherBlocks}
+                  onMoveToBlock={(toBlockId) =>
+                    void moveExerciseAcrossBlocks(block.id, entry.id, toBlockId)
+                  }
+                  onDelete={() => void deleteExerciseEntry(block.id, entry.id)}
+                >
+                  <ul className="set-list">
+                    {entry.sets.map((set) => {
+                      const vm = toSetSummaryViewModel(set);
+                      return (
+                        <li key={vm.id} className="set-summary">
+                          <span>{vm.loadLabel}</span>
+                          <span>{vm.volumeLabel}</span>
+                          <button
+                            type="button"
+                            className="logging-button"
+                            onClick={() =>
+                              void deleteSet(block.id, entry.id, vm.id)
+                            }
+                          >
+                            Delete set
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <SetRow
+                    key={`${entry.id}-${entry.sets.length}`}
+                    prefill={prefillNextSet(block.id, entry.id)}
+                    defaultLoadKind={
+                      catalogue.find((e) => e.id === entry.exerciseId)
+                        ?.defaultLoadType ?? 'none'
+                    }
+                    bandLabels={bandLabels}
+                    freeTextSuggestions={suggestFreeTextLoads(entry.exerciseId)}
+                    onConfirm={(input) =>
+                      void addSet(block.id, entry.id, input)
+                    }
+                    onLoadTypeChange={(kind) =>
+                      void recordLoadTypeDefault(entry.exerciseId, kind)
+                    }
+                    onSaveBandLabels={(labels) => void saveBandLabels(labels)}
+                  />
+                </ExerciseEntryCard>
+              );
+            })}
+          </BlockCard>
+        );
+      })}
+
+      <div aria-live="polite">
+        {undoStack.map((entry) => (
+          <UndoToast
+            key={entry.id}
+            message={UNDO_MESSAGES[entry.kind]}
+            expiresAt={entry.expiresAt}
+            onUndo={() => void undo(entry.id)}
+          />
+        ))}
+      </div>
     </main>
   );
 }
