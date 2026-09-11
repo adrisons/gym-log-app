@@ -17,7 +17,10 @@ import {
   META_FILE,
   sessionFileName,
 } from './file-system/layout';
-import { GymLogDatabase, FILE_SYSTEM_HANDLE_ROW_KEY } from './indexed-db/schema';
+import {
+  GymLogDatabase,
+  FILE_SYSTEM_HANDLE_ROW_KEY,
+} from './indexed-db/schema';
 import { CURRENT_SCHEMA_VERSION, decideSchemaAction } from './schema-version';
 import {
   draftReferencesExercise,
@@ -144,9 +147,9 @@ export class FileSystemStorageAdapter implements StoragePort {
           try {
             await dir.removeEntry(path);
           } catch (error) {
-            if (
-              !(error instanceof DOMException && error.name === 'NotFoundError')
-            ) {
+            if (!(
+              error instanceof DOMException && error.name === 'NotFoundError'
+            )) {
               throw error;
             }
           }
@@ -200,7 +203,9 @@ export class FileSystemStorageAdapter implements StoragePort {
       // — the never-initialized sentinel (stored === 0) needs the same
       // "adopt current version" write FR-007a requires, not just a real
       // 'migrate' transition.
-      await this.#writeJson(META_FILE, { schemaVersion: CURRENT_SCHEMA_VERSION });
+      await this.#writeJson(META_FILE, {
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+      });
     }
   }
 
@@ -234,7 +239,10 @@ export class FileSystemStorageAdapter implements StoragePort {
   }
 
   /** `forceHandle: false` (the default) never triggers a picker — used by every read method (FR-004a). */
-  async #readJson<T>(path: string, forceHandle = false): Promise<T | undefined> {
+  async #readJson<T>(
+    path: string,
+    forceHandle = false,
+  ): Promise<T | undefined> {
     const overlayEntry = this.#overlay.get(path);
     if (overlayEntry) {
       return overlayEntry.kind === 'deleted'
@@ -342,7 +350,11 @@ export class FileSystemStorageAdapter implements StoragePort {
     }
     const dir = await this.#getSessionsDir();
     if (!dir) return undefined;
-    const fileHandle = await this.#getFileHandle(dir, sessionFileName(id), false);
+    const fileHandle = await this.#getFileHandle(
+      dir,
+      sessionFileName(id),
+      false,
+    );
     if (!fileHandle) return undefined;
     const file = await fileHandle.getFile();
     return JSON.parse(await file.text()) as Session;
@@ -399,7 +411,8 @@ export class FileSystemStorageAdapter implements StoragePort {
 
   async saveExercise(exercise: Exercise): Promise<void> {
     await this.#ensureSchemaCheckedForWrite();
-    const exercises = (await this.#readJson<Exercise[]>(EXERCISES_FILE, true)) ?? [];
+    const exercises =
+      (await this.#readJson<Exercise[]>(EXERCISES_FILE, true)) ?? [];
     const next = exercises.filter((e) => e.id !== exercise.id);
     next.push(exercise);
     await this.#writeJson(EXERCISES_FILE, next);
@@ -424,7 +437,8 @@ export class FileSystemStorageAdapter implements StoragePort {
         'mergeExercises: survivorId and loserId must be distinct.',
       );
     }
-    const exercises = (await this.#readJson<Exercise[]>(EXERCISES_FILE, true)) ?? [];
+    const exercises =
+      (await this.#readJson<Exercise[]>(EXERCISES_FILE, true)) ?? [];
     const survivor = exercises.find((e) => e.id === survivorId);
     const loser = exercises.find((e) => e.id === loserId);
     if (!survivor || !loser) {
@@ -475,7 +489,8 @@ export class FileSystemStorageAdapter implements StoragePort {
 
   async deleteExerciseCascade(id: ExerciseId): Promise<void> {
     await this.#ensureSchemaCheckedForWrite();
-    const exercises = (await this.#readJson<Exercise[]>(EXERCISES_FILE, true)) ?? [];
+    const exercises =
+      (await this.#readJson<Exercise[]>(EXERCISES_FILE, true)) ?? [];
     if (!exercises.some((e) => e.id === id)) {
       throw new StorageError(
         'deleteExerciseCascade: id must resolve to an existing Exercise.',

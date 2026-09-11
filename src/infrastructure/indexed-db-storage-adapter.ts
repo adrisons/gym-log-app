@@ -175,7 +175,11 @@ export class IndexedDbStorageAdapter implements StoragePort {
           if (draftRow && draftReferencesExercise(draftRow.value, loserId)) {
             await this.#db.draft.put({
               key: DRAFT_ROW_KEY,
-              value: repointDraftExerciseId(draftRow.value, loserId, survivorId),
+              value: repointDraftExerciseId(
+                draftRow.value,
+                loserId,
+                survivorId,
+              ),
             });
           }
         },
@@ -321,4 +325,3 @@ function withoutSurrogateId(row: BodyMeasurementRow): BodyMeasurement {
     notes: row.notes,
   };
 }
-

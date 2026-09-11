@@ -25,7 +25,10 @@
  * current/stored fixtures). This suite proves the three reachable
  * adapter-level cases: never-initialized, same, newer.
  */
-import type { StoragePort, DateRange } from '../../src/application/ports/storage-port';
+import type {
+  StoragePort,
+  DateRange,
+} from '../../src/application/ports/storage-port';
 import type { LoggingDraft } from '../../src/application/ports/storage-port';
 import type { Session } from '../../src/domain/session';
 import type { Exercise } from '../../src/domain/exercise';
@@ -117,7 +120,11 @@ const sessionScenarios: Scenario[] = [
                 sets: [
                   createSet({
                     volume: createVolume({ kind: 'reps', count: 5 }),
-                    load: createLoad({ kind: 'weight', value: 100, unit: 'kg' }),
+                    load: createLoad({
+                      kind: 'weight',
+                      value: 100,
+                      unit: 'kg',
+                    }),
                     setKind: 'working',
                     completed: true,
                   }),
@@ -131,7 +138,10 @@ const sessionScenarios: Scenario[] = [
 
       const reader = await makeAdapter();
       const loaded = await reader.getSession(session.id);
-      assert(deepEqual(loaded, session), 'getSession returns the session unchanged after restart');
+      assert(
+        deepEqual(loaded, session),
+        'getSession returns the session unchanged after restart',
+      );
       const listed = await reader.listSessions(ALL_TIME);
       assert(
         listed.some((s) => deepEqual(s, session)),
@@ -320,7 +330,10 @@ const schemaVersionScenarios: Scenario[] = [
       } catch (error) {
         threw = error;
       }
-      assert(threw instanceof StorageError, 'a write on a too-new device rejects with StorageError');
+      assert(
+        threw instanceof StorageError,
+        'a write on a too-new device rejects with StorageError',
+      );
       assert(
         (threw as StorageError).kind === 'schema-too-new',
         'the rejection kind is schema-too-new',
@@ -342,8 +355,14 @@ const cascadeScenarios: Scenario[] = [
     name: 'mergeExercises reassigns every referencing Session Set and repoints a referencing Draft, durably',
     async run(makeAdapter) {
       const writer = await makeAdapter();
-      const survivor = makeExercise({ id: 'ex-survivor' as ExerciseId, canonicalName: 'Back squat' });
-      const loser = makeExercise({ id: 'ex-loser' as ExerciseId, canonicalName: 'Squats' });
+      const survivor = makeExercise({
+        id: 'ex-survivor' as ExerciseId,
+        canonicalName: 'Back squat',
+      });
+      const loser = makeExercise({
+        id: 'ex-loser' as ExerciseId,
+        canonicalName: 'Squats',
+      });
       await writer.saveExercise(survivor);
       await writer.saveExercise(loser);
       const session = makeSession({
@@ -445,7 +464,9 @@ const cascadeScenarios: Scenario[] = [
           {
             id: 'block-1',
             type: 'straightSets',
-            exercises: [{ id: 'entry-1', exerciseId: exercise.id, notes: '', sets: [] }],
+            exercises: [
+              { id: 'entry-1', exerciseId: exercise.id, notes: '', sets: [] },
+            ],
           },
         ],
       });
