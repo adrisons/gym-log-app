@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-11
 
-**Status**: Implemented — pending merge (PR opening)
+**Status**: Implemented — merged to `main` via PR #10
 
 **Input**: User description: "Persistence: real durable storage adapters
 behind the existing StoragePort (ADR-0002) — IndexedDbStorageAdapter
