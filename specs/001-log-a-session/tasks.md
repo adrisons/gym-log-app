@@ -204,13 +204,13 @@ Single project (`src/`, `test/` at repository root), per plan.md's Project Struc
 
 **Purpose**: verification sweeps spec.md's Success Criteria require beyond any single story's own tests, plus the accessibility/state obligations that apply across every component built above.
 
-- [ ] T083 [P] Accessibility/interaction-state audit: for every component row in `contracts/logging-screen-components.md`, confirm all six states (rest, hover, pressed, focus-visible, disabled-with-reason, loading-where-applicable) are implemented using design tokens only — no literal colour/spacing/duration (`docs/development-principles.md` §5); confirm nothing essential is hover-only and every control is keyboard-reachable (`docs/requirements.md` §7.4)
-- [ ] T084 [P] Verify both light and dark themes and a narrow (one-handed phone) viewport for the full logging screen (`docs/design.md` §6, §8 review checklist)
-- [ ] T085 [P] Grep sweep confirming no file under `src/presentation/logging/` imports `application/ports` or a `domain/` type directly, and no file under `src/application/logging/` imports anything from `infrastructure/` or `presentation/` (reinforcing `eslint-plugin-boundaries`, `docs/architecture.md`'s table — this plan adds files but no new edge type)
-- [ ] T086 Run [quickstart.md](./quickstart.md) end-to-end (all 12 manual scenarios) and confirm every automated check (`npm run typecheck && npm run test && npm run lint && npx playwright test`) is green
-- [ ] T087 Time SC-001 (≤ 3 taps to repeat the previous set) and SC-002 (< 30 s to a first set on a brand-new exercise) manually against the built screen; record the result in quickstart.md or this task's completion note
+- [x] T083 [P] Accessibility/interaction-state audit: for every component row in `contracts/logging-screen-components.md`, confirm all six states (rest, hover, pressed, focus-visible, disabled-with-reason, loading-where-applicable) are implemented using design tokens only — no literal colour/spacing/duration (`docs/development-principles.md` §5); confirm nothing essential is hover-only and every control is keyboard-reachable (`docs/requirements.md` §7.4)
+- [x] T084 [P] Verify both light and dark themes and a narrow (one-handed phone) viewport for the full logging screen (`docs/design.md` §6, §8 review checklist)
+- [x] T085 [P] Grep sweep confirming no file under `src/presentation/logging/` imports `application/ports` or a `domain/` type directly, and no file under `src/application/logging/` imports anything from `infrastructure/` or `presentation/` (reinforcing `eslint-plugin-boundaries`, `docs/architecture.md`'s table — this plan adds files but no new edge type)
+- [x] T086 Run [quickstart.md](./quickstart.md) end-to-end (all 12 manual scenarios) and confirm every automated check (`npm run typecheck && npm run test && npm run lint && npx playwright test`) is green
+- [x] T087 Time SC-001 (≤ 3 taps to repeat the previous set) and SC-002 (< 30 s to a first set on a brand-new exercise) manually against the built screen; record the result in quickstart.md or this task's completion note
 - [ ] T088 Update spec.md's `**Status**` line from `Planned` to `Implemented — merged to main via PR #<N>`, done in the merge commit itself (per spec 002's T041 precedent — the spec must not claim `Implemented` while the PR is still open)
-- [ ] T089 Add a short note to plan.md's Summary (or a new `NEXT.md` in this feature's directory — implementer's choice) pointing at the recommended follow-up persistence spec (research.md §1) now that this feature is otherwise complete, so the gap isn't lost once this branch merges
+- [x] T089 Add a short note to plan.md's Summary (or a new `NEXT.md` in this feature's directory — implementer's choice) pointing at the recommended follow-up persistence spec (research.md §1) now that this feature is otherwise complete, so the gap isn't lost once this branch merges
 
 ---
 

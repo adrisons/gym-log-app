@@ -37,7 +37,7 @@ export function BlockCard({
               setEditing(false);
             }}
           >
-            <label>
+            <label className="logging-screen__field-label">
               <span>Block name</span>
               <input
                 type="text"

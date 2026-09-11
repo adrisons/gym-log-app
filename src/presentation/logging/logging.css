@@ -134,6 +134,17 @@
   flex: 1 1 120px;
 }
 
+/* WeightLoadInput/VolumeInput wrap an unstyled <label> inside a
+   .set-row__field div (they also render quick-increment buttons as a
+   sibling, so the class can't sit on the label itself the way
+   BodyweightLoadInput/FreeTextLoadInput do) — without this, the label's
+   span+input render inline instead of stacked. */
+.set-row__field label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
 .set-list {
   list-style: none;
   margin: 0;

@@ -56,7 +56,7 @@ export function ExerciseEntryCard({
             ↓
           </button>
           {otherBlocks.length > 0 && (
-            <label>
+            <label className="logging-screen__field-label">
               <span>Move to block</span>
               <select
                 className="logging-field-input"

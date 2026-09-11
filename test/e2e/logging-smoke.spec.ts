@@ -27,7 +27,7 @@ test('logging a set appears instantly, with no Save control, in a real browser',
 
   await expect(page.getByRole('heading', { name: 'Back squat' })).toBeVisible();
 
-  await page.getByLabel('Reps').fill('5');
+  await page.getByRole('spinbutton', { name: 'Reps' }).fill('5');
   await page.getByRole('button', { name: 'Add set' }).click();
 
   await expect(page.getByText('5 reps')).toBeVisible();
