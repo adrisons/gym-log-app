@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-11
 
-**Status**: Planned
+**Status**: Implemented — merged to `main` via PR #12
 
 **Input**: User description: "Diary, search and progression (Phase 4,
 MVP-closing). Covers docs/requirements.md FR-6 (Diary/history: reverse-

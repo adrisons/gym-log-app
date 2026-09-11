@@ -140,8 +140,8 @@ Single project (`src/`, `test/` at repository root), per [plan.md](./plan.md)'s 
 - [X] T033 [P] Run `npm run test:unit` (all new unit/component tests plus the full existing suite) and confirm 0 regressions
 - [X] T034 Run `npm run test:e2e` (including T005's extended `shell-smoke.spec.ts`) and confirm 0 regressions
 - [X] T035 Walk through quickstart.md's "Manual validation (browser)" steps 1–6 in a real browser (`npm run dev`) and confirm every observed behavior matches
-- [ ] T036 Update `README.md`'s "Status" section to record Phase 4 (diary, search, progression) complete, per this project's convention of keeping that section current at each phase boundary
-- [ ] T037 Update `specs/004-diary-search-progression/spec.md`'s Status line to `Implemented — merged to main via PR #<N>` once the PR merges (per the `sdd-workflow` skill's Status-field convention) — the final commit of this feature
+- [X] T036 Update `README.md`'s "Status" section to record Phase 4 (diary, search, progression) complete, per this project's convention of keeping that section current at each phase boundary
+- [X] T037 Update `specs/004-diary-search-progression/spec.md`'s Status line to `Implemented — merged to main via PR #12` (per the `sdd-workflow` skill's Status-field convention) — this commit
 
 ---
 
