@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-08 (regenerated 2026-09-09)
 
-**Status**: Reviewed — passed spec-reviewer + /speckit-clarify; no plan.md/tasks.md yet
+**Status**: Planned — plan.md, research.md, data-model.md, contracts/ and quickstart.md complete via /speckit-plan; no tasks.md yet
 
 **Input**: User description: "The logging critical path from docs/requirements.md: FR-1 (log a session), FR-2 (blocks), FR-3 (sets and load), FR-4 (effort), FR-5 (exercise catalogue). Smallest complete, independently valuable slice; first spec in the build order in docs/agent-brief.md. Regenerated to fold in owner decisions of 2026-09-09: sessions have no open/closed lifecycle, effort is a 1–5 integer scale, a seed exercise catalogue ships, plus the merge/rename/block-delete/validation rules resolved in review."
 
