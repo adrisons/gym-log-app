@@ -22,12 +22,26 @@
  *
  * Replaces Phase 0's `AppShell` placeholder ("Real screens land in Phases
  * 1–3", its own doc comment) now that a real screen exists.
+ *
+ * Spec 004 (Diary, search and progression): adds `react-router-dom`
+ * routes for the diary/history, search, and progression screens
+ * (research.md §3) alongside the logging screen at `/`. Routing is
+ * introduced only here, at the composition boundary — `LoggingScreen`
+ * itself, and `configure()`'s call before the router renders, are
+ * unchanged (constitution Principle II: no added latency/step on the
+ * logging critical path).
  */
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { registerSW } from 'virtual:pwa-register';
 import { LoggingScreen } from './logging/logging-screen';
+import { DiaryScreen } from './diary/diary-screen';
+import { SessionDetailScreen } from './diary/session-detail-screen';
+import { ExerciseSearchScreen } from './search/exercise-search-screen';
+import { ProgressionScreen } from './progression/progression-screen';
 import { useLoggingSession } from '../application/logging/logging-store';
+import { useStorageAccess } from '../application/storage-access';
 import type { StoragePort } from '../application/ports/storage-port';
 import { IndexedDbStorageAdapter } from '../infrastructure/indexed-db-storage-adapter';
 import { FileSystemStorageAdapter } from '../infrastructure/file-system-storage-adapter';
@@ -64,10 +78,23 @@ function mount(): void {
   if (!root) {
     throw new Error('#root element not found in index.html');
   }
-  useLoggingSession.getState().configure(createStorageAdapter());
+  const storage = createStorageAdapter();
+  useLoggingSession.getState().configure(storage);
+  useStorageAccess.getState().configure(storage);
   createRoot(root).render(
     <StrictMode>
-      <LoggingScreen />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LoggingScreen />} />
+          <Route path="/diary" element={<DiaryScreen />} />
+          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+          <Route path="/search" element={<ExerciseSearchScreen />} />
+          <Route
+            path="/exercises/:exerciseId/progression"
+            element={<ProgressionScreen />}
+          />
+        </Routes>
+      </BrowserRouter>
     </StrictMode>,
   );
 }
