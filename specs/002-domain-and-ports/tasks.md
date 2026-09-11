@@ -46,8 +46,8 @@ Single project (`src/`, `test/` at repository root), per [plan.md](./plan.md)'s 
 - [ ] T004 [P] Create `src/domain/volume.ts`: the `Volume` sum type (`reps` | `duration` | `distance`, discriminant field `kind`) (data-model.md "Volume (FR-008)"; FR-015)
 - [ ] T005 [P] Create `src/domain/effort.ts`: the `Effort` type as the integer literal union `1 | 2 | 3 | 4 | 5`, with no "none"/absent variant (FR-009, FR-022)
 - [ ] T006 [P] Add branded `SessionId`/`ExerciseId` opaque string types to `src/domain/ids.ts` (data-model.md "Identifiers")
-- [ ] T007 [P] [US1] Unit test `test/unit/domain/load.test.ts`: construct all five `Load` variants; assert the type system/constructor rejects a sixth variant and an out-of-range `bodyweight.addedOrAssistedKg` (FR-007, edge case in spec.md)
-- [ ] T008 [P] [US1] Unit test `test/unit/domain/volume.test.ts`: construct all three `Volume` variants (FR-008); assert two `Set`s in the same entry may use different `Volume` variants (edge case in spec.md — this assertion belongs in T018's `Set` test, cross-referenced here)
+- [ ] T007 [P] [US1] Unit test `test/unit/domain/load.test.ts`: construct all five `Load` variants; assert the type system/constructor rejects a sixth variant and an out-of-range `bodyweight.addedOrAssistedKg`; construct a `Weight` with a decimal value (e.g. `1.2` kg) and assert the stored value is unchanged — no rounding, no unit conversion (FR-007, FR-015, edge case in spec.md)
+- [ ] T008 [P] [US1] Unit test `test/unit/domain/volume.test.ts`: construct all three `Volume` variants (FR-008); construct a `Duration`/`Distance` with a decimal value and assert it is stored unchanged (FR-015); assert two `Set`s in the same entry may use different `Volume` variants (edge case in spec.md — this assertion belongs in T018's `Set` test, cross-referenced here)
 
 **Checkpoint**: `Load`, `Volume`, `Effort`, and both ID types exist and are unit-tested — entity work in every user story below can now proceed.
 
@@ -94,6 +94,7 @@ Single project (`src/`, `test/` at repository root), per [plan.md](./plan.md)'s 
 - [ ] T021 [P] [US2] Add to `test/unit/domain/exercise.test.ts`: deleting an `Exercise` with logged history without confirmation throws `ExerciseDeleteConfirmationRequiredError` and the thrown error/return value names merge as the alternative (FR-013, red); deleting the same exercise with confirmation succeeds (FR-013, green); deleting an `Exercise` with **no** logged history succeeds without confirmation (FR-020)
 - [ ] T022 [P] [US2] Create `test/unit/domain/body-measurement.test.ts`: constructing a `BodyMeasurement` with no `bodyWeightKg` throws `InvalidBodyMeasurementError` (FR-021, red); constructing one with `bodyWeightKg` present (fat/muscle fields omitted) succeeds (FR-021, green)
 - [ ] T023 [P] [US2] Add to `test/unit/domain/load.test.ts` and `effort.test.ts` (new file): assert `Load`'s `none` variant models "load doesn't apply" while `Effort` has no equivalent "none" — a `Set` with no recorded effort is represented by `Set.effort` being `undefined`, never a sentinel `Effort` value (FR-022)
+- [ ] T023a [P] [US2] Add to `test/unit/domain/session-block-entry.test.ts`: assert `src/domain/index.ts`'s public surface exposes no constructor or function that creates an `ExerciseEntry` (or adds one to a `Block`) except by being passed an explicit, caller-supplied `ExerciseEntry` value — i.e. there is no "auto-add an entry for every catalogue exercise" or similar implicit-population API (FR-014; this rule is a structural absence, not a rejection case, so the test documents/locks the absence rather than asserting a thrown error)
 
 ### Implementation for User Story 2
 
