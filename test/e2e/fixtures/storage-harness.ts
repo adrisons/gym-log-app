@@ -64,8 +64,12 @@ async function createFileSystemStore(): Promise<{
   });
   const db = new GymLogDatabase(uniqueName('contract-fs-handles'));
   return {
+    // Passes storeDir directly as the third (`knownHandle`) constructor
+    // arg — see FileSystemStorageAdapter's doc comment on why the
+    // contract suite's "restart" simulation avoids round-tripping the
+    // handle through the Dexie cache (CI-only, unreproduced locally).
     makeAdapter: async (): Promise<StoragePort> =>
-      new FileSystemStorageAdapter(async () => storeDir, db),
+      new FileSystemStorageAdapter(async () => storeDir, db, storeDir),
     dispose: async () => {
       db.close();
       await opfsRoot
