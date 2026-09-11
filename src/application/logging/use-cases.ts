@@ -17,7 +17,7 @@ import { matchExercise, normalize } from '@/shared/fuzzy-match';
 import { renameExercise, deleteExercise } from '@/domain/exercise';
 import type { Exercise } from '@/domain/exercise';
 import type { Session } from '@/domain/session';
-import type { ExerciseId } from '@/domain/ids';
+import type { ExerciseId, SessionId } from '@/domain/ids';
 import type { Load } from '@/domain/load';
 
 /**
@@ -32,6 +32,9 @@ export type { Exercise };
 export type { Load };
 /** Re-exported for the same reason — `ExerciseCataloguePanel` (US4) needs `ExerciseId` for its `onMerge` callback. */
 export type { ExerciseId };
+/** Re-exported for the same reason — spec 004's diary/progression screens need `Session`/`SessionId`. */
+export type { Session };
+export type { SessionId };
 
 function isSameLocalDay(isoA: string, isoB: string): boolean {
   const a = new Date(isoA);

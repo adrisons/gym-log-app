@@ -18,11 +18,16 @@ taps, and see your progression and trend-based insights over time.
 
 ## Status
 
-Phase 0 (scaffolding) complete: stack chosen (`docs/stack.md`), layer
-boundary mechanically enforced, storage port interface + in-memory fake in
-place, and a placeholder PWA shell that launches with a passing smoke test.
-No domain logic, no real storage adapter, no product screens yet — see
-`docs/agent-brief.md` §3 for the phase order. Phase 1 is next.
+Phases 0–4 complete, closing the MVP loop (`docs/agent-brief.md` §3):
+stack chosen and layer boundaries mechanically enforced (Phase 0); the
+domain model, value objects and every computation rule tested without
+touching disk (Phase 1); durable storage on both real adapters —
+IndexedDB and File System Access, chosen automatically per device (Phase
+2); the logging screen — blocks, sets, load, effort, undo, catalogue
+management (Phase 3); and a diary/history screen, exercise search, and a
+per-exercise progression screen with e1RM/tonnage charts and honest
+degradation for non-numeric loads (Phase 4). See `specs/` for each
+phase's spec, plan and tasks. Phase 5 (Insights) is next.
 
 ## Development
 

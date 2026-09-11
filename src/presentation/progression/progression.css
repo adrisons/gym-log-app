@@ -1,0 +1,62 @@
+/* Shared styles for the progression screen. Every value is a design-token
+   reference (var(--…)), per constitution Principle V —
+   scripts/check-no-color-literals.sh. */
+
+.progression-screen {
+  min-height: 100vh;
+  background: var(--color-canvas);
+  color: var(--color-foreground);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.progression-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.progression-list__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.progression-list__row[data-personal-record] {
+  border-color: var(--color-accent);
+}
+
+.progression-list__pr-badge {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.progression-chart__controls {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.progression-chart__unavailable-reason {
+  color: var(--color-foreground-muted);
+}
+
+.progression-chart__dot {
+  fill: var(--color-accent);
+  stroke: none;
+}
+
+.progression-chart__pr-dot {
+  fill: var(--color-warning);
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
