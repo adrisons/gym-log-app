@@ -11,7 +11,16 @@ import { VitePWA } from 'vite-plugin-pwa';
 const MANIFEST_BACKGROUND = '#f3f4f6';
 const MANIFEST_THEME = '#2f5bff';
 
+// GitHub Pages serves a project repo (not a <user>.github.io repo) from
+// https://<owner>.github.io/<repo>/ — every asset URL and the PWA
+// manifest's start_url/icons must be rooted there, not at "/". The
+// deploy workflow (.github/workflows/deploy.yml) sets GITHUB_PAGES=true;
+// every other context (dev server, preview, CI's own test:e2e build)
+// stays at root "/".
+const BASE = process.env.GITHUB_PAGES === 'true' ? '/gym-log-app/' : '/';
+
 export default defineConfig({
+  base: BASE,
   resolve: {
     alias: {
       '@': new URL('./src', import.meta.url).pathname,
@@ -49,7 +58,8 @@ export default defineConfig({
         short_name: 'gym-log',
         description: 'A personal training diary.',
         display: 'standalone',
-        start_url: '/',
+        start_url: BASE,
+        scope: BASE,
         background_color: MANIFEST_BACKGROUND,
         theme_color: MANIFEST_THEME,
         // Flat placeholder icons (public/) — Phase 0 scope; a real icon is
@@ -58,17 +68,17 @@ export default defineConfig({
         // shell to be treated as installable (PR #3 review).
         icons: [
           {
-            src: '/icon-192.png',
+            src: `${BASE}icon-192.png`,
             sizes: '192x192',
             type: 'image/png',
           },
           {
-            src: '/icon-512.png',
+            src: `${BASE}icon-512.png`,
             sizes: '512x512',
             type: 'image/png',
           },
           {
-            src: '/icon-maskable-512.png',
+            src: `${BASE}icon-maskable-512.png`,
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
