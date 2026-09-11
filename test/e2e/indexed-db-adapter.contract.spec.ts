@@ -1,0 +1,30 @@
+import { test, expect } from './fixtures/fresh-browser-test';
+import { CONTRACT_SCENARIOS } from '../contract/storage-adapter-contract';
+
+// spec 003 US1-US4 (contracts/storage-adapters.md): the shared contract
+// suite run against a real IndexedDbStorageAdapter, in a real browser.
+// Runs in BOTH the chromium and webkit Playwright projects
+// (playwright.config.ts) — IndexedDB is available in both, matching the
+// production feature-detection fallback WebKit/iOS Safari takes
+// (spec 003 FR-004).
+//
+// One page.evaluate() per scenario, not one call for the whole suite,
+// AND a fresh browser process per test (fixtures/fresh-browser-test.ts) —
+// see that file's doc comment for why (a reproducible CI-only browser
+// crash on the File System Access sibling spec).
+
+for (const scenario of CONTRACT_SCENARIOS) {
+  test(`IndexedDbStorageAdapter: ${scenario.name}`, async ({ page }) => {
+    // Real disk/IndexedDB I/O plus this test's own fresh browser launch
+    // can be slower under CI's shared runner than locally — generous
+    // headroom over Playwright's 30s default (spec 003; see
+    // fixtures/fresh-browser-test.ts's doc comment).
+    test.setTimeout(90_000);
+    await page.goto('/test/e2e/fixtures/storage-harness.html');
+    const outcome = await page.evaluate(
+      (name) => window.__runContractScenario('indexed-db', name),
+      scenario.name,
+    );
+    expect(outcome.passed, outcome.passed ? '' : outcome.error).toBe(true);
+  });
+}
