@@ -23,6 +23,7 @@ export class InMemoryStorage implements StoragePort {
   #exercises = new Map<ExerciseId, Exercise>();
   #bodyMeasurements: BodyMeasurement[] = [];
   #draft: LoggingDraft | undefined;
+  #bandLabels: string[] = [];
   #schemaVersion = 0;
 
   async saveSession(session: Session): Promise<void> {
@@ -157,6 +158,14 @@ export class InMemoryStorage implements StoragePort {
     this.#draft = undefined;
   }
 
+  async listBandLabels(): Promise<string[]> {
+    return [...this.#bandLabels];
+  }
+
+  async saveBandLabels(labels: string[]): Promise<void> {
+    this.#bandLabels = [...labels];
+  }
+
   async getSchemaVersion(): Promise<number> {
     return this.#schemaVersion;
   }
@@ -171,42 +180,62 @@ export class InMemoryStorage implements StoragePort {
     this.#exercises.clear();
     this.#bodyMeasurements = [];
     this.#draft = undefined;
+    this.#bandLabels = [];
     this.#schemaVersion = 0;
   }
 
-  // LIMITATION, by design (FR-025; contracts/storage-port.md "LoggingDraft's
-  // shape is intentionally NOT specified here"): a real LoggingDraft will
-  // contain partial blocks/entries/sets, not a flat `exerciseId` — this
-  // spec (002) deliberately does not define that nested shape, so this
-  // fake cannot walk it. These three helpers only repoint/prune a
-  // top-level `exerciseId` convention, sufficient for this phase's own
-  // round-trip tests but NOT a general nested-draft implementation. Spec
-  // 001, which owns LoggingDraft's real shape, MUST replace this logic
-  // (and re-verify merge/cascade against its real nested structure) before
-  // relying on draft repoint/prune for an actual in-progress logging
-  // screen — treat this as a documented placeholder, not full compliance
-  // with the "merge/cascade also touches the draft" contract rule for any
-  // shape beyond the flat one exercised here.
+  // Real nested-draft tree walk (spec 001 contracts/storage-port-extension.md
+  // §1), replacing spec 002's flat `exerciseId`-convention placeholder now
+  // that spec 001 owns LoggingDraft's real shape
+  // (src/application/ports/logging-draft.ts).
   #referencesExercise(draft: LoggingDraft, exerciseId: ExerciseId): boolean {
-    return draft['exerciseId'] === exerciseId;
+    return draft.blocks.some((block) =>
+      block.exercises.some((entry) => entry.exerciseId === exerciseId),
+    );
   }
 
+  /**
+   * Merge repoint: every matching `DraftExerciseEntry.exerciseId` across
+   * every block is repointed from `fromId` to `toId`. Sets already
+   * recorded on that entry are kept unchanged — only the reference moves
+   * (spec.md's clarification: "the draft's exercise entry is rewritten in
+   * place... it now points at the survivor").
+   */
   #repointDraftExerciseId(
     draft: LoggingDraft,
     fromId: ExerciseId,
     toId: ExerciseId,
   ): LoggingDraft {
-    if (draft['exerciseId'] !== fromId) return draft;
-    return { ...draft, exerciseId: toId };
+    return {
+      ...draft,
+      blocks: draft.blocks.map((block) => ({
+        ...block,
+        exercises: block.exercises.map((entry) =>
+          entry.exerciseId === fromId ? { ...entry, exerciseId: toId } : entry,
+        ),
+      })),
+    };
   }
 
+  /**
+   * Cascade-delete prune: every `DraftExerciseEntry` referencing
+   * `exerciseId`, in every block, is removed along with its sets. A block
+   * that becomes empty as a result stays in the draft — FR-017's "zero
+   * blocks/entries is valid" applies to a draft, not only a submitted
+   * `Session` (contracts/storage-port-extension.md §1).
+   */
   #pruneDraftExerciseId(
     draft: LoggingDraft,
     exerciseId: ExerciseId,
-  ): LoggingDraft | undefined {
-    if (draft['exerciseId'] !== exerciseId) return draft;
-    const rest: LoggingDraft = { ...draft };
-    delete rest['exerciseId'];
-    return rest;
+  ): LoggingDraft {
+    return {
+      ...draft,
+      blocks: draft.blocks.map((block) => ({
+        ...block,
+        exercises: block.exercises.filter(
+          (entry) => entry.exerciseId !== exerciseId,
+        ),
+      })),
+    };
   }
 }

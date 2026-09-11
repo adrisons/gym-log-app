@@ -72,8 +72,9 @@ Load ≥ 0 (FR-026); no literal visual value outside design tokens
 
 **Scale/Scope**: one new application submodule (`application/logging/` —
 draft, use cases, view models, the Zustand store, quick-increment
-constants), one `shared/` utility (`fuzzy-match.ts`) plus the existing
-`shared/id.ts` addition (research.md §2), a `StoragePort` extension plus
+constants, `ids.ts`), a `shared/` utility (`fuzzy-match.ts`, plus a plain
+unbranded `id.ts`, research.md §2 — the one new `application` → `shared`
+edge this plan adds), a `StoragePort` extension plus
 its `InMemoryStorage` update, and the logging screen's presentation tree
 (~15 components per `contracts/logging-screen-components.md`). No changes
 to `src/domain/`.
@@ -89,7 +90,7 @@ Re-checked after Phase 1 design below.*
 | II. Logging Is the Critical Path | Every use case in data-model.md is a pure/pure-async function the store calls *after* applying the optimistic in-memory change (research.md §5); no use case blocks on anything; no loading state anywhere on the logging path except the explicitly-justified exceptions design already allows (none needed here — `contracts/logging-screen-components.md`'s `LoggingScreen` row). 5-second undo on every destructive action (FR-004/FR-023, data-model.md "Undo"); merge is the one deliberate exception, confirmed explicit and irreversible (FR-017). | PASS |
 | III. BDD Before Code | This plan follows spec.md (Reviewed) → this plan → `/speckit-tasks`. Every FR-001..FR-026 maps to a use case or component row in data-model.md/`contracts/logging-screen-components.md`, each traceable to a test per `quickstart.md`. Canonical schema untouched — `domain/` types are not modified by this plan; the one new persisted surface (band labels) is justified against the schema-version rule in research.md §7, not silently exempted. | PASS |
 | IV. External Dependencies Behind Ports | Every new use case takes its `StoragePort` as a parameter (research.md §6) rather than importing `InMemoryStorage` directly outside `test/`; the extended port still has one fake covering every method (`contracts/storage-port-extension.md` "Verification"). No capability check for "which adapter is active" anywhere — there is only ever the fake in this plan's scope. | PASS |
-| V. Dependency-Inward Layering | `application/logging/` imports only `domain` + `application/ports`; `presentation/` components import only `application/logging`'s public surface (use cases + view models) and `presentation/design` tokens, never `application/ports` or `domain` directly (`docs/architecture.md`'s table, unchanged edges — this plan adds files, not new edge types). `shared/fuzzy-match.ts` and `shared/id.ts` import nothing internal. | PASS |
+| V. Dependency-Inward Layering | `application/logging/` imports only `domain`, `application/ports`, and `shared`; `presentation/` components import only `application/logging`'s public surface (use cases + view models) and `presentation/design` tokens, never `application/ports` or `domain` directly. `shared/fuzzy-match.ts` and `shared/id.ts` import nothing internal, per `docs/architecture.md`'s table. One new edge added, deliberately, not silently: `application` → `shared` (`shared/id.ts`'s unbranded `newId()`, wrapped with domain-branded casts in `application/logging/ids.ts` since `shared` itself cannot import `domain/ids.ts`'s branded types) — `eslint.boundaries.js` and `docs/architecture.md` updated together, per the former's own instruction, and `test/boundaries/edge-set.test.ts` still asserts they agree. | PASS |
 | VI. Deterministic, Traceable Insights | Not applicable — no insight/computed-number surface in this spec (`docs/requirements.md` §5 is explicit Non-Goals here, same as spec 002). | PASS (n/a) |
 | Escalation — concrete technology choices | Zustand and Dexie are already-approved (`docs/stack.md`); this plan introduces no new library (research.md §§2–3, §10 each resolve without one). The one genuinely new technical call made unilaterally here — the draft→Session promotion rule (research.md §4) — is a *product-behavior* decision, not a technology choice, and is flagged back to the spec owner explicitly rather than treated as settled. | PASS, with one flagged item (research.md §4) |
 
@@ -146,7 +147,7 @@ src/
 │   │   └── exercise-catalogue-panel.tsx
 │   └── (design/, app-shell.tsx, main.tsx — main.tsx gains createLoggingUseCases wiring, research.md §6)
 └── shared/
-    ├── id.ts                            # newSessionId/newExerciseId (research.md §2)
+    ├── ids.ts                           # newSessionId/newExerciseId, wraps shared/id.ts (research.md §2)
     └── fuzzy-match.ts                   # research.md §3
 
 test/

@@ -10,10 +10,10 @@ import { createSet } from '../../src/domain/set';
 import { createLoad } from '../../src/domain/load';
 import { createVolume } from '../../src/domain/volume';
 
-// Spec 002 FR-023..FR-027 / contracts/storage-port.md "Verification": for
-// every StoragePort method, the in-memory fake round-trips a real
-// domain-shaped value, with no real storage API involved anywhere in this
-// file.
+// Spec 002 FR-023..FR-027 / contracts/storage-port.md "Verification", plus
+// spec 001's contracts/storage-port-extension.md: for every StoragePort
+// method, the in-memory fake round-trips a real domain-shaped value, with
+// no real storage API involved anywhere in this file.
 
 function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
   return {
@@ -31,6 +31,17 @@ function makeSession(overrides: Partial<Session> = {}): Session {
   return {
     id: 'sess-1' as SessionId,
     dateTime: '2026-09-10T18:00:00.000Z',
+    blocks: [],
+    notes: '',
+    ...overrides,
+  };
+}
+
+function makeDraft(overrides: Partial<LoggingDraft> = {}): LoggingDraft {
+  return {
+    id: 'draft-1',
+    dateTime: '2026-09-11T09:00:00.000Z',
+    lastEditedAt: '2026-09-11T09:00:00.000Z',
     blocks: [],
     notes: '',
     ...overrides,
@@ -202,7 +213,7 @@ describe('InMemoryStorage (StoragePort fake)', () => {
       ).rejects.toThrow(StorageError);
     });
 
-    it('repoints a matching LoggingDraft reference to the survivor', async () => {
+    it('repoints a matching LoggingDraft exercise entry to the survivor, keeping its sets (spec 001 contracts/storage-port-extension.md §1)', async () => {
       const survivor = makeExercise({ id: 'ex-survivor' as ExerciseId });
       const loser = makeExercise({
         id: 'ex-loser' as ExerciseId,
@@ -210,13 +221,37 @@ describe('InMemoryStorage (StoragePort fake)', () => {
       });
       await storage.saveExercise(survivor);
       await storage.saveExercise(loser);
-      const draft: LoggingDraft = { id: 'draft-1', exerciseId: loser.id };
+      const draft = makeDraft({
+        blocks: [
+          {
+            id: 'block-1',
+            type: 'straightSets',
+            exercises: [
+              {
+                id: 'entry-1',
+                exerciseId: loser.id,
+                notes: '',
+                sets: [
+                  {
+                    id: 'set-1',
+                    load: createLoad({ kind: 'none' }),
+                    volume: createVolume({ kind: 'reps', count: 5 }),
+                    setKind: 'working',
+                    completed: true,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
       await storage.saveDraft(draft);
 
       await storage.mergeExercises(survivor.id, loser.id);
 
-      const reloadedDraft = await storage.getDraft();
-      expect(reloadedDraft?.['exerciseId']).toBe(survivor.id);
+      const reloaded = await storage.getDraft();
+      expect(reloaded?.blocks[0]?.exercises[0]?.exerciseId).toBe(survivor.id);
+      expect(reloaded?.blocks[0]?.exercises[0]?.sets).toHaveLength(1);
     });
   });
 
@@ -260,31 +295,81 @@ describe('InMemoryStorage (StoragePort fake)', () => {
       ).rejects.toThrow(StorageError);
     });
 
-    it('prunes a matching LoggingDraft reference', async () => {
+    it('prunes a matching LoggingDraft exercise entry, leaving the (now possibly empty) block in place (spec 001 contracts/storage-port-extension.md §1)', async () => {
       const exercise = makeExercise();
       await storage.saveExercise(exercise);
-      const draft: LoggingDraft = { id: 'draft-1', exerciseId: exercise.id };
+      const draft = makeDraft({
+        blocks: [
+          {
+            id: 'block-1',
+            type: 'straightSets',
+            exercises: [
+              {
+                id: 'entry-1',
+                exerciseId: exercise.id,
+                notes: '',
+                sets: [],
+              },
+            ],
+          },
+        ],
+      });
       await storage.saveDraft(draft);
 
       await storage.deleteExerciseCascade(exercise.id);
 
       const reloadedDraft = await storage.getDraft();
-      expect(reloadedDraft?.['exerciseId']).toBeUndefined();
+      expect(reloadedDraft?.blocks).toHaveLength(1);
+      expect(reloadedDraft?.blocks[0]?.exercises).toEqual([]);
     });
   });
 
-  describe('Logging draft (FR-025)', () => {
-    it('round-trips an opaque payload through saveDraft/getDraft/discardDraft, without the fake interpreting its shape', async () => {
-      const draft: LoggingDraft = {
-        id: 'draft-1',
-        inProgressDateTime: '2026-09-11T09:00:00.000Z',
-        arbitraryField: { nested: true },
-      };
+  describe('Logging draft (FR-024/FR-025; spec 001 data-model.md "LoggingDraft")', () => {
+    it('round-trips a real nested draft through saveDraft/getDraft/discardDraft', async () => {
+      const draft = makeDraft({
+        blocks: [
+          {
+            id: 'block-1',
+            name: 'Squats',
+            type: 'straightSets',
+            exercises: [
+              {
+                id: 'entry-1',
+                exerciseId: 'ex-1' as ExerciseId,
+                notes: '',
+                sets: [
+                  {
+                    id: 'set-1',
+                    load: createLoad({ kind: 'weight', value: 60, unit: 'kg' }),
+                    volume: createVolume({ kind: 'reps', count: 8 }),
+                    setKind: 'working',
+                    completed: true,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
       await storage.saveDraft(draft);
       expect(await storage.getDraft()).toEqual(draft);
 
       await storage.discardDraft();
       expect(await storage.getDraft()).toBeUndefined();
+    });
+  });
+
+  describe('Band labels (spec 001 FR-011; contracts/storage-port-extension.md §2)', () => {
+    it('defaults to an empty list', async () => {
+      expect(await storage.listBandLabels()).toEqual([]);
+    });
+
+    it('round-trips an ordered list through saveBandLabels/listBandLabels, order preserved', async () => {
+      await storage.saveBandLabels(['Red', 'Blue', 'Green']);
+      expect(await storage.listBandLabels()).toEqual(['Red', 'Blue', 'Green']);
+
+      await storage.saveBandLabels(['Green', 'Red', 'Blue']);
+      expect(await storage.listBandLabels()).toEqual(['Green', 'Red', 'Blue']);
     });
   });
 
@@ -297,10 +382,11 @@ describe('InMemoryStorage (StoragePort fake)', () => {
   });
 
   describe('Test isolation', () => {
-    it('reset() clears all state', async () => {
+    it('reset() clears all state, including the draft and band labels', async () => {
       await storage.saveExercise(makeExercise());
       await storage.saveSession(makeSession());
-      await storage.saveDraft({ id: 'draft-1' });
+      await storage.saveDraft(makeDraft());
+      await storage.saveBandLabels(['Red']);
       await storage.setSchemaVersion(2);
 
       storage.reset();
@@ -310,6 +396,7 @@ describe('InMemoryStorage (StoragePort fake)', () => {
         await storage.listSessions({ from: '2000-01-01', to: '2100-01-01' }),
       ).toEqual([]);
       expect(await storage.getDraft()).toBeUndefined();
+      expect(await storage.listBandLabels()).toEqual([]);
       expect(await storage.getSchemaVersion()).toBe(0);
     });
   });

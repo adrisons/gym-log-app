@@ -23,6 +23,7 @@ import type { Session } from '../../domain/session';
 import type { Exercise } from '../../domain/exercise';
 import type { BodyMeasurement } from '../../domain/body-measurement';
 import type { SessionId, ExerciseId } from '../../domain/ids';
+import type { LoggingDraft } from './logging-draft';
 
 /** A closed date-time range, both bounds inclusive, ISO 8601 strings. */
 export interface DateRange {
@@ -32,18 +33,15 @@ export interface DateRange {
 
 /**
  * UI/session state for spec 001's "Logging draft" — explicitly NOT a
- * domain entity this spec (002) defines. Per `contracts/storage-port.md`,
- * this type exists only so `saveDraft`/`getDraft`/`discardDraft` have a
- * concrete parameter/return type the build can typecheck against; its real
- * shape (in-progress date-time, partial blocks/entries/sets, load-type
- * selections) is spec 001's own design job. Deliberately opaque and
- * extensible here — `id` is the one field this phase's fake needs to key
- * storage on; everything else is caller-defined.
+ * domain entity spec 002 defines. Real shape defined in
+ * `./logging-draft.ts` (`specs/001-log-a-session/data-model.md`
+ * "LoggingDraft") — kept in `application/ports/`, not
+ * `application/logging/`, so this file can reference it without an
+ * `application-ports` → `application` import (`docs/architecture.md`'s
+ * table only allows `application-ports` → `domain`); re-exported here as
+ * the port's own vocabulary for it.
  */
-export interface LoggingDraft {
-  id: string;
-  [key: string]: unknown;
-}
+export type { LoggingDraft };
 
 export interface StoragePort {
   // Sessions
@@ -95,6 +93,17 @@ export interface StoragePort {
   saveDraft(draft: LoggingDraft): Promise<void>;
   getDraft(): Promise<LoggingDraft | undefined>;
   discardDraft(): Promise<void>;
+
+  /**
+   * The user's own reorderable list of Band load labels (spec 001
+   * FR-011). Not a canonical entity (`docs/requirements.md` §3) — see
+   * `specs/001-log-a-session/research.md` §7 for why this does not
+   * trigger the constitution's schema-version bump rule (Principle III).
+   * Order is significant and is exactly the order the caller passed to
+   * the last `saveBandLabels` call; there is no separate sort step.
+   */
+  listBandLabels(): Promise<string[]>;
+  saveBandLabels(labels: string[]): Promise<void>;
 
   /** The schema version that travels with the data (`docs/requirements.md` §6). */
   getSchemaVersion(): Promise<number>;

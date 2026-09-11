@@ -23,11 +23,13 @@ export interface LoggingDraft {
   id: string;
   [key: string]: unknown;
 }
-// becomes: the interface in data-model.md ("LoggingDraft"), imported from
-// src/application/logging/draft.ts, re-exported (not redefined) here so
-// the port and the application layer share one source of truth for the
-// shape. (`application/ports` → `application` is a same-layer import per
-// `docs/architecture.md`'s table — both classify as `application`.)
+// becomes: the interface in data-model.md ("LoggingDraft"), defined in the
+// new src/application/ports/logging-draft.ts (NOT in
+// src/application/logging/draft.ts — application-ports may import only
+// domain, per docs/architecture.md's table, so the canonical definition
+// has to live inside application/ports/ itself; application/logging/draft.ts
+// imports it back, since application → application-ports is allowed, and
+// adds the createDraft/draftToSession construction functions).
 ```
 
 `saveDraft`/`getDraft`/`discardDraft` signatures are unchanged — only the

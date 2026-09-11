@@ -89,20 +89,29 @@ feature-detected choice — no application or presentation code changes.
 
 ## 2. ID generation
 
-**Decision**: `crypto.randomUUID()` (Web Crypto API), wrapped in a single
-`src/shared/id.ts` helper (`newSessionId(): SessionId`,
-`newExerciseId(): ExerciseId`) that casts the UUID string to the branded
-type at the one call site each domain module needs it.
+**Decision**: `crypto.randomUUID()` (Web Crypto API), split across two
+files discovered necessary during implementation (the boundary rule
+forbids `shared/` from importing any internal type, `domain/ids.ts`
+included): `src/shared/id.ts` exports a plain, unbranded `newId(): string`;
+`src/application/logging/ids.ts` wraps it with `newSessionId(): SessionId`
+/ `newExerciseId(): ExerciseId`, casting to the branded type at the one
+call site each construction path needs it. `eslint.boundaries.js` and
+`docs/architecture.md` gained one new edge for this: `application` →
+`shared` (previously `shared` had no consumer at all).
 
 **Rationale**: available, standards-based, and offline in every target
 browser (`docs/requirements.md` §7.5 target platforms — Chromium
 desktop/Android, iOS Safari 16.4+ — all ship `crypto.randomUUID`). No
 dependency added ("one dependency per concern",
-`docs/development-principles.md` §6). Lives in `shared/` per
-`docs/architecture.md`'s own description of that layer ("cross-cutting
-utilities with no business concept") — it is not a domain rule (the domain
-layer doesn't care how an id is produced, only that it is opaque and
-unique) and not application-specific.
+`docs/development-principles.md` §6). The unbranded generator belongs in
+`shared/` per `docs/architecture.md`'s own description of that layer
+("cross-cutting utilities with no business concept") — it is not a domain
+rule (the domain layer doesn't care how an id is produced, only that it is
+opaque and unique) and not application-specific. The branded cast cannot
+live in `shared/` itself, though — `shared` may import nothing internal
+(`docs/architecture.md`'s table), including `domain/ids.ts`'s branded
+types — so it moves one layer out, to `application`, which is already
+allowed to import both `domain` and (as of this addition) `shared`.
 
 **Alternatives considered**: a `uuid` or `nanoid` package — rejected, no
 capability gap `crypto.randomUUID()` doesn't already close for this

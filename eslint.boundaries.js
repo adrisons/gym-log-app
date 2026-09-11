@@ -10,9 +10,12 @@
  *
  * Layer map (constitution Principle V; docs/agent-brief.md §2):
  *   domain              — entities, value objects, pure rules. Imports nothing internal.
- *   application          — ports, use cases, view models. May import: domain.
+ *   application          — ports, use cases, view models. May import: domain, shared.
  *   application-ports    — the port interfaces (a slice of application, called out
- *                          so tests and infra can name it). Same rules as application.
+ *                          so tests and infra can name it). May import: domain only —
+ *                          narrower than application (spec 001: the port stays a pure
+ *                          domain-terms interface, with no dependency on shared utilities
+ *                          an adapter or use case might use).
  *   infrastructure       — port implementations. May import: application(-ports), domain.
  *   presentation         — screens/UI consuming view models. May import: application(-ports),
  *                          presentation-design.
@@ -21,6 +24,13 @@
  *                          Imports nothing internal.
  *   composition-root     — the single wiring point (src/presentation/main.tsx).
  *                          May import: everything.
+ *
+ * `application` → `shared` added by spec 001 (`src/application/logging/ids.ts`
+ * wraps `shared/id.ts`'s unbranded `newId()` with domain-branded casts) —
+ * the first real consumer `shared/` has had since it was scaffolded empty
+ * in Phase 0. `application-ports` deliberately does NOT gain the same
+ * edge: `storage-port.ts` states its contract in domain terms alone, with
+ * no reason to reach into `shared/`.
  *
  * `composition-root` is NOT one of the `elements` descriptors below:
  * eslint-plugin-boundaries' element patterns match folders (path prefixes),
@@ -66,7 +76,7 @@ export const elements = [
  */
 export const allowedImports = {
   domain: [],
-  application: ['application-ports', 'domain'],
+  application: ['application-ports', 'domain', 'shared'],
   'application-ports': ['domain'],
   infrastructure: ['application', 'application-ports', 'domain'],
   // NOT application-ports: presentation must never see a persistence type
