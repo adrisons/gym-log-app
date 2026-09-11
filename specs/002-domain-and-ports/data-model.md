@@ -54,11 +54,11 @@ interface Exercise {
   id: ExerciseId;
   canonicalName: string;
   aliases: string[];
-  movementPattern: string;
-  muscleGroups: string[];
+  movementPattern?: string; // optional (docs/requirements.md §3.1)
+  muscleGroups?: string[]; // optional (docs/requirements.md §3.1)
   defaultLoadType: Load['kind'];
   unilateral: boolean;
-  discipline: 'strength'; // fixed in v1; FR-001 — present so a future value is additive
+  discipline: 'Strength'; // fixed in v1, canonical casing per docs/requirements.md §1.4/§3.1; FR-001 — present so a future value is additive
 }
 ```
 
@@ -156,6 +156,8 @@ win with no runtime cost, decided here rather than left ambiguous for
 abstract class DomainError extends Error {}
 
 class InvalidSetError extends DomainError {} // FR-010
+class InvalidLoadError extends DomainError {} // FR-007: out-of-range bodyweight component
+class InvalidVolumeError extends DomainError {} // FR-008: non-integer reps count
 class InvalidBodyMeasurementError extends DomainError {} // FR-021
 class ExerciseMergeError extends DomainError {} // FR-019: same/nonexistent id
 class ExerciseDeleteConfirmationRequiredError extends DomainError {} // FR-013

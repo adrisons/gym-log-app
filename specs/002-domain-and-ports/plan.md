@@ -23,10 +23,10 @@ that established structure. No I/O, no UI.
 **Primary Dependencies**: none new. Sum types (`Load`, `Volume`) are plain
 discriminated unions — no runtime validation library is introduced (no
 zod/io-ts); construction goes through smart constructors/factory functions
-in `src/domain/` that throw a domain error (or return a `Result`-like
-failure — decided below under Domain error strategy) on an invalid shape,
-which is sufficient for FR-010/FR-019/FR-021's rejection rules without
-adding a dependency for a concern this small.
+in `src/domain/` that throw a domain error on an invalid shape (see Domain
+error strategy below — thrown `DomainError` subclasses, not a `Result`
+type), which is sufficient for FR-010/FR-019/FR-021's rejection rules
+without adding a dependency for a concern this small.
 
 **Storage**: none (unchanged from Phase 0 — the port is finalized here, but
 only the in-memory fake implements it; real adapters are Phase 2).
@@ -76,7 +76,7 @@ Technical Context). Re-checked after Phase 1 design below.*
 |---|---|---|
 | I. Data Ownership & Recoverability | No persistence implementation here; the port names the schema-version concern (FR-026) so Phase 2 has a hook, but migration itself isn't built yet — no violation, nothing to recover yet. | PASS |
 | II. Logging Is the Critical Path | No logging screen yet (spec 001). Domain types must not themselves impose latency — pure in-memory construction, no async in domain code. | PASS |
-| III. BDD Before Code | This plan follows spec.md (Reviewed) → this plan → `/speckit-tasks`. Every domain rule ships as a Given/When/Then-shaped red/green test pair (FR-028) before/with the implementing code. Canonical schema stays discipline-neutral: `Exercise.discipline` is present but fixed to `Strength` (FR-001), `Load`/`Volume` already generalize beyond strength per the constitution's own note. | PASS |
+| III. BDD Before Code | This plan follows spec.md (Reviewed) → this plan → `/speckit-tasks`. Every domain rule ships as a Given/When/Then-shaped red/green test pair (FR-028), **with one stated exception**: FR-014 ("no synthesized/implied Exercise entry") is a structural-absence rule — there is no rejection case to write a red test against, since no API exists that could violate it. It is verified by a single presence/absence check instead (tasks.md T023a), not a red/green pair. Every other FR-010..FR-013/FR-019..FR-021 rule does get the full pair. Canonical schema stays discipline-neutral: `Exercise.discipline` is present but fixed to `Strength` (FR-001, canonical casing per `docs/requirements.md` §1.4), `Load`/`Volume` already generalize beyond strength per the constitution's own note. | PASS |
 | IV. External Dependencies Behind Ports | `StoragePort` is finalized in domain terms (FR-023/FR-024/FR-025), no infrastructure type crosses it, and the in-memory fake is updated to match (FR-027) — every method has a fake. | PASS |
 | V. Dependency-Inward Layering | `src/domain/` gains real content but still imports nothing internal (unchanged forbidden-edge table from spec 000's data-model.md). `application/ports/storage-port.ts` imports only from `domain/`. No presentation surface touched. | PASS |
 | VI. Deterministic, Traceable Insights | Not applicable — §5 computation rules are this spec's explicit Non-Goal. | PASS (n/a) |
@@ -113,6 +113,7 @@ src/
 │   ├── load.ts                  # FR-007: Load value object (sum type)
 │   ├── volume.ts                # FR-008: Volume value object (sum type)
 │   ├── effort.ts                # FR-009, FR-022: Effort value object
+│   ├── ids.ts                    # branded SessionId/ExerciseId opaque types
 │   ├── errors.ts                # DomainError and subclasses (see Domain error strategy)
 │   └── index.ts                 # barrel — public domain surface
 ├── application/
@@ -126,13 +127,14 @@ test/
 │   └── in-memory-storage.ts   # FR-027: revised fake, matches finalized StoragePort
 └── unit/
     ├── domain/
-    │   ├── exercise.test.ts          # FR-011, FR-012, FR-013, FR-019, FR-020, FR-016
-    │   ├── session-block-entry.test.ts # FR-002, FR-003, FR-004, FR-017, FR-018
+    │   ├── exercise.test.ts          # FR-011, FR-012 (Exercise-local half), FR-013, FR-019, FR-020, FR-016
+    │   ├── session-block-entry.test.ts # FR-002, FR-003, FR-004, FR-014, FR-017, FR-018
     │   ├── set.test.ts                # FR-005, FR-010, FR-022
     │   ├── body-measurement.test.ts   # FR-006, FR-021
     │   ├── load.test.ts               # FR-007, FR-015
-    │   └── volume.test.ts             # FR-008, FR-015
-    └── storage-port-fake.test.ts      # FR-027, revised to real entity shapes (SC-005)
+    │   ├── volume.test.ts             # FR-008, FR-015
+    │   └── effort.test.ts             # FR-009, FR-022
+    └── storage-port-fake.test.ts      # FR-023..FR-027, incl. FR-012's cross-session reassignment half (SC-005)
 ```
 
 **Structure Decision**: extends spec 000's established five-layer tree — no
