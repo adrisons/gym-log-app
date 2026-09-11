@@ -32,6 +32,24 @@ no File System Access implementation — a `webkit` run of that spec file
 would be un-runnable, not merely skipped, matching FR-004's feature
 detection).
 
+## A note on headless/automated environments
+
+`showDirectoryPicker()` cannot be driven by a script — in headless Chromium
+(the only browser available in a typical CI/automation sandbox) it rejects
+immediately with `AbortError` rather than showing a dialog, by design (the
+same restriction that keeps a script from silently picking a directory on
+a user's behalf). `FileSystemStorageAdapter` treats that rejection as
+"not available yet, not a hard failure" (research.md's overlay design) so
+the app still boots and works in memory for that session — but nothing is
+durably written to a real directory until a real human, in a real
+(non-headless) browser, actually grants one. The automated contract suite
+(`test:contract-adapters`) sidesteps this entirely by acquiring its
+directory handle via OPFS (`navigator.storage.getDirectory()`), which
+needs no gesture — so it proves the adapter's own logic (every
+`StoragePort` method, cascades, schema version, atomicity) fully
+automatically. Only the manual steps below, which exercise the real
+`showDirectoryPicker()` path, need an actual person at an actual browser.
+
 ## Manual validation (real reload, not just re-render)
 
 1. `npm run build && npm run preview`, open the app in Chromium.

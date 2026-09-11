@@ -17,6 +17,23 @@ export default defineConfig({
       '@': new URL('./src', import.meta.url).pathname,
     },
   },
+  build: {
+    rollupOptions: {
+      // A second HTML entry point alongside the app shell: a minimal page
+      // Playwright loads to drive the shared storage-adapter contract
+      // suite against a real IndexedDbStorageAdapter/FileSystemStorageAdapter
+      // in-browser (spec 003 research.md §3) — jsdom has neither API, so
+      // this cannot run under Vitest. Not linked from the app shell; only
+      // `test/e2e/*.contract.spec.ts` navigates to it.
+      input: {
+        main: new URL('./index.html', import.meta.url).pathname,
+        storageHarness: new URL(
+          './test/e2e/fixtures/storage-harness.html',
+          import.meta.url,
+        ).pathname,
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

@@ -4,14 +4,21 @@
  * (see eslint.boundaries.js "Composition-root classification" for how that
  * permission is granted).
  *
- * Spec 001 scope: mounts the real logging screen, wired to
- * `InMemoryStorageAdapter` — NOT durable (its own doc comment). This
- * plan's explicit scope boundary (research.md §1) is the
- * application/presentation layers against the storage port, proven
- * against this non-durable stand-in, not a real on-device adapter. The
- * one edit a future persistence spec needs here is swapping this one
- * `StoragePort` instance for a real, feature-detected one (research.md
- * §6) — no application or presentation code changes.
+ * Spec 003 (Persistence): wires a real, feature-detected `StoragePort`
+ * adapter (FR-004) — `FileSystemStorageAdapter` where the File System
+ * Access API is available, `IndexedDbStorageAdapter` otherwise (notably
+ * iOS Safari). `InMemoryStorageAdapter` (spec 001's stand-in) remains in
+ * the codebase as the test-only fake (ADR-0002's third implementation)
+ * but is no longer wired here.
+ *
+ * `FileSystemStorageAdapter`'s directory handle is never acquired here at
+ * mount time — `getHandle` below only calls `showDirectoryPicker()` the
+ * first time the adapter actually needs it (its own `#ensureDirectoryHandle`,
+ * spec 003 research.md §2), which is the first real storage write. Every
+ * write on the logging critical path already originates from a user
+ * gesture (a tap confirming a set, `logging-store.ts`), so no dialog is
+ * shown at app-open time (FR-004a) — `mount()` itself calls `configure()`
+ * synchronously with an adapter instance, never awaiting a picker.
  *
  * Replaces Phase 0's `AppShell` placeholder ("Real screens land in Phases
  * 1–3", its own doc comment) now that a real screen exists.
@@ -21,9 +28,23 @@ import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import { LoggingScreen } from './logging/logging-screen';
 import { useLoggingSession } from '../application/logging/logging-store';
-import { InMemoryStorageAdapter } from '../infrastructure/in-memory-storage-adapter';
+import type { StoragePort } from '../application/ports/storage-port';
+import { IndexedDbStorageAdapter } from '../infrastructure/indexed-db-storage-adapter';
+import { FileSystemStorageAdapter } from '../infrastructure/file-system-storage-adapter';
+import { selectAdapterClass } from '../infrastructure/select-adapter';
 // tokens.css is linked directly from index.html (not imported here) so it
 // loads before first paint without waiting on the JS bundle.
+
+function createStorageAdapter(): StoragePort {
+  const hasFileSystemAccess = 'showDirectoryPicker' in window;
+  const kind = selectAdapterClass(hasFileSystemAccess);
+  if (kind === 'file-system') {
+    return new FileSystemStorageAdapter(() =>
+      window.showDirectoryPicker({ id: 'gym-log', mode: 'readwrite' }),
+    );
+  }
+  return new IndexedDbStorageAdapter();
+}
 
 function applyThemeFromSystemPreference(): void {
   const media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -43,7 +64,7 @@ function mount(): void {
   if (!root) {
     throw new Error('#root element not found in index.html');
   }
-  useLoggingSession.getState().configure(new InMemoryStorageAdapter());
+  useLoggingSession.getState().configure(createStorageAdapter());
   createRoot(root).render(
     <StrictMode>
       <LoggingScreen />

@@ -55,6 +55,33 @@ background — no dialog — and only surfaces a `StorageError` with
 `kind: 'permission-lost'` (FR-012a) if that query does not resolve to
 `'granted'`.
 
+**Implementation correction (found during `/speckit-implement`, not a
+silent deviation):** the premise above — "the very first `saveDraft`/
+`saveSession` call already runs inside a user gesture" — is false for
+this app's actual first write. `openLoggingForm`
+(`src/application/logging/use-cases.ts`, spec 001) auto-creates and saves
+an empty `LoggingDraft` the instant the logging screen mounts, called from
+`logging-store.ts`'s `initialize()` inside a `useEffect` — not from a
+click/tap. Calling `showDirectoryPicker()` from there throws
+`NotAllowedError`/`AbortError` (no live user gesture), and since
+`LoggingScreen` renders nothing interactive until that same `initialize()`
+call resolves, a hard failure there deadlocks the whole screen: no
+gesture can ever occur, because nothing renders for the user to gesture
+at. Neither `logging-store.ts` nor `use-cases.ts` may change (spec.md
+Non-Goals) — spec 001's own screens/use-cases stay untouched, so the fix
+had to live entirely inside `FileSystemStorageAdapter` itself: a
+`getHandle()` failure is no longer treated as fatal. It falls back to an
+in-memory write overlay (keyed by the same file paths the adapter already
+uses) that every read/write method consults first; the write still
+resolves normally (Principle II — no data loss, the screen renders). The
+next write that *does* carry a real gesture — the user's first actual tap,
+e.g. searching an exercise or confirming a set — retries acquisition for
+real and, on success, flushes the entire overlay to disk before
+proceeding, after which the adapter behaves exactly as originally
+designed (no further overlay involvement once a handle exists). A handle
+that exists but has lost its permission grant is unaffected by this — that
+remains a hard `permission-lost` `StorageError`, never shadowed.
+
 **Rationale**: This is the only sequencing that satisfies both FR-004
 (adapter *class* selection at startup, no gesture) and FR-004a (handle
 *acquisition* deferred to an already-gesture-triggered write) without

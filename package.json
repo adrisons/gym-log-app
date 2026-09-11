@@ -17,6 +17,7 @@
     "test:unit": "vitest run --passWithNoTests=false",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:contract-adapters": "playwright test test/e2e/indexed-db-adapter.contract.spec.ts test/e2e/file-system-adapter.contract.spec.ts",
     "lint": "eslint . && prettier --check .",
     "lint:fix": "eslint . --fix && prettier --write .",
     "check:no-color-literals": "bash scripts/check-no-color-literals.sh"
