@@ -15,6 +15,11 @@ import { CONTRACT_SCENARIOS } from '../contract/storage-adapter-contract';
 
 for (const scenario of CONTRACT_SCENARIOS) {
   test(`IndexedDbStorageAdapter: ${scenario.name}`, async ({ page }) => {
+    // Real disk/IndexedDB I/O plus this test's own fresh browser launch
+    // can be slower under CI's shared runner than locally — generous
+    // headroom over Playwright's 30s default (spec 003; see
+    // fixtures/fresh-browser-test.ts's doc comment).
+    test.setTimeout(90_000);
     await page.goto('/test/e2e/fixtures/storage-harness.html');
     const outcome = await page.evaluate(
       (name) => window.__runContractScenario('indexed-db', name),

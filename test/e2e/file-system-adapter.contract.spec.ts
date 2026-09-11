@@ -7,23 +7,28 @@ import { CONTRACT_SCENARIOS } from '../contract/storage-adapter-contract';
 // matching FR-004's production feature-detection fallback (a `webkit`
 // project run of this file would be un-runnable, not merely skipped).
 //
-// One page.evaluate() per scenario, AND a fresh browser process per test
-// (fixtures/fresh-browser-test.ts) — CI's chromium crashed reproducibly,
-// repeatedly, across several different mitigations ("Target page,
-// context or browser has been closed", Chromium crashpad visible in the
-// browser logs), never reproduced locally. Splitting into one Playwright
-// test per scenario showed the crash isn't one specific scenario's
-// fault: once the shared browser process crashed, every later test in
-// that worker failed identically, even ones whose own logic never ran —
-// pointing at the browser *process* itself, not this suite's code. A
-// fresh browser per test removes whatever accumulates across repeated
-// OPFS directory creation over many page loads in this CI container.
+// One page.evaluate() per scenario, a fresh browser process per test
+// (fixtures/fresh-browser-test.ts), and a generous per-test timeout: CI
+// repeatedly failed the exact same ~11 restart-simulating scenarios
+// (every one calling makeAdapter() twice, which reads the persisted
+// FileSystemDirectoryHandle back out of IndexedDB) with "Target page,
+// context or browser has been closed" — identically, across several
+// different code changes that should each have altered the failure
+// pattern if they'd addressed the real cause, which they didn't. That
+// invariance, plus the failing count times Playwright's 30s default
+// timeout roughly matching the run's total wall-clock time, points at a
+// timeout (real disk/IndexedDB I/O plus a fresh browser launch per test
+// being slower under CI's shared runner than locally) rather than an
+// actual crash — this fixture's own try/finally then surfaces a timed-out
+// in-flight page.evaluate() as exactly this "closed" error when the
+// timeout forces browser.close(). Never reproduced locally either way.
 
 for (const scenario of CONTRACT_SCENARIOS) {
   test(`FileSystemStorageAdapter: ${scenario.name}`, async ({
     page,
     browserName,
   }) => {
+    test.setTimeout(90_000);
     test.skip(
       browserName !== 'chromium',
       'File System Access has no WebKit implementation — matches production feature detection.',
@@ -42,6 +47,7 @@ test('a lost File System Access permission surfaces StorageError with kind "perm
   page,
   browserName,
 }) => {
+  test.setTimeout(90_000);
   test.skip(browserName !== 'chromium', 'File System Access is chromium-only.');
 
   await page.goto('/test/e2e/fixtures/storage-harness.html');
