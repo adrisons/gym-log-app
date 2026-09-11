@@ -1,0 +1,106 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { InMemoryStorage } from '../../../support';
+import { useLoggingSession } from '@/application/logging/logging-store';
+import type { ExerciseId } from '@/domain/ids';
+
+// Foundational: `initialize` only. Undo-stack behavior (T062) is US2's.
+
+describe('useLoggingSession (research.md §5)', () => {
+  it('starts with no draft and an empty undo stack', () => {
+    const state = useLoggingSession.getState();
+    expect(state.draft).toBeUndefined();
+    expect(state.undoStack).toEqual([]);
+  });
+
+  it('initialize populates draft from openLoggingForm, once configured with a storage', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    const state = useLoggingSession.getState();
+    expect(state.draft).toBeDefined();
+    expect(state.draft?.blocks).toEqual([]);
+  });
+});
+
+describe('useLoggingSession undo stack (FR-004, FR-023)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('pushing an UndoEntry makes it available for 5000ms, then it expires', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addBlock('A', 'straightSets');
+    const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
+
+    await useLoggingSession.getState().deleteBlock(blockId);
+    expect(useLoggingSession.getState().undoStack).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(useLoggingSession.getState().undoStack).toHaveLength(0);
+  });
+
+  it('undo before expiry restores the item and removes the entry', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addBlock('A', 'straightSets');
+    const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
+
+    await useLoggingSession.getState().deleteBlock(blockId);
+    expect(useLoggingSession.getState().draft!.blocks).toHaveLength(0);
+
+    await useLoggingSession.getState().undo(blockId);
+
+    expect(useLoggingSession.getState().draft!.blocks).toHaveLength(1);
+    expect(useLoggingSession.getState().undoStack).toEqual([]);
+  });
+
+  it('calling undo after expiry is a no-op', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addBlock('A', 'straightSets');
+    const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
+
+    await useLoggingSession.getState().deleteBlock(blockId);
+    await vi.advanceTimersByTimeAsync(5000);
+
+    await useLoggingSession.getState().undo(blockId);
+
+    expect(useLoggingSession.getState().draft!.blocks).toHaveLength(0);
+  });
+
+  it('two independent undo entries coexist: restoring the block does not resurrect an already-deleted set inside it', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(blockId, entryId, {
+      volume: { kind: 'reps', count: 5 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const setId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+
+    await useLoggingSession.getState().deleteSet(blockId, entryId, setId);
+    await useLoggingSession.getState().deleteBlock(blockId);
+    expect(useLoggingSession.getState().undoStack).toHaveLength(2);
+
+    await useLoggingSession.getState().undo(blockId);
+
+    const restoredEntry =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!;
+    expect(restoredEntry.sets).toEqual([]);
+    expect(useLoggingSession.getState().undoStack).toHaveLength(1);
+  });
+});

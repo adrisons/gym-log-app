@@ -1,0 +1,220 @@
+/* Shared styles for the logging screen and its subcomponents. Every value
+   is a design-token reference (var(--…)), per constitution Principle V —
+   no literal colour, radius, duration, easing, or spacing anywhere in this
+   file (scripts/check-no-color-literals.sh). One stylesheet for the whole
+   feature area rather than one per tiny form control: these are simple,
+   visually-related controls, not independent design surfaces. */
+
+.logging-screen {
+  min-height: 100vh;
+  background: var(--color-canvas);
+  color: var(--color-foreground);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  /* Narrow, one-handed phone layout is the default; nothing here needs a
+     min-width, so it already reflows to a wider viewport (docs/design.md §6). */
+}
+
+.logging-screen__field-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  color: var(--color-foreground-muted);
+}
+
+.logging-field-input {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  color: var(--color-foreground);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  min-height: 44px; /* generous hit target, docs/design.md §5 */
+}
+
+.logging-field-input:hover {
+  border-color: var(--color-border-strong);
+}
+
+.logging-field-input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.exercise-search-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.exercise-search-field__results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.logging-button {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  color: var(--color-foreground);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  min-height: 44px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--duration-short) var(--easing-standard);
+}
+
+.logging-button:hover {
+  background: var(--color-surface-raised);
+  border-color: var(--color-border-strong);
+}
+
+.logging-button:active {
+  background: var(--color-border);
+}
+
+.logging-button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.logging-button--primary {
+  background: var(--color-accent);
+  color: var(--color-accent-foreground);
+  border-color: var(--color-accent);
+  text-align: center;
+  font-weight: 600;
+}
+
+.logging-button--primary:hover {
+  background: var(--color-accent);
+  opacity: 0.9;
+}
+
+.logging-button:disabled {
+  color: var(--color-foreground-subtle);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.set-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.set-row__inputs {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.set-row__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  color: var(--color-foreground-muted);
+  flex: 1 1 120px;
+}
+
+/* WeightLoadInput/VolumeInput wrap an unstyled <label> inside a
+   .set-row__field div (they also render quick-increment buttons as a
+   sibling, so the class can't sit on the label itself the way
+   BodyweightLoadInput/FreeTextLoadInput do) — without this, the label's
+   span+input render inline instead of stacked. */
+.set-row__field label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.set-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.set-summary {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  font-family: var(--font-mono);
+}
+
+.undo-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  position: relative;
+  overflow: hidden;
+}
+
+.undo-toast__bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--color-accent);
+  transition: width var(--duration-short) linear;
+}
+
+.block-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.block-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.exercise-entry-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.exercise-entry-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}

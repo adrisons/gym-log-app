@@ -40,7 +40,7 @@ maintained by hand independently of it.
 | From | Allowed to import | Everything else is forbidden |
 |---|---|---|
 | `domain` | (nothing internal) | `application`, `application-ports`, `infrastructure`, `presentation`, `presentation-design`, `shared`, `composition-root` |
-| `application` | `domain`, `application-ports` | `infrastructure`, `presentation`, `presentation-design`, `shared`, `composition-root` |
+| `application` | `domain`, `application-ports`, `shared` | `infrastructure`, `presentation`, `presentation-design`, `composition-root` |
 | `application-ports` | `domain` | `application`, `infrastructure`, `presentation`, `presentation-design`, `shared`, `composition-root` |
 | `infrastructure` | `application`, `application-ports`, `domain` | `presentation`, `presentation-design`, `shared`, `composition-root` |
 | `presentation` | `application`, `presentation-design` | `application-ports`, `infrastructure`, `domain`, `shared`, `composition-root` |
@@ -51,6 +51,14 @@ maintained by hand independently of it.
 `shared` is deliberately not a backdoor between layers: it may import
 nothing internal, and that restriction is enforced the same way (direct and
 barrel-routed imports both fail) as every other edge.
+
+`application` → `shared` (spec 001, `specs/001-log-a-session/research.md`
+§2) is `shared`'s first real consumer — Phase 0 scaffolded the layer empty,
+with no edge granted to it yet. `src/application/logging/ids.ts` wraps
+`shared/id.ts`'s unbranded `newId()` with `domain`-branded casts.
+`application-ports` deliberately does not gain the same edge: the port
+states its contract in domain terms alone (ADR-0002), with no reason to
+reach into `shared/`.
 
 ## Verification
 
