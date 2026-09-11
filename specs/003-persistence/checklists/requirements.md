@@ -46,4 +46,26 @@
   User Scenarios and Success Criteria, so the "no implementation details"
   and "technology-agnostic success criteria" checks are marked pass on
   that basis, consistent with how specs 001 and 002 were reviewed.
+- Revised after `spec-reviewer` and `schema-guardian` adversarial review
+  (2026-09-11). Both flagged the same core gap — `getSchemaVersion`'s
+  non-nullable `Promise<number>` return had no defined behavior for a
+  never-initialized device, and "current schema version" was never pinned
+  to a number — resolved with FR-007a (current = 1, sentinel = 0, a
+  fourth case distinct from older/same/newer). `spec-reviewer` additionally
+  found: File System Access's user-gesture requirement was unreconciled
+  with FR-004's "no user-facing choice at startup" (resolved by FR-004a,
+  deferring handle *acquisition* to the first write, which is already a
+  user gesture in every existing flow); FR-011's atomicity granularity was
+  unstated for multi-record calls like `mergeExercises` (resolved: per
+  `StoragePort`-call granularity, stated explicitly); `StorageError` had
+  no way to distinguish causes the spec itself requires distinguishing
+  (resolved by FR-012a, a narrow discriminant addition — the one
+  documented exception to the "no application-layer changes" Non-Goal);
+  concurrent multi-tab writes and Band label durability were uncovered
+  (resolved: last-write-wins Non-Goal, and an explicit User Story 3
+  acceptance scenario for Band labels). All resolved via informed
+  defaults documented inline rather than `[NEEDS CLARIFICATION]` markers,
+  since each had a reasonable default consistent with existing project
+  conventions (ADR-0002, `docs/requirements.md` §6/§7.5,
+  `InMemoryStorageAdapter`'s own sentinel).
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`.
