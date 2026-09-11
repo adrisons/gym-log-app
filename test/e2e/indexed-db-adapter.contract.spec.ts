@@ -7,15 +7,19 @@ import { CONTRACT_SCENARIOS } from '../contract/storage-adapter-contract';
 // (playwright.config.ts) — IndexedDB is available in both, matching the
 // production feature-detection fallback WebKit/iOS Safari takes
 // (spec 003 FR-004).
+//
+// One page.evaluate() per scenario, not one call for the whole suite —
+// see runOneScenario's doc comment in storage-adapter-contract.ts for why
+// (a reproducible CI-only browser crash on the File System Access
+// sibling spec's single giant page.evaluate() call).
 
-test('IndexedDbStorageAdapter satisfies the shared storage-adapter contract', async ({
-  page,
-}) => {
-  await page.goto('/test/e2e/fixtures/storage-harness.html');
-  const result = await page.evaluate(() =>
-    window.__runContractSuite('indexed-db'),
-  );
-
-  expect(result.failed, JSON.stringify(result.failed, null, 2)).toEqual([]);
-  expect(result.passed.length).toBe(CONTRACT_SCENARIOS.length);
-});
+for (const scenario of CONTRACT_SCENARIOS) {
+  test(`IndexedDbStorageAdapter: ${scenario.name}`, async ({ page }) => {
+    await page.goto('/test/e2e/fixtures/storage-harness.html');
+    const outcome = await page.evaluate(
+      (name) => window.__runContractScenario('indexed-db', name),
+      scenario.name,
+    );
+    expect(outcome.passed, outcome.passed ? '' : outcome.error).toBe(true);
+  });
+}

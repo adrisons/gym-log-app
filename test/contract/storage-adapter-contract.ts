@@ -555,18 +555,46 @@ export async function runStorageAdapterContract(
   const passed: string[] = [];
   const failed: ContractFailure[] = [];
   for (const scenario of CONTRACT_SCENARIOS) {
-    const { makeAdapter, dispose } = await createStore();
-    try {
-      await scenario.run(makeAdapter);
-      passed.push(scenario.name);
-    } catch (error) {
-      failed.push({
-        scenario: scenario.name,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      await dispose?.();
-    }
+    const outcome = await runOneScenario(scenario, createStore);
+    if (outcome.passed) passed.push(scenario.name);
+    else failed.push({ scenario: scenario.name, error: outcome.error });
   }
   return { passed, failed };
+}
+
+/**
+ * Runs exactly one named scenario against a fresh store. Exists
+ * separately from `runStorageAdapterContract` so a Playwright test can
+ * drive one `page.evaluate()` call per scenario instead of cramming all
+ * ~15 into a single browser-side call — CI's `chromium` hit a
+ * reproducible, real (not flaky — 3/3) crash specifically on the
+ * File System Access contract test's single giant `page.evaluate()`
+ * ("Target page, context or browser has been closed", Chromium crashpad
+ * visible in the browser logs, on both the default headless-shell binary
+ * and the full Chrome-for-Testing build) that never reproduced locally.
+ * Isolating each scenario to its own call gives the CDP protocol a
+ * boundary per scenario, and if a specific scenario is the real trigger,
+ * only that one test fails instead of the whole suite silently losing
+ * its browser context.
+ */
+export async function runOneScenario(
+  scenario: Scenario,
+  createStore: StoreFactory,
+): Promise<{ passed: true } | { passed: false; error: string }> {
+  const { makeAdapter, dispose } = await createStore();
+  try {
+    await scenario.run(makeAdapter);
+    return { passed: true };
+  } catch (error) {
+    return {
+      passed: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  } finally {
+    await dispose?.();
+  }
+}
+
+export function findScenario(name: string): Scenario | undefined {
+  return CONTRACT_SCENARIOS.find((s) => s.name === name);
 }
