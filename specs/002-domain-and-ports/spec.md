@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-11
 
-**Status**: Planned — plan.md/data-model.md/quickstart.md exist; no tasks.md yet
+**Status**: Planned — plan.md/data-model.md/quickstart.md/tasks.md exist; implementation hasn't merged yet
 
 **Input**: User description: "Domain model and ports (Phase 1). Entities,
 value objects, domain rules (docs/requirements.md §3.3), and the finalized
