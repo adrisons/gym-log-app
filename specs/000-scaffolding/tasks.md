@@ -19,12 +19,14 @@ test tasks are first-class here, not optional.
 **Organization**: by user story (US1–US5 from spec.md). Each story is an
 independently verifiable slice of the Phase 0 deliverable.
 
-**Status (2026-09-10)**: T001–T031 and T041–T042 done (33/47). Setup,
-Foundational, US4 (stack doc), US2 (boundary rule + verification), US3
-(shared doubles), and the testing-convention part of Polish are complete;
-the full gate (typecheck, lint, prettier, no-color-literals, unit tests)
-is green. Remaining: US5 (T032–T040, the PWA shell + smoke test) and the
-rest of Polish (T043–T047, incl. the quickstart run and opening the PR).
+**Status (2026-09-11)**: T001–T042 done (42/47). Setup, Foundational, US4
+(stack doc), US2 (boundary rule + verification), US3 (shared doubles), US5
+(PWA shell + smoke test), and the testing-convention part of Polish are
+complete; the full gate (typecheck, lint, prettier, no-color-literals, unit
+tests, e2e/build) is green. Also fixed during this pass: the
+composition-root element misclassification (docs/architecture.md
+"Composition-root classification"). Remaining: the rest of Polish
+(T043–T047, incl. the quickstart run).
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -286,7 +288,7 @@ serves a placeholder; the smoke test passes; the placeholder holds no
 domain entity / persistence call / screen; it themes correctly light and
 dark from tokens only.
 
-- [ ] T032 [P] [US5] Create `src/presentation/design/tokens.css` — every
+- [X] T032 [P] [US5] Create `src/presentation/design/tokens.css` — every
       colour role from data-model.md §2 (`--color-canvas`, `--color-surface`,
       `--color-surface-raised`, `--color-foreground`,
       `--color-foreground-muted`, `--color-foreground-subtle`,
@@ -297,37 +299,37 @@ dark from tokens only.
       (dark), plus `--radius-{sm,md,lg}`, `--duration-{instant,short,medium}`,
       `--easing-{standard,decelerate,accelerate}`, `--space-1..6`. Provisional
       values allowed; no token absent (FR-018, FR-019).
-- [ ] T033 [P] [US5] Create `src/presentation/design/tokens.ts` — export a
+- [X] T033 [P] [US5] Create `src/presentation/design/tokens.ts` — export a
       typed union `TokenName` listing every custom-property name from
       T032, and a `token(name: TokenName)` helper returning
       `var(--…)`. This is the enumerated expected set FR-019 is checked
       against.
-- [ ] T034 [P] [US5] Create `src/presentation/design/index.ts` — re-export
+- [X] T034 [P] [US5] Create `src/presentation/design/index.ts` — re-export
       `tokens.ts`; do not re-export the raw CSS.
-- [ ] T035 [P] [US5] Create `test/unit/tokens.test.ts` — assert every
+- [X] T035 [P] [US5] Create `test/unit/tokens.test.ts` — assert every
       role/category name in a fixture mirroring data-model.md §2 is present
       in `TokenName`, and (parse `tokens.css`) that each appears under both
       a light and a dark selector. Fail on a missing token (FR-019).
-- [ ] T036 [US5] Create `src/presentation/app-shell.tsx` — a placeholder
+- [X] T036 [US5] Create `src/presentation/app-shell.tsx` — a placeholder
       component: an app title and one line of text, all colours/spacing via
       `token(...)` or CSS classes bound to custom properties. No domain
       import, no `StoragePort` import, no route beyond `/` (FR-020, FR-022).
-- [ ] T037 [US5] Create `src/presentation/main.tsx` — the composition root:
+- [X] T037 [US5] Create `src/presentation/main.tsx` — the composition root:
       mount `<AppShell/>` into `#root`, register the PWA service worker
       (via `virtual:pwa-register`), set `<html data-theme>` from
       `prefers-color-scheme` with a listener. This is the single wiring
       point (Principle V); it is the only file allowed to import across all
       layers.
-- [ ] T038 [US5] Create `index.html` at repo root — `#root` div, link
+- [X] T038 [US5] Create `index.html` at repo root — `#root` div, link
       `tokens.css`, `<script type="module" src="/src/presentation/main.tsx">`,
       manifest link (from `vite-plugin-pwa`), `theme-color` meta bound to a
       token value.
-- [ ] T039 [US5] Create `test/e2e/shell-smoke.spec.ts` — Playwright: load
+- [X] T039 [US5] Create `test/e2e/shell-smoke.spec.ts` — Playwright: load
       the app, assert the placeholder title is visible, assert the service
       worker registers (`navigator.serviceWorker.ready`), run once in
       Chromium and once in WebKit. This is the FR-021 smoke test and part of
       `npm run test:e2e` → CI.
-- [ ] T040 [US5] The binding check for "no literal colours outside the
+- [X] T040 [US5] The binding check for "no literal colours outside the
       token module" (SC-007) is a grep, wired into CI as its own step (or a
       Vitest test): `grep -RInE '#[0-9a-fA-F]{3,8}|rgb\(|hsl\('
       src/ --exclude-dir=design` MUST return nothing (non-zero exit fails

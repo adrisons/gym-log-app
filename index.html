@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- theme-color mirrors --color-canvas (tokens.css); a manifest/meta tag
+         can't read a CSS custom property, so this is duplicated by hand —
+         see the note in vite.config.ts. -->
+    <meta name="theme-color" content="#f7f7f8" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/src/presentation/design/tokens.css" />
+    <title>gym-log</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/presentation/main.tsx"></script>
+  </body>
+</html>
