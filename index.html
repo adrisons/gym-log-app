@@ -7,7 +7,10 @@
          can't read a CSS custom property, so this is duplicated by hand —
          see the note in vite.config.ts. -->
     <meta name="theme-color" content="#f3f4f6" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- vite-plugin-pwa injects the <link rel="manifest"> tag itself, at
+         build time, already correctly base-rooted (vite.config.ts's BASE) —
+         a hand-written one here would need the same base-path handling and
+         would drift out of sync with GitHub Pages' /gym-log-app/ subpath. -->
     <!-- Backs --font-ui / --font-mono (tokens.css). Google Fonts is loaded
          directly rather than self-hosted for now — revisit if an ADR-level
          reason (offline-first strictness, licensing) comes up later. -->

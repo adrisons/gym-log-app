@@ -1,0 +1,52 @@
+name: Deploy to GitHub Pages
+
+# Builds and publishes the app shell to GitHub Pages every time main is
+# updated (a PR merge or a direct push) — one-time repo setup required:
+# Settings → Pages → Build and deployment → Source → "GitHub Actions".
+on:
+  push:
+    branches: [main]
+  # Lets a maintainer redeploy the current main without a new commit.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deployment at a time; a newer push takes priority over a
+# still-running older one rather than queuing behind it.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+      # GITHUB_PAGES=true switches vite.config.ts's base path to
+      # /gym-log-app/ — GitHub Pages serves a project repo from
+      # https://<owner>.github.io/<repo>/, not from the domain root.
+      - run: npm run build
+        env:
+          GITHUB_PAGES: 'true'
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

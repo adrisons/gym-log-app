@@ -51,6 +51,20 @@ private repo does not currently have (GitHub Pro, or making the repo
 public); until upgraded, treat a green `ci-gate` as a merge prerequisite by
 convention rather than a platform-enforced one.
 
+## Deployment
+
+Every push to `main` (a PR merge or a direct push) builds and publishes the
+app to GitHub Pages via `.github/workflows/deploy.yml`, at
+`https://<owner>.github.io/gym-log-app/`. GitHub Pages serves a project repo
+from that subpath, not the domain root, so the build sets
+`GITHUB_PAGES=true`, which switches `vite.config.ts`'s `base` (and the PWA
+manifest's `start_url`/`scope`/icon paths) to `/gym-log-app/`; every other
+build (dev server, `preview`, CI's own `test:e2e`) stays at `/`.
+
+One-time repo setup this workflow depends on: **Settings → Pages → Build
+and deployment → Source → "GitHub Actions"** — not done automatically by
+pushing this workflow file.
+
 ## Documentation
 
 - [`docs/requirements.md`](docs/requirements.md) — what the app does
