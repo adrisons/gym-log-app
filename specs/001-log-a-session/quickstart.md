@@ -27,12 +27,18 @@ viewport first, then a wide one, in both light and dark theme:
    appears instantly, no Save control anywhere, no spinner (US1-7, SC-001:
    count taps — repeating the previous set should be ≤ 3 taps once one set
    exists).
-3. **Leave and return**: enter a set, reload the page (simulates
-   close/reopen within the same day) → the draft is restored with that set
-   intact, no data lost (US1-2, US1-8, SC-007). *Caveat*: this proves the
-   application/port contract, not on-device durability — see
-   `research.md` §1; a real reload against a real adapter is the follow-up
-   persistence spec's job.
+3. **Leave and return** — *not yet a literal browser-reload check with
+   today's build*: `InMemoryStorageAdapter` (`src/infrastructure/`) is
+   explicitly non-durable (research.md §1) — state lives only in that
+   page load's JS heap, so an actual `page.reload()` loses it today,
+   correctly, and is not something to expect to pass until the follow-up
+   persistence spec lands. What *is* verified now: enter a set and confirm
+   (via `test/integration/logging-flow.test.ts` and
+   `test/unit/storage-port-fake.test.ts`) that `storage.getDraft()`
+   reflects it immediately after — the application/port contract for
+   "every change is persisted automatically" (FR-003/FR-024) holds; only
+   the on-device durability of the adapter itself (SC-003/SC-007) is
+   pending.
 4. **Double-tap guard**: on a pre-filled set, tap confirm twice within
    about a second → only one set recorded (US1-9, FR-025).
 5. **Blocks**: create two blocks, name one, leave one unnamed (shows as

@@ -12,9 +12,10 @@ describe('useLoggingSession (research.md §5)', () => {
     expect(state.undoStack).toEqual([]);
   });
 
-  it('initialize populates draft from openLoggingForm', async () => {
+  it('initialize populates draft from openLoggingForm, once configured with a storage', async () => {
     const storage = new InMemoryStorage();
-    await useLoggingSession.getState().initialize(storage);
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
     const state = useLoggingSession.getState();
     expect(state.draft).toBeDefined();
     expect(state.draft?.blocks).toEqual([]);

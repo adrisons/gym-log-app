@@ -18,9 +18,13 @@ band-labels surface (FR-011); everything else composes existing domain
 smart constructors and the existing port.
 
 **Scope boundary, stated up front**: this plan does **not** implement a
-real storage adapter (`IndexedDbStorageAdapter`/`FileSystemStorageAdapter`,
+*durable* storage adapter (`IndexedDbStorageAdapter`/`FileSystemStorageAdapter`,
 `docs/agent-brief.md` Phase 2). It builds and fully tests the feature
-against `InMemoryStorage`, and recommends a follow-up persistence spec
+against `InMemoryStorageAdapter` — a non-durable `StoragePort`
+implementation that, discovered during implementation, has to live under
+`src/infrastructure/` rather than `test/support/` since the composition
+root cannot import from `test/`; it is still explicitly not durable, still
+the same scope boundary — and recommends a follow-up persistence spec
 before shipping — see `research.md` §1 for the full reasoning and its
 consequence for FR-005/FR-024/SC-003/SC-007. This is a deliberate,
 documented scope decision, not an oversight; flag it back if the intent was
@@ -130,7 +134,8 @@ src/
 │       ├── view-models.ts               # toBlockViewModel etc.
 │       ├── quick-increments.ts          # named constants (research.md §9)
 │       └── logging-store.ts             # useLoggingSession (Zustand) — draft state, undo stack, debounce guard
-├── infrastructure/                      # UNCHANGED (no real adapter — see Summary)
+├── infrastructure/
+│   └── in-memory-storage-adapter.ts     # moved from test/support/ — main.tsx needs an in-src/ StoragePort impl; NOT durable, see Summary
 ├── presentation/
 │   ├── logging/
 │   │   ├── logging-screen.tsx

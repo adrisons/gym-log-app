@@ -12,8 +12,18 @@ Phase 0 instructions.
 `presentation` layers of the logging feature (FR-001..FR-026), wired
 against the existing `StoragePort` interface (`specs/002-domain-and-ports`)
 and tested entirely against `InMemoryStorage`
-(`test/support/in-memory-storage.ts`) — no real `infrastructure/` adapter
-is written here. `LoggingDraft`'s real nested shape (owned by this spec per
+(`InMemoryStorageAdapter`) — no *durable* `infrastructure/` adapter
+(`IndexedDbStorageAdapter`/`FileSystemStorageAdapter`) is written here.
+**Discovered during implementation**: `InMemoryStorageAdapter` itself does
+have to live under `src/infrastructure/`, not `test/support/` as first
+assumed — `src/presentation/main.tsx` (the composition root) needs a real,
+in-`src/`-layer `StoragePort` implementation to wire, since `src/` may
+never import from `test/`. It is still explicitly non-durable (its own doc
+comment says so) and still the same scope boundary as originally decided
+here: this plan proves the feature's behavior against an in-memory
+implementation, not a real on-device one. `test/support/in-memory-storage.ts`
+now just re-exports the same class under its historical test-facing name,
+so every existing test keeps importing it unchanged. `LoggingDraft`'s real nested shape (owned by this spec per
 `contracts/storage-port.md`'s own note) **is** designed and implemented
 here, and `InMemoryStorage`'s flat-placeholder repoint/prune logic **is**
 replaced to walk that real shape — that limitation was explicitly assigned
