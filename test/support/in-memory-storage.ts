@@ -30,9 +30,16 @@ export class InMemoryStorage implements StoragePort {
   }
 
   async listSessions(range: DateRange): Promise<SessionRecord[]> {
-    return [...this.#sessions.values()].filter(
-      (s) => s.dateTime >= range.from && s.dateTime <= range.to,
-    );
+    // Compare parsed instants, not raw ISO 8601 strings: two equivalent
+    // timestamps with different offsets (e.g. "20:00+02:00" vs a "Z"
+    // bound) don't compare correctly as strings, which could wrongly
+    // exclude an in-range session.
+    const from = Date.parse(range.from);
+    const to = Date.parse(range.to);
+    return [...this.#sessions.values()].filter((s) => {
+      const dateTime = Date.parse(s.dateTime);
+      return dateTime >= from && dateTime <= to;
+    });
   }
 
   async deleteSession(id: SessionId): Promise<void> {

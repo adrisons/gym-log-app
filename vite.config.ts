@@ -35,7 +35,28 @@ export default defineConfig({
         start_url: '/',
         background_color: MANIFEST_BACKGROUND,
         theme_color: MANIFEST_THEME,
-        icons: [],
+        // Flat placeholder icons (public/) — Phase 0 scope; a real icon is
+        // a docs/design.md concern for a later pass. Chromium requires at
+        // least a 192px and a 512px icon, plus a maskable icon, for the
+        // shell to be treated as installable (PR #3 review).
+        icons: [
+          {
+            src: '/icon-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+          },
+          {
+            src: '/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+          },
+          {
+            src: '/icon-maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
       },
     }),
   ],

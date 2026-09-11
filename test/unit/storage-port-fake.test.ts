@@ -46,6 +46,23 @@ describe('InMemoryStorage (StoragePort fake)', () => {
     expect(result).toEqual([]);
   });
 
+  it('listSessions compares parsed instants, not raw ISO strings (mixed offsets)', async () => {
+    // 2026-09-10T20:00:00+02:00 is the same instant as 18:00:00Z — a naive
+    // string comparison against a "Z" bound would wrongly exclude it.
+    const offsetSession: SessionRecord = {
+      id: 's2',
+      dateTime: '2026-09-10T20:00:00+02:00',
+    };
+    await storage.saveSession(offsetSession);
+
+    const result = await storage.listSessions({
+      from: '2026-09-10T17:00:00Z',
+      to: '2026-09-10T19:00:00Z',
+    });
+
+    expect(result).toContainEqual(offsetSession);
+  });
+
   it('deleteSession → getSession returns undefined', async () => {
     await storage.saveSession(session);
     await storage.deleteSession('s1');

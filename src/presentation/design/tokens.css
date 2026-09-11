@@ -97,6 +97,15 @@
   --color-success: #4fbf78;
 }
 
+/* A minimal reset — the browser's default body margin would otherwise
+   overflow a 100vh shell and leave an unthemed sliver visible around it
+   (most noticeable in dark mode). Not a token itself, but belongs here:
+   this file is the one stylesheet always loaded first (index.html), before
+   any component styles. */
+body {
+  margin: 0;
+}
+
 /* An explicit light choice always wins over the OS preference. */
 :root[data-theme='light'] {
   --color-canvas: #f7f7f8;

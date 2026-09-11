@@ -59,9 +59,14 @@ Then run the edge-set check (`test/boundaries/`) that compares the enforced
 ## 4. Shared test doubles + integration harness (FR-013..FR-016, SC-005)
 
 ```
-npm test -- test/unit/storage-port-fake.test.ts
-npm test -- test/integration/harness.test.ts
+npm run test:unit -- test/unit/storage-port-fake.test.ts
+npm run test:unit -- test/integration/harness.test.ts
 ```
+
+(`npm test` runs the composite `test:unit && test:e2e` script — an extra
+argument after `--` would be appended to that whole command line and
+picked up by the Playwright half, not routed to Vitest. Use `test:unit`
+directly to select a single Vitest file.)
 
 Expected: the first round-trips a value through the in-memory fake of the
 `StoragePort` with no real storage API (FR-014); the second drives a
