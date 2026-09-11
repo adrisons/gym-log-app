@@ -212,9 +212,10 @@ use case the way a session has.
 
 ## 7. `StorageError.kind` discriminant (FR-012a)
 
-**Decision**: `src/application/errors.ts`'s `StorageError` gains one new
-optional field: `kind?: 'quota-exceeded' | 'permission-lost' |
-'schema-too-new'`. Absent (`undefined`) covers every other failure — the
+**Decision**: `src/application/errors.ts`'s `StorageError` class gains one
+new optional constructor param/readonly field: `kind?: 'quota-exceeded' |
+'permission-lost' | 'schema-too-new'`, added after the existing `cause`
+param. Absent (`undefined`) covers every other failure — the
 discriminant only needs to distinguish the three causes spec.md's FR-010
 and Edge Cases explicitly require distinguishing; it is not a general
 error-code system. `message` stays the human-readable text; `kind` is for

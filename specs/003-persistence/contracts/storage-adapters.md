@@ -10,10 +10,16 @@ fake.
 ## `StorageError.kind` addition (FR-012a)
 
 ```ts
-// src/application/errors.ts
-export interface StorageError extends Error {
-  cause?: unknown;
-  kind?: 'quota-exceeded' | 'permission-lost' | 'schema-too-new';
+// src/application/errors.ts — existing class, `kind` is the one addition
+export class StorageError extends Error {
+  override readonly name = 'StorageError';
+  constructor(
+    message: string,
+    override readonly cause?: unknown,
+    readonly kind?: 'quota-exceeded' | 'permission-lost' | 'schema-too-new',
+  ) {
+    super(message);
+  }
 }
 ```
 
