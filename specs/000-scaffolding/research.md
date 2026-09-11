@@ -29,9 +29,13 @@ assumes TS.
 the Load/Volume unions the domain leans on); ReScript / Elm (smaller
 ecosystems, worse PWA/tooling story, higher ramp for a solo project).
 
-## 2. UI framework — React 18
+## 2. UI framework — React 19
 
-**Decision**: React 18 with function components and hooks.
+**Decision**: React (function components and hooks). Proposed and approved
+as React 18 on 2026-09-10; updated to React 19 on the owner's later
+instruction to adopt each dependency's latest stable major except
+TypeScript (`docs/stack.md` "Versions") — the rationale below is unchanged
+by that version bump; it was never version-specific.
 
 **Rationale**: largest ecosystem for the specific things later phases need —
 Testing Library, Playwright component testing, charts, accessible primitives
@@ -53,9 +57,11 @@ simple. `presentation/` stays a thin view layer consuming view models
   logging screen (undo, optimistic updates, focus management) is exactly the
   work a framework removes; rejected as false economy.
 
-## 3. Build tool — Vite 5
+## 3. Build tool — Vite 8
 
-**Decision**: Vite 5 as bundler and dev server.
+**Decision**: Vite as bundler and dev server. Proposed and approved as
+Vite 5 on 2026-09-10; updated to Vite 8 under the same later
+latest-stable-major instruction as §2.
 
 **Rationale**: near-zero-config for a React+TS PWA, fast HMR, first-class
 `vite-plugin-pwa`, native test runner (Vitest) sharing the same config and
@@ -165,10 +171,11 @@ tree-shakes to the chart types used.
   bespoke code for a personal app.
 - **Nivo** — nice defaults but heavier and pulls a large dependency tree.
 
-## 8. Navigation — React Router 6
+## 8. Navigation — React Router 7
 
-**Decision**: React Router 6 in `createBrowserRouter` / data-router mode,
-client-side only.
+**Decision**: React Router in `createBrowserRouter` / data-router mode,
+client-side only. Proposed and approved as React Router 6 on 2026-09-10;
+updated to 7 under the same later latest-stable-major instruction as §2.
 
 **Rationale**: the app has a handful of routes (log, diary, exercise
 detail, body, settings); React Router is the default, well-understood

@@ -32,23 +32,29 @@ constitution, Escalation).
 **Language/Version**: TypeScript 5.x (strict), targeting ES2022; Node 24 LTS
 for tooling/CI.
 
-**Primary Dependencies** (proposed — see research.md for rationale and
-alternatives; subject to owner approval):
+**Primary Dependencies** — approved by the project owner as proposed on
+2026-09-10 (see research.md for rationale and alternatives), then updated
+to each library's latest stable major on the owner's later instruction
+("latest majors except TypeScript, which stays on 5.x" — see `docs/stack.md`
+"Versions" for the full exception list and reasoning). `docs/stack.md` is
+the canonical, kept-current record of exact concerns/tools; the table below
+names majors for traceability against research.md's original rationale,
+not exact pins (see `package.json` for those):
 
-| Concern | Proposed | Note |
+| Concern | Tool (major) | Note |
 |---|---|---|
-| PWA framework | React 18 + TypeScript | |
-| Build tool / bundler | Vite 5 | |
+| PWA framework | React 19 + TypeScript | |
+| Build tool / bundler | Vite 8 | |
 | State management | Zustand | small, unopinionated store; no Redux boilerplate |
 | Service worker / offline precache | `vite-plugin-pwa` (Workbox) | precaches the app shell (ADR-0002) |
 | Storage helper — File System Access API | none, hand-written adapter | thin API; no maintained wrapper worth a dependency |
-| Storage helper — IndexedDB | Dexie | ergonomic IndexedDB; adapter still behind the port |
+| Storage helper — IndexedDB | Dexie 4 | ergonomic IndexedDB; adapter still behind the port |
 | Charts | Recharts | deferred use (Phase 4/5); named now per "one dependency per concern" |
-| Navigation | React Router | |
+| Navigation | React Router 7 | |
 | Test runner | Vitest | Vite-native; one runner for unit + integration + smoke |
 | Component/DOM testing | `@testing-library/react` + `@testing-library/user-event` | |
 | End-to-end / smoke (browser) | Playwright | the launch smoke test and later E2E |
-| Lint | ESLint 9 flat config + `eslint-plugin-boundaries` + `@typescript-eslint` | boundaries plugin is the layer rule |
+| Lint | ESLint 9.x flat config + `eslint-plugin-boundaries` + `@typescript-eslint` | held at 9.x, not 10.x — `eslint-plugin-react`'s peer range doesn't cover 10 yet |
 | Formatting | Prettier | |
 | Date/time | deferred to the Phase 1 spec | platform `Date`/`Intl` expected; ADR if a lib proves needed |
 | Fuzzy search | deferred to the Phase 4 spec | e.g. Fuse.js or `uFuzzy`, decided when search is specified |
@@ -104,8 +110,14 @@ no feature surface.
 No violations. Complexity Tracking table is empty.
 
 **Owner sign-off**: the project owner approved every tool in
-[research.md](./research.md) as proposed on 2026-09-10, with no changes.
-`docs/stack.md` is written to match.
+[research.md](./research.md) as proposed on 2026-09-10, with no changes to
+which concern each tool covers. During implementation, the owner separately
+approved updating every dependency to its latest stable major except
+TypeScript (held at 5.x) — see `docs/stack.md` "Versions" — after
+`npm install` surfaced known vulnerabilities in the originally-proposed
+versions. `docs/stack.md` and this plan's Primary Dependencies table are
+kept current with the actually-implemented majors; research.md's own
+per-concern sections note where their proposed version was later updated.
 
 ## Project Structure
 

@@ -19,14 +19,34 @@ test tasks are first-class here, not optional.
 **Organization**: by user story (US1–US5 from spec.md). Each story is an
 independently verifiable slice of the Phase 0 deliverable.
 
-**Status (2026-09-11)**: T001–T042 done (42/47). Setup, Foundational, US4
-(stack doc), US2 (boundary rule + verification), US3 (shared doubles), US5
-(PWA shell + smoke test), and the testing-convention part of Polish are
-complete; the full gate (typecheck, lint, prettier, no-color-literals, unit
-tests, e2e/build) is green. Also fixed during this pass: the
-composition-root element misclassification (docs/architecture.md
-"Composition-root classification"). Remaining: the rest of Polish
-(T043–T047, incl. the quickstart run).
+**Status (2026-09-11)**: T001–T046 done, T047 partial (46.5/47). Every user
+story (US1–US5) and all of Polish except the branch-protection half of T047
+are complete; the full gate (typecheck, lint, prettier, no-color-literals,
+82 unit tests, e2e/build) is green, and `specs/000-scaffolding/quickstart.md`
+was run end to end (all 6 sections pass). PR #3 open with `ci-gate` green.
+
+Fixed during PR #3 code review (GitHub Copilot), all re-verified: (1) the
+composition-root element misclassification (main.tsx never actually
+classified as its own type); (2) `ci-gate` reporting green on a `skipped`
+dependency job; (3) `presentation` could import `application-ports`
+directly, contradicting the port's own contract; (4) the `application`
+barrel re-exported persistence types that leaked the same violation; (5)
+`presentation` could import the composition root as an ordinary same-layer
+("internal") dependency, bypassing the boundary rule entirely; (6)
+`check-no-color-literals.sh`'s `|| true` masked real `grep` failures; (7)
+`app-shell.css` lacked a body-margin reset; (8) `in-memory-storage.ts`
+compared ISO date strings instead of parsed instants; (9) a test `as never`
+cast defeated its own claimed type-exactness check; (10) the PWA manifest
+had no icons, so the shell was not actually installable; (11) a quickstart
+command routed its argument to the wrong npm script; (12) `plan.md` /
+`research.md` still named the pre-upgrade stack majors (React 18/Vite
+5/Router 6) instead of what's implemented. See `docs/architecture.md`
+"Composition-root classification", `test/boundaries/README.md` cases
+9–13, and the individual file diffs for detail on each.
+
+T047's branch-protection verification is UNVERIFIED, not a code defect —
+see that task's note: this private repo's GitHub plan returns 403 on the
+branch-protection API.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -357,25 +377,31 @@ SC-007).
       pressed, focus-visible, disabled-with-a-stated-reason, loading
       (constitution Definition of Done); note `--color-focus-ring` exists to
       serve focus-visible; state Phase 0 builds no interactive element.
-- [ ] T043 [P] Add `docs/architecture.md` a closing note (FR-023): any
+- [X] T043 [P] Add `docs/architecture.md` a closing note (FR-023): any
       later change to the layer map updates both this doc's forbidden-edge
       table and `eslint.config.js` in the same change, and
       `test/boundaries/edge-set.test.ts` guards the two staying equal.
-- [ ] T044 [P] Update `AGENTS.md` reading order and `docs/agent-brief.md`
+- [X] T044 [P] Update `AGENTS.md` reading order and `docs/agent-brief.md`
       §1: the three scaffolding docs (`docs/stack.md`,
       `docs/architecture.md`, `docs/testing.md`) now exist; strike them from
       the "still missing" list.
-- [ ] T045 [P] Update `README.md`: project one-liner, the Development
+- [X] T045 [P] Update `README.md`: project one-liner, the Development
       section (from T016), a "Docs" index linking requirements / design /
       development-principles / agent-brief / stack / architecture / testing /
       the ADRs.
-- [ ] T046 Run the full `specs/000-scaffolding/quickstart.md` end to end;
+- [X] T046 Run the full `specs/000-scaffolding/quickstart.md` end to end;
       fix anything that does not hold; record the run outcome in the PR
       description.
-- [ ] T047 Open the Phase 0 PR into the default branch; confirm the CI gate
+- [~] T047 Open the Phase 0 PR into the default branch; confirm the CI gate
       is green and the branch-protection required checks block a red gate
       (create a throwaway red commit on a scratch branch to confirm FR-002,
-      then discard it).
+      then discard it). PR #3 opened, `ci-gate` green (all 5 jobs). The
+      branch-protection half of FR-002 is UNVERIFIED: this repo is private
+      on a GitHub plan that returns 403 on the branch-protection API
+      ("Upgrade to GitHub Pro or make this repository public"), so a
+      required-status-check rule cannot currently be configured or tested.
+      Not a code defect — re-run this verification once the repo is public
+      or the plan is upgraded.
 
 ---
 

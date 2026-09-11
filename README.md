@@ -18,10 +18,11 @@ taps, and see your progression and trend-based insights over time.
 
 ## Status
 
-Phase 0 (scaffolding) in progress: stack chosen (`docs/stack.md`), layer
+Phase 0 (scaffolding) complete: stack chosen (`docs/stack.md`), layer
 boundary mechanically enforced, storage port interface + in-memory fake in
-place. No domain logic, no real storage adapter, no screens yet — see
-`docs/agent-brief.md` §3 for the phase order.
+place, and a placeholder PWA shell that launches with a passing smoke test.
+No domain logic, no real storage adapter, no product screens yet — see
+`docs/agent-brief.md` §3 for the phase order. Phase 1 is next.
 
 ## Development
 
@@ -42,9 +43,13 @@ npm run test:unit              # vitest run --passWithNoTests=false
 npm run test:e2e               # playwright test
 ```
 
-`npm test` runs `test:unit` then `test:e2e`. A pull request cannot merge
-unless all four checks are green (branch protection on the default branch
-requires the CI workflow's jobs).
+`npm test` runs `test:unit` then `test:e2e`. CI runs these same commands on
+every PR behind a single required `ci-gate` job (`.github/workflows/ci.yml`)
+that fails if any of them fails — or is skipped. Branch-protection
+enforcement that blocks merging a red `ci-gate` requires a GitHub plan this
+private repo does not currently have (GitHub Pro, or making the repo
+public); until upgraded, treat a green `ci-gate` as a merge prerequisite by
+convention rather than a platform-enforced one.
 
 ## Documentation
 

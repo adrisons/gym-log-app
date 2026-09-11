@@ -25,13 +25,15 @@ project yet. Until one exists, `.specify/memory/constitution.md` and
 document is added later, it overrides everything above on process and
 quality questions, per `.specify/memory/constitution.md`.
 
-**Current phase: platform and architecture are decided; concrete toolchain
-is not.** ADR-0002 fixes the app as a PWA with a two-adapter storage port.
-It does not name a PWA framework, build tool, or adapter library — those are
-chosen in `/speckit-plan` and recorded in `docs/stack.md`, confirmed with the
-project owner first. Do not introduce a concrete tool/library name into
-`docs/requirements.md`, `docs/design.md`, feature specs under `specs/`, or
-the project constitution ahead of that step.
+**Current phase: platform, architecture, and the Phase 0 toolchain are
+decided.** ADR-0002 fixes the app as a PWA with a two-adapter storage port.
+The concrete PWA framework, build tool, and adapter library are chosen and
+recorded in `docs/stack.md` (owner-confirmed, per `/speckit-plan` for
+`specs/000-scaffolding/`). Any *later* phase's spec still follows the same
+rule for whatever it introduces: no concrete tool/library name lands in
+`docs/requirements.md`, `docs/design.md`, a feature spec under `specs/`, or
+the project constitution ahead of that phase's own `/speckit-plan` and
+owner confirmation.
 
 This project uses spec-kit. Do not write implementation code for a use case
 before it has a `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` →
