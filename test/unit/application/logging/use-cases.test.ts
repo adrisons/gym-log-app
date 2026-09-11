@@ -5,6 +5,10 @@ import {
   discardDraft,
   searchExercises,
   createExercise,
+  recordLoadTypeDefault,
+  suggestFreeTextLoads,
+  listBandLabels,
+  saveBandLabels,
 } from '@/application/logging/use-cases';
 import { createDraft } from '@/application/logging/draft';
 import type { Exercise } from '@/domain/exercise';
@@ -197,5 +201,90 @@ describe('createExercise (FR-002, FR-015)', () => {
     expect(exercise.canonicalName).toBe('Hip thrust');
     expect(exercise.discipline).toBe('Strength');
     expect(await storage.getExercise(exercise.id)).toEqual(exercise);
+  });
+});
+
+describe('recordLoadTypeDefault (FR-009, Acceptance Scenario US3-1)', () => {
+  it("updates and saves the exercise's defaultLoadType", async () => {
+    const storage = new InMemoryStorage();
+    const exercise = await createExercise(storage, { canonicalName: 'Row' });
+
+    await recordLoadTypeDefault(storage, exercise.id, 'band');
+
+    expect((await storage.getExercise(exercise.id))?.defaultLoadType).toBe(
+      'band',
+    );
+  });
+});
+
+describe('suggestFreeTextLoads (FR-012)', () => {
+  it('returns the distinct free-text values previously recorded for that exercise, most-recent-first', () => {
+    const exerciseId = 'ex-1' as ExerciseId;
+    const sessions: Session[] = [
+      {
+        id: 's1' as SessionId,
+        dateTime: '2026-09-01T00:00:00.000Z',
+        notes: '',
+        blocks: [
+          {
+            type: 'straightSets',
+            exercises: [
+              {
+                exerciseId,
+                notes: '',
+                sets: [
+                  {
+                    load: { kind: 'freeText', text: 'Setting 4' },
+                    setKind: 'working',
+                    completed: true,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 's2' as SessionId,
+        dateTime: '2026-09-05T00:00:00.000Z',
+        notes: '',
+        blocks: [
+          {
+            type: 'straightSets',
+            exercises: [
+              {
+                exerciseId,
+                notes: '',
+                sets: [
+                  {
+                    load: { kind: 'freeText', text: 'Setting 6' },
+                    setKind: 'working',
+                    completed: true,
+                  },
+                  {
+                    load: { kind: 'freeText', text: 'Setting 4' },
+                    setKind: 'working',
+                    completed: true,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    expect(suggestFreeTextLoads(exerciseId, sessions)).toEqual([
+      'Setting 6',
+      'Setting 4',
+    ]);
+  });
+});
+
+describe('listBandLabels/saveBandLabels (FR-011)', () => {
+  it('round-trip through the port, preserving order', async () => {
+    const storage = new InMemoryStorage();
+    await saveBandLabels(storage, ['Red', 'Blue']);
+    expect(await listBandLabels(storage)).toEqual(['Red', 'Blue']);
   });
 });

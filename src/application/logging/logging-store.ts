@@ -34,8 +34,12 @@ import {
   openLoggingForm,
   searchExercises as searchExercisesUseCase,
   createExercise as createExerciseUseCase,
+  recordLoadTypeDefault as recordLoadTypeDefaultUseCase,
+  suggestFreeTextLoads as suggestFreeTextLoadsUseCase,
+  saveBandLabels as saveBandLabelsUseCase,
 } from '@/application/logging/use-cases';
 import type { CreateExerciseInput } from '@/application/logging/use-cases';
+import type { Load } from '@/domain/load';
 import {
   addExerciseEntry as addExerciseEntryToDraft,
   addSet as addSetToDraft,
@@ -70,6 +74,7 @@ export interface LoggingSessionState {
   undoStack: UndoEntry[];
   catalogue: Exercise[];
   sessions: Session[];
+  bandLabels: string[];
   /** entryId → ms epoch of the last confirmed set on that entry (FR-025). */
   lastConfirmedAt: Record<string, number>;
 
@@ -86,6 +91,12 @@ export interface LoggingSessionState {
   prefillNextSet: (blockId: string, entryId: string) => SetPrefill | undefined;
   searchExercises: (query: string) => Exercise[];
   createExercise: (input: CreateExerciseInput) => Promise<Exercise>;
+  recordLoadTypeDefault: (
+    exerciseId: ExerciseId,
+    loadType: Load['kind'],
+  ) => Promise<void>;
+  suggestFreeTextLoads: (exerciseId: ExerciseId) => string[];
+  saveBandLabels: (labels: string[]) => Promise<void>;
 }
 
 export const useLoggingSession = create<LoggingSessionState>((set, get) => ({
@@ -94,6 +105,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => ({
   undoStack: [],
   catalogue: [],
   sessions: [],
+  bandLabels: [],
   lastConfirmedAt: {},
 
   configure: (storage) => set({ storage }),
@@ -101,12 +113,13 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => ({
   initialize: async () => {
     const { storage } = get();
     if (!storage) return;
-    const [draft, catalogue, sessions] = await Promise.all([
+    const [draft, catalogue, sessions, bandLabels] = await Promise.all([
       openLoggingForm(storage),
       storage.listExercises(),
       storage.listSessions(FULL_RANGE),
+      storage.listBandLabels(),
     ]);
-    set({ draft, catalogue, sessions });
+    set({ draft, catalogue, sessions, bandLabels });
   },
 
   setSessionDateTime: async (iso) => {
@@ -165,5 +178,30 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => ({
     const exercise = await createExerciseUseCase(storage, input);
     set((state) => ({ catalogue: [...state.catalogue, exercise] }));
     return exercise;
+  },
+
+  recordLoadTypeDefault: async (exerciseId, loadType) => {
+    const { storage } = get();
+    if (!storage) return;
+    await recordLoadTypeDefaultUseCase(storage, exerciseId, loadType);
+    set((state) => ({
+      catalogue: state.catalogue.map((exercise) =>
+        exercise.id === exerciseId
+          ? { ...exercise, defaultLoadType: loadType }
+          : exercise,
+      ),
+    }));
+  },
+
+  suggestFreeTextLoads: (exerciseId) => {
+    const { sessions } = get();
+    return suggestFreeTextLoadsUseCase(exerciseId, sessions);
+  },
+
+  saveBandLabels: async (labels) => {
+    const { storage } = get();
+    if (!storage) return;
+    set({ bandLabels: labels });
+    await saveBandLabelsUseCase(storage, labels);
   },
 }));

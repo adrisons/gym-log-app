@@ -32,6 +32,12 @@ export function LoggingScreen() {
   const prefillNextSet = useLoggingSession((s) => s.prefillNextSet);
   const searchExercises = useLoggingSession((s) => s.searchExercises);
   const createExercise = useLoggingSession((s) => s.createExercise);
+  const bandLabels = useLoggingSession((s) => s.bandLabels);
+  const recordLoadTypeDefault = useLoggingSession(
+    (s) => s.recordLoadTypeDefault,
+  );
+  const suggestFreeTextLoads = useLoggingSession((s) => s.suggestFreeTextLoads);
+  const saveBandLabels = useLoggingSession((s) => s.saveBandLabels);
 
   useEffect(() => {
     void initialize();
@@ -81,7 +87,14 @@ export function LoggingScreen() {
                 <SetRow
                   key={`${entry.id}-${entry.sets.length}`}
                   prefill={prefillNextSet(block.id, entry.id)}
+                  defaultLoadKind={exercise?.defaultLoadType ?? 'none'}
+                  bandLabels={bandLabels}
+                  freeTextSuggestions={suggestFreeTextLoads(entry.exerciseId)}
                   onConfirm={(input) => void addSet(block.id, entry.id, input)}
+                  onLoadTypeChange={(kind) =>
+                    void recordLoadTypeDefault(entry.exerciseId, kind)
+                  }
+                  onSaveBandLabels={(labels) => void saveBandLabels(labels)}
                 />
               </li>
             );

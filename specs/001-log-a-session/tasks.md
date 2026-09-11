@@ -116,28 +116,28 @@ Single project (`src/`, `test/` at repository root), per plan.md's Project Struc
 
 ### Tests for User Story 3
 
-- [ ] T039 [P] [US3] Unit test, add to `test/unit/application/logging/use-cases.test.ts`: `recordLoadTypeDefault(storage, exerciseId, loadType)` updates and saves the exercise's `defaultLoadType` (FR-009, Acceptance Scenario US3-1)
-- [ ] T040 [P] [US3] Unit test, add to `test/unit/application/logging/use-cases.test.ts`: `suggestFreeTextLoads(exerciseId, sessions)` returns the distinct free-text values previously recorded for that exercise, most-recent-first (research.md §8, FR-012)
-- [ ] T041 [P] [US3] Unit test `test/unit/application/logging/use-cases.test.ts`: `listBandLabels`/`saveBandLabels` wrappers round-trip through the port unchanged, preserving order (FR-011)
-- [ ] T042 [P] [US3] Component test `test/unit/presentation/logging/load-type-picker.test.tsx`: five options, selecting one calls `recordLoadTypeDefault` and switches the rendered sub-input; all six states present
-- [ ] T043 [P] [US3] Component test `test/unit/presentation/logging/band-load-input.test.tsx`: lists the user's band labels in their stored order; includes a "manage labels" entry (add/reorder/remove) calling `saveBandLabels` (FR-011)
-- [ ] T044 [P] [US3] Component test `test/unit/presentation/logging/bodyweight-load-input.test.tsx`: signed added/assisted numeric field; value is clamped in the UI to −300..+300 (matching the domain `createLoad` bound, FR-014); a value of exactly 0 is treated as "no component" in the rendered summary
-- [ ] T045 [P] [US3] Component test `test/unit/presentation/logging/free-text-load-input.test.tsx`: hard stop / visible counter at 40 characters (FR-012); autocompletes from `suggestFreeTextLoads`
-- [ ] T046 [P] [US3] Component test `test/unit/presentation/logging/effort-picker.test.tsx`: one tap per level; every level, in every state including rest, shows its word label next to the number, never a bare digit (ADR-0003, FR-013)
-- [ ] T047 [US3] Component test, extend `test/unit/presentation/logging/set-row-minimal.test.tsx` (or split into `set-row.test.tsx` — file-splitting decision left to implementation) to cover quick-increment buttons: tapping the down-increment at 0 keeps the value at 0 and the button shows disabled-with-reason, never silently no-ops without a visible state (FR-010, `contracts/logging-screen-components.md` "WeightLoadInput" row)
-- [ ] T048 [US3] Integration test, add to `test/integration/logging-flow.test.ts`: record one set per load type (Weight/Band/Bodyweight/Free text/None-with-Volume) for the same exercise entry and read each back unchanged through `storage.getDraft()` (spec.md User Story 3 Independent Test)
+- [x] T039 [P] [US3] Unit test, add to `test/unit/application/logging/use-cases.test.ts`: `recordLoadTypeDefault(storage, exerciseId, loadType)` updates and saves the exercise's `defaultLoadType` (FR-009, Acceptance Scenario US3-1)
+- [x] T040 [P] [US3] Unit test, add to `test/unit/application/logging/use-cases.test.ts`: `suggestFreeTextLoads(exerciseId, sessions)` returns the distinct free-text values previously recorded for that exercise, most-recent-first (research.md §8, FR-012)
+- [x] T041 [P] [US3] Unit test `test/unit/application/logging/use-cases.test.ts`: `listBandLabels`/`saveBandLabels` wrappers round-trip through the port unchanged, preserving order (FR-011)
+- [x] T042 [P] [US3] Component test `test/unit/presentation/logging/load-type-picker.test.tsx`: five options, selecting one calls `recordLoadTypeDefault` and switches the rendered sub-input; all six states present
+- [x] T043 [P] [US3] Component test `test/unit/presentation/logging/band-load-input.test.tsx`: lists the user's band labels in their stored order; includes a "manage labels" entry (add/reorder/remove) calling `saveBandLabels` (FR-011)
+- [x] T044 [P] [US3] Component test `test/unit/presentation/logging/bodyweight-load-input.test.tsx`: signed added/assisted numeric field; value is clamped in the UI to −300..+300 (matching the domain `createLoad` bound, FR-014); a value of exactly 0 is treated as "no component" in the rendered summary
+- [x] T045 [P] [US3] Component test `test/unit/presentation/logging/free-text-load-input.test.tsx`: hard stop / visible counter at 40 characters (FR-012); autocompletes from `suggestFreeTextLoads`
+- [x] T046 [P] [US3] Component test `test/unit/presentation/logging/effort-picker.test.tsx`: one tap per level; every level, in every state including rest, shows its word label next to the number, never a bare digit (ADR-0003, FR-013)
+- [x] T047 [US3] Component test, extend `test/unit/presentation/logging/set-row-minimal.test.tsx` (or split into `set-row.test.tsx` — file-splitting decision left to implementation) to cover quick-increment buttons: tapping the down-increment at 0 keeps the value at 0 and the button shows disabled-with-reason, never silently no-ops without a visible state (FR-010, `contracts/logging-screen-components.md` "WeightLoadInput" row)
+- [x] T048 [US3] Integration test, add to `test/integration/logging-flow.test.ts`: record one set per load type (Weight/Band/Bodyweight/Free text/None-with-Volume) for the same exercise entry and read each back unchanged through `storage.getDraft()` (spec.md User Story 3 Independent Test)
 
 ### Implementation for User Story 3
 
-- [ ] T049 [P] [US3] Add `recordLoadTypeDefault`, `suggestFreeTextLoads`, `listBandLabels`, `saveBandLabels` to `src/application/logging/use-cases.ts` (depends on T016; makes T039-T041 pass)
-- [ ] T050 [US3] Extend `logging-store.ts` with actions for the above four use cases plus effort/setKind updates on a pending set (depends on T017, T049)
-- [ ] T051 [P] [US3] Create `src/presentation/logging/load-type-picker.tsx` (makes T042 pass)
-- [ ] T052 [P] [US3] Create `src/presentation/logging/band-load-input.tsx`, including inline label management (makes T043 pass)
-- [ ] T053 [P] [US3] Create `src/presentation/logging/bodyweight-load-input.tsx` (makes T044 pass)
-- [ ] T054 [P] [US3] Create `src/presentation/logging/free-text-load-input.tsx` (makes T045 pass)
-- [ ] T055 [P] [US3] Create `src/presentation/logging/effort-picker.tsx`, using `view-models.ts`'s `EFFORT_LABELS` (makes T046 pass)
-- [ ] T056 [US3] Extend `weight-load-input.tsx`/`volume-input.tsx` (from T036) with quick-increment buttons from `quick-increments.ts`, clamped at 0 with a stated disabled reason (depends on T014, T036; makes T047 pass); extend `volume-input.tsx` with duration/distance modes
-- [ ] T057 [US3] Wire `load-type-picker.tsx` into the set-row component from T037 so a set can use any of the five load types plus effort (depends on T051-T056; makes T048 pass)
+- [x] T049 [P] [US3] Add `recordLoadTypeDefault`, `suggestFreeTextLoads`, `listBandLabels`, `saveBandLabels` to `src/application/logging/use-cases.ts` (depends on T016; makes T039-T041 pass)
+- [x] T050 [US3] Extend `logging-store.ts` with actions for the above four use cases plus effort/setKind updates on a pending set (depends on T017, T049)
+- [x] T051 [P] [US3] Create `src/presentation/logging/load-type-picker.tsx` (makes T042 pass)
+- [x] T052 [P] [US3] Create `src/presentation/logging/band-load-input.tsx`, including inline label management (makes T043 pass)
+- [x] T053 [P] [US3] Create `src/presentation/logging/bodyweight-load-input.tsx` (makes T044 pass)
+- [x] T054 [P] [US3] Create `src/presentation/logging/free-text-load-input.tsx` (makes T045 pass)
+- [x] T055 [P] [US3] Create `src/presentation/logging/effort-picker.tsx`, using `view-models.ts`'s `EFFORT_LABELS` (makes T046 pass)
+- [x] T056 [US3] Extend `weight-load-input.tsx`/`volume-input.tsx` (from T036) with quick-increment buttons from `quick-increments.ts`, clamped at 0 with a stated disabled reason (depends on T014, T036; makes T047 pass); extend `volume-input.tsx` with duration/distance modes
+- [x] T057 [US3] Wire `load-type-picker.tsx` into the set-row component from T037 so a set can use any of the five load types plus effort (depends on T051-T056; makes T048 pass)
 
 **Checkpoint**: User Stories 1 and 3 (both P1) together are the MVP — every load type, volume kind, and effort works, against the fake.
 

@@ -27,6 +27,8 @@ import type { Load } from '@/domain/load';
  * safe to pass through unlike a persistence type).
  */
 export type { Exercise };
+/** Re-exported for the same reason as `Exercise` above — `LoadTypePicker` (US3) needs `Load['kind']`. */
+export type { Load };
 
 function isSameLocalDay(isoA: string, isoB: string): boolean {
   const a = new Date(isoA);
@@ -165,4 +167,62 @@ export async function createExercise(
   };
   await storage.saveExercise(exercise);
   return exercise;
+}
+
+/**
+ * FR-009, Acceptance Scenario US3-1: remembers the load type chosen for a
+ * set as that exercise's default for future sets. A no-op if the id
+ * doesn't resolve (nothing to update).
+ */
+export async function recordLoadTypeDefault(
+  storage: StoragePort,
+  exerciseId: ExerciseId,
+  loadType: Load['kind'],
+): Promise<void> {
+  const exercise = await storage.getExercise(exerciseId);
+  if (!exercise) return;
+  await storage.saveExercise({ ...exercise, defaultLoadType: loadType });
+}
+
+/**
+ * FR-012: distinct Free text load values previously recorded for this
+ * exercise, most-recent-session-first. Derived on read, not persisted
+ * separately (research.md §8, `docs/development-principles.md` §4 —
+ * "keep derived data rebuildable").
+ */
+export function suggestFreeTextLoads(
+  exerciseId: ExerciseId,
+  sessions: Session[],
+): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  const byMostRecent = [...sessions].sort((a, b) =>
+    a.dateTime < b.dateTime ? 1 : a.dateTime > b.dateTime ? -1 : 0,
+  );
+  for (const session of byMostRecent) {
+    for (const block of session.blocks) {
+      for (const entry of block.exercises) {
+        if (entry.exerciseId !== exerciseId) continue;
+        for (const set of entry.sets) {
+          if (set.load.kind === 'freeText' && !seen.has(set.load.text)) {
+            seen.add(set.load.text);
+            result.push(set.load.text);
+          }
+        }
+      }
+    }
+  }
+  return result;
+}
+
+/** FR-011: thin wrappers over the port's band-labels surface. */
+export async function listBandLabels(storage: StoragePort): Promise<string[]> {
+  return storage.listBandLabels();
+}
+
+export async function saveBandLabels(
+  storage: StoragePort,
+  labels: string[],
+): Promise<void> {
+  await storage.saveBandLabels(labels);
 }
