@@ -1,0 +1,125 @@
+/**
+ * Design tokens — the only source of visual values in this app (constitution
+ * Principle V; docs/development-principles.md §5). No literal colour,
+ * radius, duration, easing, or spacing value may appear anywhere else in
+ * src/ (SC-007, enforced by scripts/check-no-color-literals.sh + an ESLint
+ * no-restricted-syntax rule).
+ *
+ * Values here are provisional (Phase 0 scope, spec 000 FR-018) — the exact
+ * palette is a docs/design.md concern for a later pass. What matters now is
+ * that every token role from specs/000-scaffolding/data-model.md §2 exists,
+ * for both light and dark, so nothing built against these names has to
+ * change shape later.
+ *
+ * Theme mechanism (data-model.md §2 "Theme mechanism"):
+ *   :root                        — light values (default).
+ *   @media (prefers-color-scheme: dark) — OS-level dark preference.
+ *   :root[data-theme="dark"]     — explicit user override (future Settings
+ *                                   toggle, FR-11), takes precedence.
+ * tokens.ts mirrors every custom-property name declared here as a typed
+ * union (TokenName) — keep the two files in sync when adding a token.
+ */
+
+:root {
+  /* Colour roles — docs/design.md §3.1 */
+  --color-canvas: #f7f7f8;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-foreground: #1a1a1e;
+  --color-foreground-muted: #4c4c53;
+  --color-foreground-subtle: #7a7a82;
+  --color-border: #e2e2e6;
+  --color-border-strong: #c7c7cf;
+  --color-accent: #3457d5;
+  --color-accent-foreground: #ffffff;
+  --color-focus-ring: #3457d5;
+  --color-danger: #b3261e;
+  --color-warning: #8a5a00;
+  --color-success: #1e6b3e;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+
+  /* Durations — named categories, not magic numbers (docs/design.md rule 2) */
+  --duration-instant: 80ms;
+  --duration-short: 150ms;
+  --duration-medium: 260ms;
+
+  /* Easings */
+  --easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --easing-decelerate: cubic-bezier(0, 0, 0, 1);
+  --easing-accelerate: cubic-bezier(0.3, 0, 1, 1);
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: #17171a;
+    --color-surface: #1f1f23;
+    --color-surface-raised: #28282d;
+    --color-foreground: #f0f0f2;
+    --color-foreground-muted: #b8b8c0;
+    --color-foreground-subtle: #86868f;
+    --color-border: #333338;
+    --color-border-strong: #47474e;
+    --color-accent: #7f9bff;
+    --color-accent-foreground: #0f1220;
+    --color-focus-ring: #7f9bff;
+    --color-danger: #ff6b64;
+    --color-warning: #e3a63e;
+    --color-success: #4fbf78;
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-canvas: #17171a;
+  --color-surface: #1f1f23;
+  --color-surface-raised: #28282d;
+  --color-foreground: #f0f0f2;
+  --color-foreground-muted: #b8b8c0;
+  --color-foreground-subtle: #86868f;
+  --color-border: #333338;
+  --color-border-strong: #47474e;
+  --color-accent: #7f9bff;
+  --color-accent-foreground: #0f1220;
+  --color-focus-ring: #7f9bff;
+  --color-danger: #ff6b64;
+  --color-warning: #e3a63e;
+  --color-success: #4fbf78;
+}
+
+/* A minimal reset — the browser's default body margin would otherwise
+   overflow a 100vh shell and leave an unthemed sliver visible around it
+   (most noticeable in dark mode). Not a token itself, but belongs here:
+   this file is the one stylesheet always loaded first (index.html), before
+   any component styles. */
+body {
+  margin: 0;
+}
+
+/* An explicit light choice always wins over the OS preference. */
+:root[data-theme='light'] {
+  --color-canvas: #f7f7f8;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-foreground: #1a1a1e;
+  --color-foreground-muted: #4c4c53;
+  --color-foreground-subtle: #7a7a82;
+  --color-border: #e2e2e6;
+  --color-border-strong: #c7c7cf;
+  --color-accent: #3457d5;
+  --color-accent-foreground: #ffffff;
+  --color-focus-ring: #3457d5;
+  --color-danger: #b3261e;
+  --color-warning: #8a5a00;
+  --color-success: #1e6b3e;
+}

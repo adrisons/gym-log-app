@@ -1,0 +1,15 @@
+dist/
+dev-dist/
+coverage/
+playwright-report/
+test-results/
+node_modules/
+package-lock.json
+
+# Tool-owned config, not our code style
+.claude/
+.specify/
+.github/
+
+# Docs are authored by hand / by spec-kit; the editor handles wrapping
+*.md

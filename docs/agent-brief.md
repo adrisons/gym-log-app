@@ -15,21 +15,23 @@ ADRs under `docs/decisions/` (why it is the way it is).
 ## 1. Before the first line of product code
 
 Build the documentation scaffolding — one ADR already exists per closed
-decision (`docs/decisions/ADR-0001..0004`); still missing:
+decision (`docs/decisions/ADR-0001..0004`). All three scaffolding docs below
+now exist, written by Phase 0 (`specs/000-scaffolding/`):
 
 - `docs/stack.md`: one tool per concern (PWA framework, state, the two
   storage adapters, charts, navigation, tests, lint, formatting) plus an
-  explicit list of what may not be added without an ADR. This is a
-  `/speckit-plan` output — the framework and adapter libraries are chosen
-  there, not assumed here, and confirmed with the project owner first
-  (`AGENTS.md`).
+  explicit list of what may not be added without an ADR. Written by
+  `/speckit-plan` for Phase 0 — the framework and adapter libraries were
+  chosen there, not assumed here, and confirmed with the project owner
+  first (`AGENTS.md`).
 - `docs/architecture.md`: the layer map and the dependency-inward rule
-  (constitution Principle V).
+  (constitution Principle V), mechanically enforced
+  (`eslint-plugin-boundaries`, `test/boundaries/edge-set.test.ts`).
 - `docs/testing.md`: the pyramid, shared doubles, how a test is written here.
 
 `docs/design.md`, `docs/requirements.md` and `docs/development-principles.md`
-already exist and do not need to be recreated. `README.md` covers setup and
-usage and is kept separate from the above.
+already existed before Phase 0 and were not recreated by it. `README.md`
+covers setup and usage and is kept separate from the above.
 
 **Do not write product code until the CI gate exists** (typecheck + tests +
 lint) and the layer-boundary rule genuinely fails on an illegal import.
