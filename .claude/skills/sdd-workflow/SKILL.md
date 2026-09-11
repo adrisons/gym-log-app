@@ -74,3 +74,24 @@ If a `speckit-*` skill already does the thing, use it. Only fall back to a
 project subagent (`spec-reviewer`, `schema-guardian`) for the two checks
 spec-kit doesn't cover: adversarial cross-spec review, and domain-model/
 schema-migration impact.
+
+## Keeping `spec.md`'s **Status** field current
+
+spec-kit's own commands never touch the `**Status**:` line the template
+puts near the top of `spec.md` — it stays whatever `/speckit-specify` set
+it to unless someone updates it by hand. This project keeps it meaningful
+by updating it manually at each phase boundary, using these values:
+
+| Status | Set when |
+|---|---|
+| `Draft` | Just created by `/speckit-specify`, not yet through review (phase 2 above). |
+| `Reviewed` | Passed `spec-reviewer` (and `schema-guardian` where it applies) and any `/speckit-clarify` follow-up — no `plan.md`/`tasks.md` yet. |
+| `Planned` | `/speckit-plan` and `/speckit-tasks` have run — `plan.md`/`tasks.md` exist, implementation hasn't merged yet. |
+| `Implemented` | The feature's work has merged to the default branch — note the merging PR number(s) after the status, e.g. `Implemented — merged to main via PR #3`. |
+
+Update the line as part of the commit that completes each phase (the
+review-findings commit sets `Reviewed`, the plan/tasks commit sets
+`Planned`, the merge-worthy final commit or the merge itself sets
+`Implemented`) — don't let it silently lag, and don't leave a spec's own
+header contradicting what `specs/<NNN-slug>/tasks.md`'s status notes (if
+present) already say happened.
