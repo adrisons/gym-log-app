@@ -20,7 +20,21 @@ export default defineConfig({
     timeout: 120_000,
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // spec 003: the OPFS-heavy storage-adapter contract tests
+        // (test/e2e/*.contract.spec.ts) crash Playwright's default
+        // headless "chrome-headless-shell" binary in CI (reproducible,
+        // not a flake — "Target page, context or browser has been
+        // closed" mid-page.evaluate). The full Chrome-for-Testing build,
+        // requested via `channel`, does not have this issue — verified
+        // locally against the same test code. No other project here
+        // needs the lightweight shell's speed badly enough to risk it.
+        channel: 'chromium',
+      },
+    },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
 });
