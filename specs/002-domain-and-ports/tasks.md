@@ -158,7 +158,7 @@ Single project (`src/`, `test/` at repository root), per [plan.md](./plan.md)'s 
 - [x] T038 [P] Grep sweep confirming no file under `src/domain/` imports from `application/`, `infrastructure/`, or `presentation/` (SC-001 cross-check, reinforcing the existing eslint-boundaries rule from spec 000)
 - [x] T039 Manual cross-check: every type spec 001's Key Entities section names as part of a `Session` has a corresponding `src/domain/` export; record the check inline as a spec.md SC-004 confirmation (no code change expected — a gap here would mean returning to Phase 3/4)
 - [x] T040 Run [quickstart.md](./quickstart.md) end-to-end and confirm every one of its six sections passes
-- [ ] T041 Update spec.md's `**Status**` line from `Planned` to `Implemented — merged to main via PR #<N>` as part of the merging commit/PR (per `.claude/skills/sdd-workflow/SKILL.md`'s Status convention)
+- [x] T041 Update spec.md's `**Status**` line from `Planned` to `Implemented — merged to main via PR #<N>` as part of the merging commit/PR (per `.claude/skills/sdd-workflow/SKILL.md`'s Status convention)
 
 ---
 
