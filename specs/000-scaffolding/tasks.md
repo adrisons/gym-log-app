@@ -19,11 +19,35 @@ test tasks are first-class here, not optional.
 **Organization**: by user story (US1–US5 from spec.md). Each story is an
 independently verifiable slice of the Phase 0 deliverable.
 
-**Status (2026-09-11)**: T001–T046 done, T047 partial (46.5/47). Every user
-story (US1–US5) and all of Polish except the branch-protection half of T047
-are complete; the full gate (typecheck, lint, prettier, no-color-literals,
-82 unit tests, e2e/build) is green, and `specs/000-scaffolding/quickstart.md`
-was run end to end (all 6 sections pass). PR #3 open with `ci-gate` green.
+**Status (2026-09-11): Phase 0 DONE — PR #3 merged to `main`** (T001–T046
+done, T047 partial, 46.5/47). Every user story (US1–US5) and all of Polish
+except the branch-protection half of T047 are complete; the full gate
+(typecheck, lint, prettier, no-color-literals, 82 unit tests, e2e/build) is
+green — re-verified on `main` post-merge with a clean `npm ci`, not just on
+the PR branch. `specs/000-scaffolding/quickstart.md` was run end to end (all
+6 sections pass).
+
+**Next**: per `docs/agent-brief.md` §3's build order, Phase 1 is "Domain and
+ports" (entities, value objects — Load/Volume/Effort —,
+`docs/requirements.md` §3.3/§5 business rules, ports + in-memory fakes; no
+real I/O, no UI) — **no spec for this exists yet under `specs/`**.
+`specs/001-log-a-session/spec.md` (numbered 001, but functionally
+`docs/agent-brief.md`'s **Phase 3** — "Logging", FR-1..FR-5, the MVP
+critical path) has already been through its spec-reviewer/clarify cycle,
+but per the build order it should not be planned/implemented before a
+Phase 1 domain spec and a Phase 2 persistence spec exist and are built —
+spec 001 depends on the domain entities and storage adapters those phases
+would produce. Decide with the project owner whether to (a) write and run
+a Phase 1 (domain/ports) spec next, in build-order sequence, or (b)
+deliberately reorder and take spec 001 next regardless, and record that
+choice. Do not assume (b) silently.
+
+Once whichever spec is chosen is reached, the user has asked to generate
+UI mockups (full form flow: open/draft session, add block+exercise, add
+sets, merge duplicate exercise, delete block with undo) as part of that
+spec's `/speckit-plan` research/design phase, before `/speckit-tasks` —
+this preference was recorded before the build-order question above was
+noticed and still applies to spec 001 whenever it is actually planned.
 
 Fixed during PR #3 code review (GitHub Copilot), all re-verified: (1) the
 composition-root element misclassification (main.tsx never actually
