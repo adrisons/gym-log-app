@@ -19,6 +19,13 @@ test tasks are first-class here, not optional.
 **Organization**: by user story (US1–US5 from spec.md). Each story is an
 independently verifiable slice of the Phase 0 deliverable.
 
+**Status (2026-09-10)**: T001–T031 and T041–T042 done (33/47). Setup,
+Foundational, US4 (stack doc), US2 (boundary rule + verification), US3
+(shared doubles), and the testing-convention part of Polish are complete;
+the full gate (typecheck, lint, prettier, no-color-literals, unit tests)
+is green. Remaining: US5 (T032–T040, the PWA shell + smoke test) and the
+rest of Polish (T043–T047, incl. the quickstart run and opening the PR).
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: can run in parallel (different files, no dependency on an
@@ -37,11 +44,11 @@ repo root, per plan.md "Project Structure".
 **Purpose**: bring the toolchain from research.md into an installable,
 buildable repository.
 
-- [ ] T001 Initialize the Node project: `package.json` (name `gym-log`,
+- [X] T001 Initialize the Node project: `package.json` (name `gym-log`,
       `"type": "module"`, private), `.nvmrc` / `engines` pinning Node 24,
       `.gitignore` already covers `node_modules/` `dist/` — add `coverage/`
       and `playwright-report/`.
-- [ ] T002 Add and pin dependencies from research.md: `react`, `react-dom`,
+- [X] T002 Add and pin dependencies from research.md: `react`, `react-dom`,
       `react-router-dom@6`, `zustand`, `dexie`, `recharts` (runtime);
       `vite@5`, `@vitejs/plugin-react`, `vite-plugin-pwa`, `typescript@5`,
       `vitest`, `@vitest/coverage-v8`, `jsdom`, `@testing-library/react`,
@@ -50,25 +57,25 @@ buildable repository.
       `eslint-plugin-react`, `eslint-plugin-react-hooks`,
       `eslint-plugin-boundaries`, `prettier`, `eslint-config-prettier`
       (dev). Exact versions committed to the lockfile.
-- [ ] T003 [P] Create `tsconfig.json`: `strict`, `noUncheckedIndexedAccess`,
+- [X] T003 [P] Create `tsconfig.json`: `strict`, `noUncheckedIndexedAccess`,
       `target` ES2022, `module`/`moduleResolution` bundler, `jsx`
       react-jsx, `paths` for `@/*` → `src/*`, `include` `src` + `test`.
-- [ ] T004 [P] Create `vite.config.ts`: `@vitejs/plugin-react`,
+- [X] T004 [P] Create `vite.config.ts`: `@vitejs/plugin-react`,
       `vite-plugin-pwa` with `registerType: 'autoUpdate'` and a manifest
       stub (name, short_name, theme_color from a token, display
       `standalone`), `test` block delegating to Vitest (jsdom env,
       `setupFiles` → `test/support/setup.ts`, coverage provider v8).
-- [ ] T005 [P] Create `prettier` config (`.prettierrc`: printWidth 80,
+- [X] T005 [P] Create `prettier` config (`.prettierrc`: printWidth 80,
       singleQuote true, semi true) and `.prettierignore` (`dist`, `coverage`,
       `playwright-report`, `*.md` left to the editor).
-- [ ] T006 [P] Create `playwright.config.ts`: `testDir` `test/e2e`,
+- [X] T006 [P] Create `playwright.config.ts`: `testDir` `test/e2e`,
       `webServer` running `npm run dev` (or `preview`), projects for
       Chromium and WebKit (WebKit covers the iOS Safari path from ADR-0002),
       `reporter` list + html.
-- [ ] T007 Create the `src/` and `test/` directory skeleton with
+- [X] T007 Create the `src/` and `test/` directory skeleton with
       `.gitkeep` in `src/domain/`, `src/infrastructure/`, `src/shared/`,
       matching plan.md "Project Structure".
-- [ ] T008 Add `package.json` scripts, and make them the single documented
+- [X] T008 Add `package.json` scripts, and make them the single documented
       way to run each check (FR-003): `dev` (`vite`), `build`
       (`tsc --noEmit && vite build`), `preview`, `typecheck`
       (`tsc --noEmit`), `test` (`vitest run && playwright test`), `test:unit`
@@ -87,14 +94,14 @@ everything the five stories build on.
 
 **⚠️ CRITICAL**: no story phase starts until this is done.
 
-- [ ] T009 Create `eslint.config.js` (flat): base JS + `@typescript-eslint`
+- [X] T009 Create `eslint.config.js` (flat): base JS + `@typescript-eslint`
       + `react` + `react-hooks` + `eslint-config-prettier`, then
       `eslint-plugin-boundaries` with `settings['boundaries/elements']`
       matching path patterns for `domain`, `application`,
       `application-ports` (`src/application/ports/*`), `infrastructure`,
       `presentation`, `presentation-design` (`src/presentation/design/*`),
       `shared`, and `composition-root` (`src/presentation/main.tsx`).
-- [ ] T010 In `eslint.config.js`, add the `boundaries/element-types` rule,
+- [X] T010 In `eslint.config.js`, add the `boundaries/element-types` rule,
       building its options from the shared `eslint.boundaries.js` module
       (see T024) which encodes the forbidden-edge table from data-model.md
       §3 exactly: `domain` → nothing internal; `application` → `domain`
@@ -102,7 +109,7 @@ everything the five stories build on.
       `application` + `presentation-design`; `presentation-design` →
       nothing internal; `shared` → nothing internal; `composition-root` →
       all. Default `disallow`.
-- [ ] T011 Create `src/application/ports/storage-port.ts` — the `StoragePort`
+- [X] T011 Create `src/application/ports/storage-port.ts` — the `StoragePort`
       interface from contracts/storage-port.md: `saveSession`, `getSession`,
       `listSessions`, `deleteSession`, `saveExercise`, `getExercise`,
       `listExercises`, `getSchemaVersion`, `setSchemaVersion`, all
@@ -110,16 +117,16 @@ everything the five stories build on.
       Placeholder types (`SessionId = string`, `SessionRecord = { id:
       SessionId } & Record<string, unknown>`, `DateRange`, etc.) with a
       comment that Phase 1 owns and may reshape this.
-- [ ] T012 Create `src/application/index.ts` — a barrel that re-exports
+- [X] T012 Create `src/application/index.ts` — a barrel that re-exports
       `StoragePort` and the placeholder types. This exists specifically so
       T024 can prove the boundary rule catches a barrel-routed illegal
       import (FR-006).
-- [ ] T013 [P] Create `src/application/errors.ts` — a `StorageError` stub
+- [X] T013 [P] Create `src/application/errors.ts` — a `StorageError` stub
       (application-layer error type the port rejects with; policy finalized
       in Phase 1).
-- [ ] T014 Create `test/support/setup.ts` — Vitest setup:
+- [X] T014 Create `test/support/setup.ts` — Vitest setup:
       `@testing-library/jest-dom` matchers, `afterEach(cleanup)`.
-- [ ] T015 Create `.github/workflows/ci.yml` — one workflow, triggers
+- [X] T015 Create `.github/workflows/ci.yml` — one workflow, triggers
       `pull_request` and `push` to the default branch. Jobs/steps: checkout,
       setup-node 24 with cache, `npm ci`, then `npm run typecheck`,
       `npm run lint`, `npm run test:unit`, `npx playwright install --with-deps`
@@ -128,7 +135,7 @@ everything the five stories build on.
       real flag — a zero-test collection then fails the step) to satisfy
       FR-004's zero-test case; set it in the `test:unit` script or
       `vite.config.ts` test config. (A1 from /speckit-analyze)
-- [ ] T016 Document the checks in `README.md`: a "Development" section
+- [X] T016 Document the checks in `README.md`: a "Development" section
       listing the exact commands from T008 and stating CI runs the same
       ones (FR-003). Note Node 24, `npm ci`, `npm run dev`.
 
@@ -151,7 +158,7 @@ file.
 > US4 is sequenced first among the stories because `docs/stack.md` is the
 > record the owner approved and every other doc/config references it.
 
-- [ ] T017 [US4] Create `docs/stack.md` — a table of one tool per concern
+- [X] T017 [US4] Create `docs/stack.md` — a table of one tool per concern
       from research.md: PWA framework (React 18 + TS), build (Vite 5), state
       (Zustand), service worker (`vite-plugin-pwa`/Workbox), IndexedDB
       helper (Dexie 4), File System Access helper ("none, hand-written
@@ -160,22 +167,22 @@ file.
       (Testing Library), E2E/smoke (Playwright), lint (ESLint 9 flat +
       `eslint-plugin-boundaries` + `@typescript-eslint`), formatting
       (Prettier), design tokens (CSS custom properties). No concern blank.
-- [ ] T018 [US4] In `docs/stack.md`, add the "deferred" rows: date/time
+- [X] T018 [US4] In `docs/stack.md`, add the "deferred" rows: date/time
       ("deferred to the Phase 1 spec; platform `Date`/`Intl` expected") and
       fuzzy search ("deferred to the Phase 4 spec"). (FR-010)
-- [ ] T019 [US4] In `docs/stack.md`, add the "Not without an ADR" section:
+- [X] T019 [US4] In `docs/stack.md`, add the "Not without an ADR" section:
       any second library for a covered concern; any outbound-network
       dependency; any CSS-in-JS or utility-CSS framework; any state library
       beyond Zustand; a build tool other than Vite; a test runner other
       than Vitest. Cross-reference the constitution's Escalation list.
       (FR-011)
-- [ ] T020 [US4] In `docs/stack.md`, add a "Storage" subsection stating: one
+- [X] T020 [US4] In `docs/stack.md`, add a "Storage" subsection stating: one
       port (`application/ports/storage-port.ts`), two Phase 2 adapters
       (`FileSystemStorageAdapter`, `IndexedDbStorageAdapter`), helper
       libraries named here are Dexie (IndexedDB) and none (File System
       Access); the adapter code itself is Phase 2, not Phase 0. Confirm no
       contradiction with ADR-0002. (FR-012)
-- [ ] T021 [US4] Record the owner sign-off: a line in `docs/stack.md`
+- [X] T021 [US4] Record the owner sign-off: a line in `docs/stack.md`
       ("Stack approved by the project owner on 2026-09-10, see
       `specs/000-scaffolding/plan.md` and `research.md`").
 
@@ -195,16 +202,16 @@ edge, once direct and once via barrel; the build fails each time naming the
 import; remove them and the build passes; the edge-set check reports zero
 drift between doc and config.
 
-- [ ] T022 [US2] Create `docs/architecture.md` — the layer map (`domain` /
+- [X] T022 [US2] Create `docs/architecture.md` — the layer map (`domain` /
       `application` / `infrastructure` / `presentation` with
       `presentation/design/` sub-layer, plus `shared`), the
       dependency-inward rule in prose (constitution Principle V;
       `docs/development-principles.md` §3), and the composition-root
       single-wiring-point rule. (FR-009)
-- [ ] T023 [US2] In `docs/architecture.md`, add the **forbidden-edge table**
+- [X] T023 [US2] In `docs/architecture.md`, add the **forbidden-edge table**
       verbatim from data-model.md §3 (source layer → MUST NOT import), as
       the enumerable form the enforcement is checked against. (FR-009)
-- [ ] T024 [P] [US2] Extract the layer matrix into a shared module
+- [X] T024 [P] [US2] Extract the layer matrix into a shared module
       `eslint.boundaries.js` (exports the allowed-import map / forbidden-edge
       list as plain data); `eslint.config.js` (T010) imports it to build the
       `boundaries/element-types` options, so config and doc-check read one
@@ -212,12 +219,12 @@ drift between doc and config.
       that imports `eslint.boundaries.js` and asserts its forbidden-edge set
       equals a fixture mirroring `docs/architecture.md`'s table exactly;
       fail on any difference. (FR-009, SC-003; U1 from /speckit-analyze)
-- [ ] T025 [US2] Create `test/boundaries/README.md` (or
+- [X] T025 [US2] Create `test/boundaries/README.md` (or
       `illegal-import.md`) — the manual procedure for FR-008: for each
       forbidden edge, the exact illegal `import` line to add (direct form
       and barrel form via `@/application`), the expected `eslint` failure,
       and the `shared`-from-`domain` case direct + barrel.
-- [ ] T026 [US2] Execute the FR-008 verification: temporarily add each
+- [X] T026 [US2] Execute the FR-008 verification: temporarily add each
       illegal import from T025, run `npm run lint`, confirm it fails and
       names the import, remove it. Do the barrel-routed variant through
       `src/application/index.ts`. Do the `shared` variant. Record the
@@ -240,26 +247,26 @@ with no browser storage API; a second test drives save-then-read through the
 integration harness; both green under Vitest; both imported from
 `test/support/`.
 
-- [ ] T027 [P] [US3] Create `test/support/in-memory-storage.ts` — a
+- [X] T027 [P] [US3] Create `test/support/in-memory-storage.ts` — a
       `Map`-backed `class InMemoryStorage implements StoragePort` covering
       every method from T011, fully deterministic, with a `reset()` for test
       isolation, importing only `StoragePort` + types from
       `@/application/ports/storage-port` (data-model.md §1; contracts rule
       6).
-- [ ] T028 [P] [US3] Create `test/support/integration-harness.ts` — a
+- [X] T028 [P] [US3] Create `test/support/integration-harness.ts` — a
       `createHarness()` that builds the composition wiring with
       `InMemoryStorage` substituted for the `StoragePort` at the seam and
       returns the wired pieces a test needs, so a test does not rebuild the
       composition (FR-016).
-- [ ] T029 [US3] Create `test/support/index.ts` — the single documented
+- [X] T029 [US3] Create `test/support/index.ts` — the single documented
       re-export point for `InMemoryStorage`, `createHarness`, and future
       doubles (FR-015).
-- [ ] T030 [P] [US3] Create `test/unit/storage-port-fake.test.ts` — for
+- [X] T030 [P] [US3] Create `test/unit/storage-port-fake.test.ts` — for
       every `StoragePort` method: save→get round-trips; save→list includes
       it; delete→get returns undefined; `setSchemaVersion`→`getSchemaVersion`
       round-trips; `reset()` clears. No jsdom storage, no browser API
       (data-model.md §1; contracts "Verification").
-- [ ] T031 [US3] Create `test/integration/harness.test.ts` — use
+- [X] T031 [US3] Create `test/integration/harness.test.ts` — use
       `createHarness()`, drive a save-then-read of a placeholder session
       through the wired `StoragePort`, assert the value comes back. Proves
       the harness supplies the standard composition (FR-016).
@@ -337,13 +344,13 @@ SC-007).
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T041 Create `docs/testing.md` — the test pyramid (many Vitest unit,
+- [X] T041 Create `docs/testing.md` — the test pyramid (many Vitest unit,
       fewer integration via the harness, few Playwright E2E/smoke), the
       shared doubles and their location (`test/support/`, re-exported from
       `test/support/index.ts`), and "how a test is written here" (arrange
       with plain values / `createHarness()`, assert on results, query DOM by
       accessible role). (FR-017)
-- [ ] T042 In `docs/testing.md`, add the **interactive-element state
+- [X] T042 In `docs/testing.md`, add the **interactive-element state
       convention** (FR-024): every interactive element ships rest, hover,
       pressed, focus-visible, disabled-with-a-stated-reason, loading
       (constitution Definition of Done); note `--color-focus-ring` exists to
