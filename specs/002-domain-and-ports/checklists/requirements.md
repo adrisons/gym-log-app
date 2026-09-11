@@ -40,4 +40,16 @@
   project-owner decision in the Context and Assumptions sections, not
   hidden — reviewers should confirm this framing is acceptable rather than
   treating it as an omission.
-- All items pass on first draft; no iteration was needed.
+- **Revised after spec-reviewer + schema-guardian review (2026-09-11)**.
+  schema-guardian found the spec consistent with `docs/requirements.md`
+  §3/§6, with one citation correction (FR-002: D6, not ADR-0003). Applied.
+  spec-reviewer found 11 issues; the substantive ones were resolved:
+  added `specs/002-domain-and-ports/contracts/storage-port.md` with a
+  concrete method set (closing the "FR-017 defers the interface shape"
+  finding), acknowledged spec 001's Logging draft at the port boundary
+  (`saveDraft`/`getDraft`/`discardDraft`) without defining its domain
+  shape, added explicit FRs for empty-list validity, order-by-position,
+  merge-rejection on identical/nonexistent ids, no-history delete, and
+  Body measurement's weight-required rule, and clarified Effort's
+  optionality lives on `Set`, not as an `Effort` variant. All items still
+  pass after the revision.

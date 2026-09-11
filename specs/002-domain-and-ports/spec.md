@@ -72,9 +72,10 @@ each `Load` variant and each `Volume` variant, with no import from
 **Acceptance Scenarios**:
 
 1. **Given** the domain types, **When** a developer constructs a `Set`
-   with a `Weight` load and a `Reps` volume, **Then** the value compiles
-   and round-trips through a plain equality check with no persistence
-   concept involved.
+   with a `Weight` load and a `Reps` volume and asserts it equal to an
+   independently-constructed value with the same fields, **Then** the
+   equality check passes with no persistence concept involved anywhere in
+   the type or the test.
 2. **Given** the domain types, **When** a developer inspects the `Load`
    type, **Then** exactly five variants are available (`Weight`, `Band`,
    `Bodyweight`, `FreeText`, `None`) and the type system rejects a sixth.
@@ -190,22 +191,24 @@ about the type requires a "seed" or "system-provided" marker to be valid.
   FR-014 precedent (−300..+300 kg), reused here rather than redefined —
   this spec's `Load` type must accommodate that range, not re-litigate it.
 - What happens when an `Exercise entry`'s referenced catalogue exercise no
-  longer exists at read time (deleted without merge, which US2 says
-  should be rejected when history exists, but a exercise with **no**
-  history could still be deleted)? The reference is by identifier; a
-  dangling reference is a Phase 2 (Persistence) concern — read-repair or
-  refusal — not resolved by the domain type itself, which only defines
-  the reference shape.
+  longer exists at read time? Deleting an exercise with history requires
+  confirmation and cascades (FR-013, FR-024 via `deleteExerciseCascade`);
+  deleting one with no history may proceed without confirmation (FR-020) —
+  either way, deletion always removes the dependent `Exercise entry`/`Set`
+  data via cascade, so a dangling reference should never be produced by
+  the domain operations this spec defines. A reference some other path
+  left dangling (e.g. data corruption) is a Phase 2 (Persistence) read
+  concern — read-repair or refusal — not resolved by the domain type
+  itself, which only defines the reference shape.
 - What happens when two `Set`s in the same `Exercise entry` have different
   `Volume` variants (one `Reps`, the next `Duration`)? Allowed —
   `docs/requirements.md` §3.2 gives the example of a 45-second plank and
   an 8-rep press both being valid sets; the domain model does not force
   volume-variant consistency within an exercise entry.
-- What happens when a `Body measurement` is recorded with no numeric
-  field at all (no weight, no percentage)? Out of scope for this spec to
-  decide as a hard rule — `docs/requirements.md` §3.1 lists body weight as
-  the one non-optional field of that entity, so a `Body measurement`
-  without it is not constructible, mirroring the Set rule in US2.1.
+- What happens when a `mergeExercises` call names the same identifier as
+  both survivor and loser, or an identifier with no matching `Exercise`?
+  Rejected (FR-019) — never a silent no-op, since a caller relying on a
+  silent no-op could believe a merge happened when it didn't.
 
 ## Non-Goals *(mandatory)*
 
@@ -244,7 +247,7 @@ about the type requires a "seed" or "system-provided" marker to be valid.
   date-time, an ordered list of `Block`s, free-form notes, an optional
   overall feeling, and an optional duration. A `Session` MUST NOT carry
   any open/closed lifecycle state (`docs/requirements.md` §3.1, revised
-  per ADR-0003/D6).
+  per D6, §8).
 - **FR-003**: The domain layer MUST define a `Block` type with: an
   optional name, a type (straight sets / superset / circuit), and an
   ordered list of `Exercise entry` items.
@@ -304,29 +307,91 @@ about the type requires a "seed" or "system-provided" marker to be valid.
   user-created entry (ADR-0005: "seed entries behave as ordinary editable
   catalogue entries").
 
-**Storage port** (finalizing the spec 000 placeholder)
+**Structural completeness** (closing spec-reviewer findings #7, #8, #9)
 
-- **FR-017**: `src/application/ports/storage-port.ts` MUST be revised to
-  replace its Phase-0 placeholder `SessionRecord`/`ExerciseRecord` types
-  and `SessionId`/`ExerciseId` aliases with the real entity/value-object
-  types this spec defines (FR-001..FR-009), adjusting method signatures as
-  needed to remain domain-shaped, per the file's own existing note that
-  "Phase 1 owns this interface."
-- **FR-018**: The `StoragePort` interface MUST expose a way to read and
+- **FR-017**: `Block.exercises` and `Session.blocks` MUST accept an empty
+  ordered list as a valid construction — a `Block` with zero `Exercise
+  entry` items and a `Session` with zero `Block`s are both valid domain
+  states (matching spec 001 FR-023's "a session with zero blocks MUST be a
+  valid state," restated here at the domain-type level since this spec is
+  the authoritative source other specs build on).
+- **FR-018**: Order (`Exercise entry` within a `Block`, `Set` within an
+  `Exercise entry`, `Block` within a `Session`) MUST be represented by list
+  position alone — no separate stored "order" field/index exists anywhere
+  in the domain types. (Resolves an inconsistency between an earlier draft
+  of FR-004, which described "order" as if it were its own field, and
+  FR-003/FR-002's "ordered list" framing — list position is the single
+  source of truth for order throughout this spec.)
+- **FR-019**: A `mergeExercises` operation (see FR-024) MUST reject if the
+  survivor and loser identifiers are the same, or if either does not
+  resolve to an existing `Exercise` — merging an exercise with itself, or
+  with a nonexistent exercise, is an error, never a silent no-op.
+- **FR-020**: Deleting a catalogue `Exercise` entry that has **no** logged
+  history MAY proceed without confirmation (the confirmation-and-offer-merge
+  requirement in FR-013 applies only when history exists) — stated here
+  explicitly as its own rule, not merely implied by FR-013's "if it has
+  history" phrasing, so both the with-history and without-history paths
+  are each backed by a stated FR (closing spec-reviewer finding #4).
+
+**Body measurement rule** (closing spec-reviewer finding #6, mirrors FR-010's pattern)
+
+- **FR-021**: The domain layer MUST reject construction of a `Body
+  measurement` with no body weight value — weight is the one non-optional
+  field of that entity (`docs/requirements.md` §3.1); the fat/muscle
+  fields remain optional.
+
+**Effort's optionality is Set-level, not a value-object variant**
+
+- **FR-022**: `Effort` (FR-009) is never itself an "absent" or "None"
+  value — it is a plain integer 1–5 whenever it exists. Optionality lives
+  on `Set.effort` (FR-005: "an Effort (optional)"), represented as the
+  field being absent/undefined on `Set`, never as a sentinel value of
+  `Effort` itself. (Closes spec-reviewer finding #5: this distinguishes
+  "a Set with no recorded effort" from "an Effort value that means
+  none," which `Load`'s `None` variant does model — `Effort` has no
+  equivalent variant, deliberately, since docs/requirements.md §3.2 defines
+  it as a plain 1–5 integer, not a sum type.)
+
+**Storage port** (finalizing the spec 000 placeholder — full contract in
+`contracts/storage-port.md`, resolving spec-reviewer findings #2/#3 that
+the Phase-0 placeholder's method set was never concretely re-specified)
+
+- **FR-023**: `src/application/ports/storage-port.ts` MUST be revised to
+  match `contracts/storage-port.md` exactly: the Phase-0 placeholder
+  `SessionRecord`/`ExerciseRecord` types and `SessionId`/`ExerciseId`
+  aliases are replaced with the real entity/value-object types this spec
+  defines (FR-001..FR-009), and the method set is the one enumerated in
+  that contract — not an unspecified "adjust as needed."
+- **FR-024**: The `StoragePort` interface MUST include `mergeExercises`
+  and `deleteExerciseCascade` as dedicated atomic operations (not composed
+  by a caller from per-record save/get/delete calls) — per
+  `contracts/storage-port.md`'s rationale: a single owner of the
+  reassignment/cascade logic, and a single `StorageError` failure mode for
+  the whole operation.
+- **FR-025**: The `StoragePort` interface MUST include `saveDraft`,
+  `getDraft`, and `discardDraft` as a narrow, dedicated surface for spec
+  001's Logging draft (FR-024 there) — the draft is explicitly NOT
+  modeled as a partial/nullable `Session`; its own type is an
+  application-layer (spec 001) concern, not a domain entity this spec
+  defines, per `contracts/storage-port.md`'s note that the draft's shape
+  "evolves independently of" the Session schema version. (Closes
+  spec-reviewer finding #1: the draft is acknowledged at the port
+  boundary rather than silently absent from this spec.)
+- **FR-026**: The `StoragePort` interface MUST expose a way to read and
   set a schema version associated with the stored data
   (`docs/requirements.md` §6), without implementing migrate/same/refuse
   logic — that logic is Phase 2's job; this spec only names the concern at
   the port level (the method(s) already exist as
-  `getSchemaVersion`/`setSchemaVersion` from Phase 0 and MUST be retained,
-  adjusted only if the finalized entity shapes require it).
-- **FR-019**: `test/support/in-memory-storage.ts` MUST be updated to
+  `getSchemaVersion`/`setSchemaVersion` from Phase 0 and MUST be retained).
+- **FR-027**: `test/support/in-memory-storage.ts` MUST be updated to
   implement the finalized `StoragePort` faithfully — every method
-  round-trips a real domain-shaped value — remaining the single documented
-  shared-doubles location (spec 000 FR-015); no second fake is introduced
-  elsewhere.
-- **FR-020**: Every domain rule (FR-010..FR-015) and every value object
-  variant (FR-007..FR-009) MUST have an exhaustive unit test — a
-  violation-rejected case and a valid-case-accepted companion per rule,
+  round-trips a real domain-shaped value, including `mergeExercises` and
+  `deleteExerciseCascade`'s reassignment/cascade behavior — remaining the
+  single documented shared-doubles location (spec 000 FR-015); no second
+  fake is introduced elsewhere.
+- **FR-028**: Every domain rule (FR-010..FR-015, FR-019..FR-021) and every
+  value object variant (FR-007..FR-009) MUST have an exhaustive unit test —
+  a violation-rejected case and a valid-case-accepted companion per rule,
   matching the red/green discipline `test/boundaries/README.md`
   established for spec 000's boundary rule. No real I/O (file system,
   IndexedDB, network) appears anywhere in this spec's test suite.
@@ -349,7 +414,16 @@ about the type requires a "seed" or "system-provided" marker to be valid.
 - **Volume**: a value object, one of `Reps` | `Duration` | `Distance`.
 - **Effort**: a value object, an integer 1–5.
 - **Body measurement**: a dated record of body weight and optional
-  composition figures, independent of any `Session`.
+  composition figures, independent of any `Session`. Not constructible
+  without a body weight value (FR-021).
+
+**Explicitly not a domain entity this spec defines**: spec 001's
+**Logging draft** (its own Key Entities section) is UI/session state, not
+a `Session` — this spec does not define its shape. It is acknowledged only
+at the storage-port boundary (FR-025, `contracts/storage-port.md`), which
+gives it a narrow save/get/discard surface without prescribing its
+internal representation, consistent with spec 001's own statement that the
+draft's shape evolves independently of the Session schema version.
 
 ## Success Criteria *(mandatory)*
 
@@ -371,9 +445,14 @@ about the type requires a "seed" or "system-provided" marker to be valid.
   `test/unit/` files covering this spec's scope.
 - **SC-004**: A developer starting `specs/001-log-a-session`'s
   `/speckit-plan` can import every entity/value-object type this spec
-  defines with no further domain-modeling work required — verified by a
-  manual cross-check of spec 001's Key Entities section against this
-  spec's Key Entities section, confirming no gap.
+  defines with no further domain-modeling work required for anything spec
+  001 models as a `Session` — verified by a manual cross-check of spec
+  001's Key Entities section against this spec's, confirming no gap. The
+  one deliberate exception is spec 001's Logging draft, which this spec
+  does not define as a domain type (see Key Entities' closing note) — that
+  developer still needs to design the draft's own shape at the application
+  layer; this spec only guarantees the storage-port surface
+  (`saveDraft`/`getDraft`/`discardDraft`, FR-025) exists for it.
 - **SC-005**: The finalized `StoragePort` interface and its in-memory fake
   pass the same self-test pattern spec 000 established
   (`test/unit/storage-port-fake.test.ts`), extended to cover every method
