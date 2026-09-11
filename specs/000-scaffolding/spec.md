@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-10
 
-**Status**: Draft
+**Status**: Implemented — merged to `main` via PR #3, PR #4
 
 **Targets build phase**: Phase 0 — the scaffolding phase that precedes MVP
 (`docs/agent-brief.md` §3 Phase 0; MVP scope is `docs/requirements.md` §9)
