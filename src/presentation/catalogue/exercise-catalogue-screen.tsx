@@ -8,19 +8,27 @@
  */
 import { useEffect, useState } from 'react';
 import { requireStorage } from '@/application/storage-access';
+import { useLoggingSession } from '@/application/logging/logging-store';
 import { allStoredDataRange } from '@/application/date-range';
 import { searchExercises } from '@/application/search/exercise-search';
-import {
-  renameExerciseWithCollisionCheck,
-  mergeExercises,
-  deleteExerciseCascade,
-} from '@/application/logging/use-cases';
+import { renameExerciseWithCollisionCheck } from '@/application/logging/use-cases';
 import type { Exercise, Session } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
 import { ExerciseCataloguePanel } from '../logging/exercise-catalogue-panel';
 import './catalogue.css';
 
 export function ExerciseCatalogueScreen() {
+  // Merge/delete cascade through the logging store's own actions, not the
+  // bare use-case functions directly: those actions also re-sync the
+  // store's in-memory `draft`/`catalogue` from storage afterward. Skipping
+  // that would leave LoggingScreen showing a stale pre-merge/delete draft
+  // until its next `initialize()` — long enough for a quick edit there to
+  // save that stale draft back and resurrect a reference to the merged-
+  // away/deleted exercise.
+  const mergeExercisesInSession = useLoggingSession((s) => s.mergeExercises);
+  const deleteExerciseCascadeInSession = useLoggingSession(
+    (s) => s.deleteExerciseCascade,
+  );
   const [catalogue, setCatalogue] = useState<Exercise[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [query, setQuery] = useState('');
@@ -107,13 +115,10 @@ export function ExerciseCatalogueScreen() {
             return result;
           }}
           onMerge={(survivorId, loserId) => {
-            void mergeExercises(requireStorage(), survivorId, loserId).then(
-              refresh,
-            );
+            void mergeExercisesInSession(survivorId, loserId).then(refresh);
           }}
           onDeleteConfirm={() => {
-            void deleteExerciseCascade(
-              requireStorage(),
+            void deleteExerciseCascadeInSession(
               managing.id,
               hasHistory(managing.id),
               true,

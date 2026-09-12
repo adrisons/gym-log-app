@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ExerciseCatalogueScreen } from '@/presentation/catalogue/exercise-catalogue-screen';
 import { useStorageAccess } from '@/application/storage-access';
+import { useLoggingSession } from '@/application/logging/logging-store';
 import type { ExerciseId } from '@/domain/ids';
 import { InMemoryStorage } from '../../../support';
 
@@ -98,5 +99,78 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
       expect(screen.getByText('Barbell back squat')).toBeInTheDocument();
     });
     expect(screen.queryByText('Back squat')).not.toBeInTheDocument();
+  });
+
+  it('a merge re-syncs the logging store, not just this screen (stale-draft regression)', async () => {
+    const storage = await seededStorage();
+    // `lastEditedAt` must be "now" (today) — `openLoggingForm` (called by
+    // the logging store's own `initialize()` below) promotes any draft
+    // from an earlier calendar day into a Session and replaces it with a
+    // brand-new empty draft, which would defeat this test's setup.
+    const now = new Date().toISOString();
+    await storage.saveDraft({
+      id: 'draft-1',
+      dateTime: now,
+      notes: '',
+      lastEditedAt: now,
+      blocks: [
+        {
+          id: 'block-1',
+          type: 'straightSets',
+          exercises: [
+            {
+              id: 'entry-1',
+              exerciseId: 'ex-1' as ExerciseId,
+              notes: '',
+              sets: [],
+            },
+          ],
+        },
+      ],
+    });
+    useStorageAccess.getState().configure(storage);
+    // Configured exactly like the composition root does (main.tsx) — both
+    // stores share the same storage instance, and the logging session is
+    // "already initialized" the way it would be from an earlier visit to
+    // LoggingScreen before navigating here.
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+
+    // Renaming "Back squat" to the existing "Bench press" name triggers
+    // the collision-merge offer; confirming merges Back squat (ex-1) into
+    // Bench press (ex-2).
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Manage Back squat' }),
+    );
+    await userEvent.clear(screen.getByLabelText(/rename exercise/i));
+    await userEvent.type(
+      screen.getByLabelText(/rename exercise/i),
+      'Bench press',
+    );
+    await userEvent.click(screen.getByRole('button', { name: /save name/i }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /merge \(not undoable\)/i }),
+    );
+
+    await waitFor(() => {
+      const catalogue = useLoggingSession.getState().catalogue;
+      expect(catalogue.some((e) => e.id === 'ex-1')).toBe(false);
+    });
+    // The logging store's own in-memory draft — not just underlying
+    // storage — must be repointed off the merged-away exercise too, or a
+    // quick edit on LoggingScreen right after this merge would save the
+    // stale draft back and resurrect the reference to `ex-1`.
+    const draft = useLoggingSession.getState().draft;
+    const exerciseIds = draft?.blocks.flatMap((block) =>
+      block.exercises.map((entry) => entry.exerciseId),
+    );
+    expect(exerciseIds).not.toContain('ex-1');
+    expect(exerciseIds).toContain('ex-2');
   });
 });
