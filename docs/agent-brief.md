@@ -122,3 +122,12 @@ against §7.1, before and after any optimisation.
 ### Phase 7 — Templates (FR-13) — v1.1
 
 Session templates, kept off the logging critical path (D7).
+
+### Phase 8 — Swimming, the first non-Strength discipline — v1.1
+
+D8 is closed for swimming (ADR-0006): the `discipline` field becomes a real
+enum, a distance/duration-based progression metric and its own insight card
+type are added, with a schema version bump (1 → 2) and a tested migration
+(existing exercises default to `Strength`) per `docs/requirements.md` §6.
+Not yet specced. Ordering relative to Phase 7 is not fixed by ADR-0006 —
+either can go first; decide when this phase is picked up.
