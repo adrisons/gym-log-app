@@ -60,6 +60,35 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
     expect(screen.queryByText('Back squat')).not.toBeInTheDocument();
   });
 
+  it('names what is missing when a filter matches nothing (empty-state regression)', async () => {
+    useStorageAccess.getState().configure(await seededStorage());
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+
+    await userEvent.type(
+      screen.getByPlaceholderText(/search the catalogue/i),
+      'nonexistent exercise',
+    );
+
+    expect(
+      screen.getByText(/no exercises match .nonexistent exercise.\./i),
+    ).toBeInTheDocument();
+  });
+
+  it('names what is missing when the catalogue itself is empty (empty-state regression)', async () => {
+    useStorageAccess.getState().configure(new InMemoryStorage());
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('No exercises in your catalogue yet.'),
+      ).toBeInTheDocument();
+    });
+  });
+
   it('opens the management panel for the tapped exercise', async () => {
     useStorageAccess.getState().configure(await seededStorage());
     render(<ExerciseCatalogueScreen />);

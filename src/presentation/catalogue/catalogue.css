@@ -12,6 +12,10 @@
   gap: var(--space-4);
 }
 
+.catalogue-screen__empty {
+  color: var(--color-foreground-muted);
+}
+
 .catalogue-screen__list {
   list-style: none;
   margin: 0;

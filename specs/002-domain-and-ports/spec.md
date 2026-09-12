@@ -249,6 +249,10 @@ about the type requires a "seed" or "system-provided" marker to be valid.
   with: canonical name, aliases, movement pattern, muscle groups, default
   load type, a unilateral flag, and a discipline field (fixed to
   `Strength` in v1, but present so a future discipline is additive).
+  _(Amended by ADR-0006, schema v2: also carries a default volume kind
+  and whether effort is tracked, together forming the exercise's
+  set-entry template — see the ADR for the forward-only rule governing
+  a template change.)_
 - **FR-002**: The domain layer MUST define a `Session` type with: a
   date-time, an ordered list of `Block`s, free-form notes, an optional
   overall feeling, and an optional duration. A `Session` MUST NOT carry

@@ -210,12 +210,13 @@ describe('createExercise (FR-002, FR-015)', () => {
     expect(await storage.getExercise(exercise.id)).toEqual(exercise);
   });
 
-  it('defaults the set-entry template to Reps, effort untracked (ADR-0006)', async () => {
+  it('defaults the set-entry template to Weight + Reps, effort untracked (ADR-0006)', async () => {
     const storage = new InMemoryStorage();
     const exercise = await createExercise(storage, {
       canonicalName: 'Hip thrust',
     });
 
+    expect(exercise.defaultLoadType).toBe('weight');
     expect(exercise.defaultVolumeKind).toBe('reps');
     expect(exercise.trackEffort).toBe(false);
   });

@@ -28,7 +28,6 @@ import {
   toBlockViewModel,
   toSetSummaryViewModel,
 } from '@/application/logging/view-models';
-import { createExercise } from '@/application/logging/use-cases';
 import type {
   Exercise,
   Session,
@@ -55,6 +54,10 @@ export function SessionDetailScreen() {
   const updateExerciseTemplateInSession = useLoggingSession(
     (s) => s.updateExerciseTemplate,
   );
+  // Same reasoning as above: creating an exercise here must also land in
+  // useLoggingSession.catalogue, or a stale search on LoggingScreen could
+  // miss the new exercise or offer to create a duplicate of it.
+  const createExerciseInSession = useLoggingSession((s) => s.createExercise);
   const [original, setOriginal] = useState<Session | undefined>(undefined);
   const [editable, setEditable] = useState<EditableSession | undefined>(
     undefined,
@@ -290,7 +293,7 @@ export function SessionDetailScreen() {
                   }
                   onCreateExercise={(name) => {
                     void (async () => {
-                      const exercise = await createExercise(requireStorage(), {
+                      const exercise = await createExerciseInSession({
                         canonicalName: name,
                       });
                       setCatalogue((current) => [...current, exercise]);
@@ -437,7 +440,7 @@ export function SessionDetailScreen() {
         onSelectExercise={(exercise) => addExerciseAtTopLevel(exercise.id)}
         onCreateExercise={(name) => {
           void (async () => {
-            const exercise = await createExercise(requireStorage(), {
+            const exercise = await createExerciseInSession({
               canonicalName: name,
             });
             setCatalogue((current) => [...current, exercise]);

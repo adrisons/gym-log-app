@@ -118,6 +118,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       }),
     );
     useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
 
     render(
       <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
@@ -184,6 +185,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       }),
     );
     useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
 
     // Gate `saveExercise` so the component's `await createExercise(...)`
     // stays pending until this test explicitly releases it — the window
@@ -284,6 +286,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       }),
     );
     useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
 
     // The first save this screen attempts (triggered by the "Add exercise"
     // edit below) rejects, simulating a transient storage failure (e.g. a
@@ -385,6 +388,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       }),
     );
     useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
 
     render(
       <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
@@ -464,6 +468,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       }),
     );
     useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
 
     render(
       <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
@@ -585,5 +590,76 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       const updated = catalogue.find((e) => e.id === exerciseId);
       expect(updated?.trackEffort).toBe(true);
     });
+  });
+
+  it('creating an exercise re-syncs the logging store, not just this screen (stale-catalogue regression)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const sessionId = 's1' as SessionId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [
+          createBlock({
+            type: 'straightSets',
+            name: 'Push day',
+            exercises: [{ exerciseId, notes: '', sets: [] }],
+          }),
+        ],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+    // Same setup as the composition root (main.tsx) — both stores share
+    // the same storage instance, and the logging session is "already
+    // initialized" the way it would be from an earlier visit to
+    // LoggingScreen before navigating here.
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <Routes>
+          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Squat' }),
+      ).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.type(
+      screen.getByPlaceholderText(/search or create an exercise/i),
+      'Deadlift',
+    );
+    await userEvent.click(screen.getByText('Create "Deadlift"'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Deadlift' }),
+      ).toBeInTheDocument();
+    });
+
+    // The logging store's own in-memory catalogue — not just underlying
+    // storage — must include the new exercise too, or returning to
+    // LoggingScreen would search a stale catalogue that's missing it
+    // (and could offer to create a duplicate).
+    const catalogue = useLoggingSession.getState().catalogue;
+    expect(catalogue.some((e) => e.canonicalName === 'Deadlift')).toBe(true);
   });
 });

@@ -87,6 +87,16 @@ export function ExerciseCatalogueScreen() {
         />
       </label>
 
+      {results.length === 0 && (
+        <p className="catalogue-screen__empty">
+          {catalogue.length === 0 ? (
+            'No exercises in your catalogue yet.'
+          ) : (
+            <>No exercises match &ldquo;{query}&rdquo;.</>
+          )}
+        </p>
+      )}
+
       <ul className="catalogue-screen__list">
         {results.map((exercise) => (
           <li key={exercise.id} className="catalogue-screen__row">
