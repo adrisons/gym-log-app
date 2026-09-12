@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { SessionDetailScreen } from '@/presentation/diary/session-detail-screen';
 import { useStorageAccess } from '@/application/storage-access';
+import { useLoggingSession } from '@/application/logging/logging-store';
 import { createSession } from '@/domain/session';
 import { createBlock } from '@/domain/block';
 import { createSet } from '@/domain/set';
@@ -510,5 +511,79 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       ).not.toBeInTheDocument();
     });
     expect(screen.queryByText('Block 2')).not.toBeInTheDocument();
+  });
+
+  it('saving an exercise template re-syncs the logging store, not just this screen (stale-template regression)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const sessionId = 's1' as SessionId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [
+          createBlock({
+            type: 'straightSets',
+            name: 'Push day',
+            exercises: [{ exerciseId, notes: '', sets: [] }],
+          }),
+        ],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+    // Same setup as the composition root (main.tsx) — both stores share
+    // the same storage instance, and the logging session is "already
+    // initialized" the way it would be from an earlier visit to
+    // LoggingScreen before navigating here.
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <Routes>
+          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Squat' }),
+      ).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Squat actions' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /edit tracked fields/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /track effort/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    // The logging store's own in-memory catalogue — not just underlying
+    // storage — must reflect the template change too, or returning to
+    // LoggingScreen would render the old template (and its set-entry
+    // controls) until its next initialize().
+    await waitFor(() => {
+      const catalogue = useLoggingSession.getState().catalogue;
+      const updated = catalogue.find((e) => e.id === exerciseId);
+      expect(updated?.trackEffort).toBe(true);
+    });
   });
 });

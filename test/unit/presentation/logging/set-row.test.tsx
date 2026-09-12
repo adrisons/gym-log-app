@@ -114,6 +114,39 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006)',
     expect(screen.getByRole('button', { name: /add set/i })).toBeEnabled();
   });
 
+  it('normalizes an out-of-range historical rep-count prefill instead of silently confirming it under an "unset" wheel (out-of-range-prefill regression)', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        prefill={{
+          // Legal historical data: `createVolume` has no upper bound on
+          // reps, but the wheel only offers 1..100.
+          volume: { kind: 'reps', count: 150 },
+          load: { kind: 'weight', value: 100, unit: 'kg' },
+        }}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    // The wheel correctly shows nothing selected...
+    expect(screen.getByRole('option', { name: '—' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    // ...and confirming must not silently submit the stale out-of-range
+    // count that a naive read of `prefill` would still hold: the weight
+    // alone already enables Add set, so this only needs a load, no reps
+    // choice, to fire.
+    await userEvent.click(screen.getByRole('button', { name: /add set/i }));
+
+    expect(onConfirm).toHaveBeenCalledWith({
+      load: { kind: 'weight', value: 100, unit: 'kg' },
+      setKind: 'working',
+    });
+  });
+
   it("ignores a prefill whose load kind no longer matches the exercise's template", () => {
     render(
       <SetRow

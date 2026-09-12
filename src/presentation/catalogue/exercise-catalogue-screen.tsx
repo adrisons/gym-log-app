@@ -11,20 +11,24 @@ import { requireStorage } from '@/application/storage-access';
 import { useLoggingSession } from '@/application/logging/logging-store';
 import { allStoredDataRange } from '@/application/date-range';
 import { searchExercises } from '@/application/search/exercise-search';
-import { renameExerciseWithCollisionCheck } from '@/application/logging/use-cases';
 import type { Exercise, Session } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
 import { ExerciseCataloguePanel } from '../logging/exercise-catalogue-panel';
 import './catalogue.css';
 
 export function ExerciseCatalogueScreen() {
-  // Merge/delete cascade through the logging store's own actions, not the
-  // bare use-case functions directly: those actions also re-sync the
-  // store's in-memory `draft`/`catalogue` from storage afterward. Skipping
-  // that would leave LoggingScreen showing a stale pre-merge/delete draft
-  // until its next `initialize()` — long enough for a quick edit there to
-  // save that stale draft back and resurrect a reference to the merged-
-  // away/deleted exercise.
+  // Rename/merge/delete all go through the logging store's own actions,
+  // not the bare use-case functions directly: those actions also re-sync
+  // the store's in-memory `draft`/`catalogue` from storage afterward.
+  // Skipping that would leave LoggingScreen showing a stale catalogue
+  // (rename) or draft (merge/delete) until its next `initialize()` — long
+  // enough for a quick edit there to read/write against data this screen
+  // just changed underneath it (e.g. offering to create a duplicate of an
+  // exercise that was just renamed, or resurrecting a reference to one
+  // merged-away/deleted).
+  const renameExerciseInSession = useLoggingSession(
+    (s) => s.renameExerciseWithCollisionCheck,
+  );
   const mergeExercisesInSession = useLoggingSession((s) => s.mergeExercises);
   const deleteExerciseCascadeInSession = useLoggingSession(
     (s) => s.deleteExerciseCascade,
@@ -106,11 +110,7 @@ export function ExerciseCatalogueScreen() {
           hasHistory={hasHistory(managing.id)}
           search={(q) => searchExercises(q, catalogue)}
           onRename={async (newName) => {
-            const result = await renameExerciseWithCollisionCheck(
-              requireStorage(),
-              managing.id,
-              newName,
-            );
+            const result = await renameExerciseInSession(managing.id, newName);
             if (result.status === 'renamed') await refresh();
             return result;
           }}

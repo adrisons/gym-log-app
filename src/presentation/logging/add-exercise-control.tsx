@@ -1,9 +1,8 @@
 /**
- * A button that expands into `ExerciseSearchField` — the same collapse/
- * expand idiom `SetRow`'s "Change load type" control already uses, so
- * this reads as one control instead of an always-visible search field
- * sitting in view before the user has asked for it (docs/design.md §2).
- * Collapses back to a button after a selection/creation, or on blur.
+ * A button that expands into `ExerciseSearchField`, so this reads as one
+ * control instead of an always-visible search field sitting in view
+ * before the user has asked for it (docs/design.md §2). Collapses back to
+ * a button after a selection/creation, or on blur.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { Exercise } from '@/application/logging/use-cases';

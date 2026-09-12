@@ -37,7 +37,7 @@ const TIMED_KIND_META: Record<
   },
 };
 
-const MAX_REPS = 100;
+export const MAX_REPS = 100;
 const REPS_OPTIONS: WheelPickerOption<number | undefined>[] = [
   { value: undefined, label: '—' },
   ...Array.from({ length: MAX_REPS }, (_, i) => ({

@@ -22,7 +22,7 @@ import { WeightLoadInput } from './weight-load-input';
 import { BandLoadInput } from './band-load-input';
 import { BodyweightLoadInput } from './bodyweight-load-input';
 import { FreeTextLoadInput } from './free-text-load-input';
-import { VolumeInput } from './volume-input';
+import { VolumeInput, MAX_REPS } from './volume-input';
 import type { VolumeKind } from './volume-input';
 import { EffortPicker } from './effort-picker';
 import { SetConfirmControl } from './set-confirm-control';
@@ -47,7 +47,16 @@ function initialVolumeValue(
 ): number | undefined {
   const volume = prefill?.volume;
   if (!volume || volume.kind !== volumeKind) return undefined;
-  if (volume.kind === 'reps') return volume.count;
+  if (volume.kind === 'reps') {
+    // A legal historical `Set` can hold a rep count the reps wheel
+    // doesn't offer (it only goes to `MAX_REPS` — domain `createVolume`
+    // has no upper bound). Left as-is, `WheelPicker` would silently fall
+    // back to its "unset" position while this out-of-range value stayed
+    // held here, letting Add set confirm it despite the wheel visibly
+    // showing nothing selected. Normalizing to `undefined` here keeps
+    // what's held in sync with what's shown.
+    return volume.count <= MAX_REPS ? volume.count : undefined;
+  }
   if (volume.kind === 'duration') return volume.seconds;
   return volume.metres;
 }

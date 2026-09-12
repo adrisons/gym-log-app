@@ -78,7 +78,12 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
   });
 
   it('refreshes the list to show the new name after a successful rename', async () => {
-    useStorageAccess.getState().configure(await seededStorage());
+    const storage = await seededStorage();
+    useStorageAccess.getState().configure(storage);
+    // Rename is routed through the logging store's own action (matching
+    // the composition root's real setup, where both stores share one
+    // storage instance) — see the stale-catalogue regression test below.
+    useLoggingSession.getState().configure(storage);
     render(<ExerciseCatalogueScreen />);
 
     await waitFor(() => {
@@ -172,5 +177,43 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
     );
     expect(exerciseIds).not.toContain('ex-1');
     expect(exerciseIds).toContain('ex-2');
+  });
+
+  it('a rename re-syncs the logging store, not just this screen (stale-catalogue regression)', async () => {
+    const storage = await seededStorage();
+    useStorageAccess.getState().configure(storage);
+    // Same setup as the merge regression above — the logging session is
+    // "already initialized" the way it would be from an earlier visit to
+    // LoggingScreen before navigating here.
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Manage Back squat' }),
+    );
+    await userEvent.clear(screen.getByLabelText(/rename exercise/i));
+    await userEvent.type(
+      screen.getByLabelText(/rename exercise/i),
+      'Barbell back squat',
+    );
+    await userEvent.click(screen.getByRole('button', { name: /save name/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Barbell back squat')).toBeInTheDocument();
+    });
+
+    // The logging store's own in-memory catalogue — not just underlying
+    // storage — must reflect the rename too, or returning to LoggingScreen
+    // would render the old name until its next initialize() and could
+    // offer to create a duplicate under the new name in the meantime.
+    const catalogue = useLoggingSession.getState().catalogue;
+    const renamed = catalogue.find((e) => e.id === 'ex-1');
+    expect(renamed?.canonicalName).toBe('Barbell back squat');
   });
 });

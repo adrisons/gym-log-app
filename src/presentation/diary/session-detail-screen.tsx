@@ -16,6 +16,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { requireStorage } from '@/application/storage-access';
+import { useLoggingSession } from '@/application/logging/logging-store';
 import {
   editableToSession,
   newEditableItemId,
@@ -27,10 +28,7 @@ import {
   toBlockViewModel,
   toSetSummaryViewModel,
 } from '@/application/logging/view-models';
-import {
-  createExercise,
-  updateExerciseTemplate,
-} from '@/application/logging/use-cases';
+import { createExercise } from '@/application/logging/use-cases';
 import type {
   Exercise,
   Session,
@@ -47,6 +45,16 @@ import './diary.css';
 export function SessionDetailScreen() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  // Routed through the logging store's own action, not the bare use-case
+  // directly: LoggingScreen reads its exercise templates from
+  // `useLoggingSession.catalogue`, an independent in-memory copy that
+  // survives navigation — bypassing it here would leave that store
+  // showing the old template (and its set-entry controls) until its next
+  // `initialize()`, long enough for a quick set entry there under
+  // controls the user just changed on this screen.
+  const updateExerciseTemplateInSession = useLoggingSession(
+    (s) => s.updateExerciseTemplate,
+  );
   const [original, setOriginal] = useState<Session | undefined>(undefined);
   const [editable, setEditable] = useState<EditableSession | undefined>(
     undefined,
@@ -227,8 +235,7 @@ export function SessionDetailScreen() {
                   : exercise,
               ),
             );
-            void updateExerciseTemplate(
-              requireStorage(),
+            void updateExerciseTemplateInSession(
               editingTemplateFor.id,
               template,
             );
