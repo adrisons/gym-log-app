@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-12
 
-**Status**: Planned
+**Status**: Implemented — merged to `main` via PR #13
 
 **Input**: User description: "Insights (Phase 5, v1). Covers
 docs/requirements.md FR-9: deterministic, explainable global-conclusion

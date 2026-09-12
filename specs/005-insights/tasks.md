@@ -192,7 +192,7 @@ Single project (`src/`, `test/` at repository root), per [plan.md](./plan.md)'s 
 - [X] T037 Run `npm run test:e2e` (including the extended `shell-smoke.spec.ts` route check from T008) and confirm 0 regressions
 - [X] T038 Walk through quickstart.md's "Manual validation (browser)" steps 1-4 in a real browser (`npm run dev`) and confirm every observed behavior matches
 - [X] T039 Update `README.md`'s "Status" section to record Phase 5 (Insights) complete, per this project's convention of keeping that section current at each phase boundary
-- [ ] T040 Update `specs/005-insights/spec.md`'s Status line to `Implemented — merged to main via PR #<N>` once the PR merges (per the `sdd-workflow` skill's Status-field convention) — the final commit of this feature
+- [X] T040 Update `specs/005-insights/spec.md`'s Status line to `Implemented — merged to main via PR #13` (per the `sdd-workflow` skill's Status-field convention) — this commit
 
 ---
 
