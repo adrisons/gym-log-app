@@ -369,9 +369,13 @@ just the seed set, and the app otherwise behaves like a fresh install.
   atomically (FR-011's dependency), remove every session, every band
   label, every setting and the pending logging draft if one exists, and
   MUST reset the exercise catalogue to exactly the seed set
-  (`docs/requirements.md` D9, ADR-0005) — not to empty — and reset the
-  schema-version marker, so the device ends in precisely the state a fresh
-  install starts from, no more and no less.
+  (`docs/requirements.md` D9, ADR-0005) — not to empty. "Reset the
+  schema-version marker" means returning it to the same uninitialized
+  sentinel `specs/003-persistence` FR-007a already defines for a device
+  that has never been written to — never a hardcoded version literal —
+  so the device ends in precisely the state a fresh install starts from,
+  no more and no less, and this stays correct even after a future schema
+  bump changes what "current" means.
 - **FR-017**: This feature MUST NOT alter the existing schema-version
   migrate/open/refuse behavior for a device's own local storage
   (`specs/003-persistence`); it only adds the export/import surface and
@@ -473,6 +477,21 @@ just the seed set, and the app otherwise behaves like a fresh install.
   draft itself (Non-Goals; `specs/001-log-a-session/research.md` §7). This
   spec's own claim that no version bump is needed is still confirmed by
   `schema-guardian` at `/speckit-plan` time, not taken as already settled.
+- **Seed exercise IDs are not deterministic across installs.** Catalogue
+  entry IDs are generated with `crypto.randomUUID()` per install
+  (`specs/001-log-a-session/research.md` §2), including for the seed set
+  (D9, ADR-0005) — two independent installs' seed entries for, say, "Back
+  Squat" do not share an ID. Importing between two already-seeded,
+  independent installs (as opposed to importing into a fresh or emptied
+  one, User Story 2's primary case) will therefore show each source-device
+  seed entry as an addition rather than a match, and can leave a device
+  with duplicate-looking catalogue entries for what was originally the
+  same seed exercise. This is a known, accepted v1 limitation, not a bug
+  to fix here: the user can resolve any resulting duplicates with the
+  exercise catalogue's existing merge capability
+  (`specs/002-domain-and-ports` FR-012); making seed IDs deterministic
+  across installs instead is a larger change (ADR-0005's own generation
+  strategy) out of this spec's scope.
 - **Tabular export has no corresponding import.** FR-12's spreadsheet
   export exists for the user's own external analysis, not as a second
   interchange format to round-trip through.
