@@ -202,9 +202,15 @@ Create a session and add blocks, exercises and sets.
 
 - Adding a set defaults to the previous set's values for that exercise (same
   load, same reps), so confirming is one tap.
-- Load type is chosen per exercise and remembered; it can be overridden per set.
-- The numeric keypad appears by default on numeric fields, with quick increments
-  (± 2.5 kg, configurable).
+- Load type is chosen per exercise and remembered; it can be overridden per set,
+  via a collapsed "change load type" control rather than a picker shown by
+  default — the common case (Weight) needs no extra tap.
+- Weight uses the numeric keypad by default (`inputMode="decimal"`) with no
+  dedicated quick-increment buttons — entering a value directly is the whole
+  interaction. Reps are chosen with a scrollable wheel (1 to 100, plus an
+  unset position for a load-only set); the wheel itself is the quick-increment
+  mechanism, so it carries no separate ± buttons either. Duration and distance
+  keep a numeric field with quick increments (configurable defaults).
 - Bands are picked from a user-owned, reorderable list with free labels.
 - Free text accepts up to 40 characters and autocompletes from what has already
   been used for that exercise.
@@ -216,7 +222,9 @@ Create a session and add blocks, exercises and sets.
 
 ### FR-4 — Effort `[v1]`
 
-- Record a set's effort with a one-tap control on a 1–5 scale (ADR-0003).
+- Record a set's effort with a compact scrollable control on a 1–5 scale
+  (ADR-0003) — one gesture to reach an adjacent level, an explicit "not
+  recorded" position rather than a level always pre-selected.
 - Recording it is optional on every set.
 - The scale always shows its meaning in words, never the number alone (§7.4).
 
