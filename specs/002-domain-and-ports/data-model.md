@@ -86,7 +86,6 @@ No open/closed lifecycle field (FR-002).
 ```ts
 interface Block {
   name?: string;
-  loose?: boolean; // implicit container for an exercise logged outside any explicit block (docs/requirements.md FR-2); rendered with no header/controls. Distinct from having no `name` — an explicitly created block without a name yet is NOT loose and still shows its position label and stays renameable/deletable (FR-2). Omitted on every explicitly created block and on data predating this field, so old data defaults to normal-block rendering.
   type: 'straightSets' | 'superset' | 'circuit';
   exercises: ExerciseEntry[]; // ordered; [] is valid (FR-017)
 }

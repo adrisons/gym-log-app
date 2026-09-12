@@ -4,13 +4,14 @@
  * `application/diary/session-editing.ts`'s doc comment for the exact
  * editable surface and why undo is out of scope here.
  *
- * Mirrors LoggingScreen's layout conventions: a `loose` block (an implicit
- * container for an exercise added outside any block — `domain/block.ts`'s
- * `Block.loose`) renders `bare` (no header/menu) once it has exercises; an
- * explicitly created block that just hasn't been named yet is never
- * `loose` and always keeps its header (FR-2). "Add exercise"/"Add block"
- * sit at the bottom, and each exercise's set-entry template (ADR-0006) is
- * editable through its own menu.
+ * Mirrors LoggingScreen's layout conventions: a `loose` block (an implicit,
+ * presentation-only container for an exercise added outside any block —
+ * `application/ports/logging-draft.ts`'s `DraftBlock.loose`, never part of
+ * the persisted `Block`) renders `bare` (no header/menu), even while
+ * empty; an explicitly created block that just hasn't been named yet is
+ * never `loose` and always keeps its header (FR-2). "Add exercise"/"Add
+ * block" sit at the bottom, and each exercise's set-entry template
+ * (ADR-0006) is editable through its own menu.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -243,7 +244,10 @@ export function SessionDetailScreen() {
           (sum, entry) => sum + entry.sets.length,
           0,
         );
-        const isBare = block.loose === true && block.exercises.length > 0;
+        // No `exercises.length > 0` guard: a `loose` block stays bare even
+        // once emptied by deleting its last exercise — it's still an
+        // implicit container the user never asked to see as a block.
+        const isBare = block.loose === true;
 
         return (
           <BlockCard

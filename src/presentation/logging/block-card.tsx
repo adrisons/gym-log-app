@@ -16,10 +16,11 @@
  *
  * `bare`, when true, skips the header/border chrome entirely and renders
  * only `children`/`footer` — an implicit home for a "loose" exercise
- * added outside any block (`domain/block.ts`'s `Block.loose`) shouldn't
- * look like a block at all. This is distinct from having no `name`: an
- * explicitly created block the user simply hasn't renamed yet is never
- * `bare` — FR-2 requires it to keep showing its position label and stay
+ * added outside any block (`application/ports/logging-draft.ts`'s
+ * `DraftBlock.loose`, presentation-only) shouldn't look like a block at
+ * all. This is distinct from having no `name`: an explicitly created
+ * block the user simply hasn't renamed yet is never `bare` — FR-2
+ * requires it to keep showing its position label and stay
  * renameable/deletable.
  */
 import { useState } from 'react';

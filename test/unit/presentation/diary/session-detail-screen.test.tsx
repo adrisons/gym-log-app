@@ -433,4 +433,82 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       screen.getAllByRole('button', { name: /rename/i }).length,
     ).toBeGreaterThan(0);
   });
+
+  it('a loose block stays chrome-less even after its last exercise is deleted (empty-loose-block regression)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const sessionId = 's1' as SessionId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [
+          createBlock({
+            type: 'straightSets',
+            name: 'Push day',
+            exercises: [{ exerciseId, notes: '', sets: [] }],
+          }),
+        ],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <Routes>
+          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Squat' }),
+      ).toBeInTheDocument();
+    });
+
+    // Top-level "Add exercise" (not a per-block footer): the trailing
+    // block is named ("Push day"), so this creates a fresh loose block.
+    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.type(
+      screen.getByPlaceholderText(/search or create an exercise/i),
+      'Lat pulldown',
+    );
+    await userEvent.click(screen.getByText('Create "Lat pulldown"'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Lat pulldown' }),
+      ).toBeInTheDocument();
+    });
+    // Loose block: no "Block 2" header for it.
+    expect(screen.queryByText('Block 2')).not.toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Lat pulldown actions' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Delete exercise' }),
+    );
+
+    // Now empty, but still loose: must stay invisible, not suddenly gain
+    // a "Block 2" header with rename/delete controls.
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('heading', { name: 'Lat pulldown' }),
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText('Block 2')).not.toBeInTheDocument();
+  });
 });

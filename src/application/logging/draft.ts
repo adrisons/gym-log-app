@@ -61,7 +61,8 @@ export function draftToSession(draft: LoggingDraft, id: SessionId): Session {
   const blocks = draft.blocks.map((block) =>
     createBlock({
       ...(block.name !== undefined ? { name: block.name } : {}),
-      ...(block.loose !== undefined ? { loose: block.loose } : {}),
+      // `block.loose` is deliberately dropped here — presentation-only,
+      // never part of the persisted `Block` (see `domain/block.ts`).
       type: block.type,
       exercises: block.exercises.map((entry) => ({
         exerciseId: entry.exerciseId,
