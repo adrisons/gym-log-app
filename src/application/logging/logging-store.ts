@@ -255,23 +255,38 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     },
 
     updateExerciseTemplate: async (exerciseId, template) => {
-      const { storage, catalogue: previousCatalogue } = get();
+      const { storage } = get();
       if (!storage) return;
+      const before = get().catalogue.find((e) => e.id === exerciseId);
+      if (!before) return;
+      const optimistic = { ...before, ...template };
       set((state) => ({
         catalogue: state.catalogue.map((exercise) =>
-          exercise.id === exerciseId ? { ...exercise, ...template } : exercise,
+          exercise.id === exerciseId ? optimistic : exercise,
         ),
       }));
       try {
         await updateExerciseTemplateUseCase(storage, exerciseId, template);
       } catch (error) {
-        // Roll the optimistic update back: durable storage never got the
-        // new template, so leaving it applied here would show set-entry
-        // controls for a template that silently reverts on the next
-        // reload. Re-thrown so a caller that keeps its own copy of the
-        // catalogue (`SessionDetailScreen`) can also undo its echo of this
-        // same optimistic update and keep its editor open to retry.
-        set({ catalogue: previousCatalogue });
+        // Roll back only this call's own optimistic entry, by reference —
+        // never the whole captured catalogue: doing that would also erase
+        // any *other* exercise that arrived (e.g. via `createExercise`)
+        // while this write was pending. The `=== optimistic` check is a
+        // per-exercise revision guard: if a newer call already replaced
+        // this same entry with a different optimistic value (or it was
+        // merged/deleted away) since we set it, that identity check fails
+        // and this older, now-irrelevant failure leaves it alone instead
+        // of clobbering whatever superseded it. Re-thrown so a caller that
+        // keeps its own copy of the catalogue (`SessionDetailScreen`) can
+        // also undo its echo of this same optimistic update and keep its
+        // editor open to retry.
+        set((state) => ({
+          catalogue: state.catalogue.map((exercise) =>
+            exercise.id === exerciseId && exercise === optimistic
+              ? before
+              : exercise,
+          ),
+        }));
         throw error;
       }
     },

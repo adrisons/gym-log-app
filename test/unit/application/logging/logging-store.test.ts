@@ -141,4 +141,60 @@ describe('useLoggingSession.updateExerciseTemplate (docs/requirements.md §7.1)'
       .catalogue.find((e) => e.id === exerciseId);
     expect(catalogueEntry?.trackEffort).toBe(false);
   });
+
+  it('a rollback undoes only its own exercise, never a different one added while the write was pending (concurrent-update regression)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const original = {
+      id: exerciseId,
+      canonicalName: 'Back squat',
+      aliases: [],
+      defaultLoadType: 'weight' as const,
+      defaultVolumeKind: 'reps' as const,
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength' as const,
+    };
+    await storage.saveExercise(original);
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+
+    const realSaveExercise = storage.saveExercise.bind(storage);
+    let rejectTemplateWrite: (error: Error) => void;
+    const pendingTemplateWrite = new Promise<void>((_, reject) => {
+      rejectTemplateWrite = reject;
+    });
+    storage.saveExercise = vi.fn((exercise) =>
+      exercise.id === exerciseId
+        ? pendingTemplateWrite
+        : realSaveExercise(exercise),
+    );
+
+    const templateUpdate = useLoggingSession
+      .getState()
+      .updateExerciseTemplate(exerciseId, {
+        defaultLoadType: 'weight',
+        defaultVolumeKind: 'reps',
+        trackEffort: true,
+      });
+
+    // A second, unrelated exercise is fully created — and lands in the
+    // catalogue — while the template write above is still pending.
+    const created = await useLoggingSession
+      .getState()
+      .createExercise({ canonicalName: 'Bench press' });
+    expect(
+      useLoggingSession.getState().catalogue.some((e) => e.id === created.id),
+    ).toBe(true);
+
+    rejectTemplateWrite!(new Error('disk full'));
+    await expect(templateUpdate).rejects.toThrow('disk full');
+
+    // The failed template write's rollback must undo only its own
+    // exercise, not the whole catalogue snapshot it started from — which
+    // predates (and therefore lacks) the concurrently created exercise.
+    const catalogue = useLoggingSession.getState().catalogue;
+    expect(catalogue.some((e) => e.id === created.id)).toBe(true);
+    expect(catalogue.find((e) => e.id === exerciseId)?.trackEffort).toBe(false);
+  });
 });
