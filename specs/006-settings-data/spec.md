@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-12
 
-**Status**: Draft
+**Status**: Reviewed
 
 **Input**: User description: "Settings, export and import (FR-11, FR-12) —
 v1, Phase 6 per docs/agent-brief.md §3. Build the Settings screen (default
@@ -104,7 +104,13 @@ neither delivers the underlying value (moving data between devices) alone.
 (real or simulated) device, import it into a second, independent
 installation, and confirm the imported data matches the source after
 confirming the preview — independent of the Settings screen's other
-fields (User Story 3).
+fields (User Story 3). Sessions, band labels, settings and the draft
+should match exactly; the exercise catalogue matches for every
+user-added/edited entry, but the two installations' own independently
+seeded entries are expected to show up as additions rather than a clean
+match (Assumptions: seed IDs are not deterministic across installs) — the
+test should confirm that specific, documented outcome, not a byte-for-byte
+catalogue match.
 
 **Acceptance Scenarios**:
 
@@ -149,8 +155,9 @@ device at all (User Stories 1-2).
 
 **Independent Test**: change each setting in isolation, restart the app,
 and confirm each choice persisted and is visibly in effect (unit shown on
-logged loads, theme applied, week view starting on the chosen day, quick
-increments offered while logging).
+logged loads, theme applied, the Insights consistency card's week count
+following the chosen first day of the week, quick increments offered while
+logging).
 
 **Acceptance Scenarios**:
 
@@ -162,6 +169,10 @@ increments offered while logging).
 3. **Given** the theme set to "system", **When** the operating system's
    light/dark preference changes, **Then** the app's theme follows it
    without the user opening the app's own settings again.
+4. **Given** a first-day-of-week setting changed away from the ISO
+   (Monday-start) default, **When** the Insights screen next computes its
+   consistency card (`specs/005-insights` FR-010), **Then** the weeks it
+   counts are bounded by the chosen day, not Monday (FR-018).
 
 ---
 
@@ -250,9 +261,15 @@ just the seed set, and the app otherwise behaves like a fresh install.
   ("your in-progress, unsubmitted entry will be replaced") rather than
   silently merging the two or leaving the local draft untouched.
 - What happens if delete-everything is used and the user then tries to
-  import a previously exported file? → Works exactly like importing into
-  any fresh install: every record in the file is added, since nothing
-  local remains to match against.
+  import a previously exported file? → Sessions, band labels, settings and
+  the logging draft behave exactly like importing into any fresh install:
+  every one in the file is added, since nothing local remains to match
+  against. The exercise catalogue is the one exception: delete-everything
+  leaves the seed set in place (FR-016), and — per the seed-ID limitation
+  above — the file's own seed entries typically carry different IDs than
+  this device's freshly-reseeded ones, so they are added alongside the
+  local seed set rather than matching it, the same duplicate-seed outcome
+  as importing onto any other already-seeded device.
 
 ## Non-Goals *(mandatory)*
 
@@ -276,9 +293,15 @@ just the seed set, and the app otherwise behaves like a fresh install.
   were added (`specs/001-log-a-session/research.md` §7). On that same
   precedent, adding Settings (and exporting/importing the logging draft,
   User Story 1-2) does not itself require a version bump — the current
-  version stays 1 for that reason specifically, not by assumption; this is
-  still confirmed by `schema-guardian` at `/speckit-plan` time (Assumptions),
-  since it is this spec's own claim to defend, not settled elsewhere.
+  version stays 1 for that reason specifically, not by assumption. This
+  spec's `schema-guardian` review (Assumptions) confirmed the claim sound
+  against Principle III's literal wording, while flagging that
+  `docs/requirements.md` §6's own, broader wording ("any change to the
+  persisted schema bumps the version") is not identically scoped —
+  Principle III governs here per the same precedent already accepted for
+  band labels and the logging draft, but the two documents' wording is
+  not reconciled, and any future spec relying on this precedent again
+  should address §6 explicitly, not just Principle III.
 - **Body measurements in the export.** Body composition tracking was
   removed from scope entirely (Decision D10); there is nothing of that
   kind to export or import.
@@ -307,10 +330,11 @@ just the seed set, and the app otherwise behaves like a fresh install.
 - **FR-006**: The system MUST provide a Data section on the Settings
   screen offering export, import, and delete-everything.
 - **FR-007**: Export MUST produce one file containing every canonical
-  record the app stores (sessions, exercise catalogue, band labels,
-  settings) plus the pending logging draft if one exists
-  (`specs/001-log-a-session` FR-024), in an open, documented, versioned
-  format, carrying the schema version the data was exported at.
+  record the app stores (sessions, exercise catalogue) plus the app's
+  non-canonical singleton state — band labels, settings, and the pending
+  logging draft if one exists (`specs/001-log-a-session` FR-024) — in an
+  open, documented, versioned format, carrying the schema version the data
+  was exported at.
 - **FR-008**: The exported file's content MUST be readable without the
   app's internal storage format, and MUST reference records by a readable
   form (e.g., an exercise's name) wherever one exists, rather than by an
@@ -369,13 +393,15 @@ just the seed set, and the app otherwise behaves like a fresh install.
   atomically (FR-011's dependency), remove every session, every band
   label, every setting and the pending logging draft if one exists, and
   MUST reset the exercise catalogue to exactly the seed set
-  (`docs/requirements.md` D9, ADR-0005) — not to empty. "Reset the
-  schema-version marker" means returning it to the same uninitialized
-  sentinel `specs/003-persistence` FR-007a already defines for a device
-  that has never been written to — never a hardcoded version literal —
-  so the device ends in precisely the state a fresh install starts from,
-  no more and no less, and this stays correct even after a future schema
-  bump changes what "current" means.
+  (`docs/requirements.md` D9, ADR-0005) — not to empty. The reseeding
+  write is itself the device's next "first real write" in
+  `specs/003-persistence` FR-007a's sense, so "reset the schema-version
+  marker" means this same atomic operation ends with the marker at the
+  app's current schema version — the same constant a genuinely fresh
+  install's own first-run seed write already sets it to (D9/ADR-0005: the
+  seed catalogue is written at install/first run, before a user does
+  anything observable) — never a hardcoded version literal that could go
+  stale after a future schema bump.
 - **FR-017**: This feature MUST NOT alter the existing schema-version
   migrate/open/refuse behavior for a device's own local storage
   (`specs/003-persistence`); it only adds the export/import surface and
@@ -389,12 +415,17 @@ just the seed set, and the app otherwise behaves like a fresh install.
   delete-everything's confirmations) MUST pass the accessibility audit
   `docs/requirements.md` §7.4 requires, and `docs/agent-brief.md`'s Phase 6
   names as part of closing this phase — not deferred to a later pass.
-- **FR-020**: Export, import and delete-everything MUST each be measured
-  against the performance targets in `docs/requirements.md` §7.1, both
-  before and after any optimization made to meet them, per
-  `docs/agent-brief.md`'s Phase 6 — closing this phase requires the
-  measurement to exist, not just an assumption that it will perform
-  adequately.
+- **FR-020**: `docs/requirements.md` §7.1 sets no numeric target for
+  export, import or delete-everything specifically (its targets cover
+  launch, logging interactions, and search/insight recomputation) — but
+  `docs/agent-brief.md`'s Phase 6 still names "performance measured
+  against §7.1, before and after any optimisation" as part of closing this
+  phase. The system MUST have a recorded, repeatable measurement of each
+  operation's duration against a representative data set, taken both
+  before and after any optimization made in response to it; this feature
+  does not itself set a pass/fail number where §7.1 doesn't provide one —
+  that is confirmed at `/speckit-plan` time, alongside whichever concrete
+  representative data-set size is chosen.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -405,12 +436,15 @@ just the seed set, and the app otherwise behaves like a fresh install.
   band-label list (already stored, `specs/001-log-a-session` FR-011).
 - **Export file (interchange record).** A single, self-contained,
   versioned snapshot of a device's canonical data (sessions, exercise
-  catalogue, band labels, settings) and its pending logging draft if one
-  exists, at the moment it was produced, plus the schema version it was
-  written at. Not a canonical entity itself — it is a point-in-time export
-  of the canonical entities that already exist plus the one piece of
-  durable non-canonical state (`specs/001-log-a-session` "Logging draft"),
-  per `docs/requirements.md` §6's "interchange format" language.
+  catalogue) plus its non-canonical singleton state — band labels,
+  settings, and the pending logging draft if one exists — at the moment it
+  was produced, plus the schema version it was written at. Not a canonical
+  entity itself — it is a point-in-time export of the canonical entities
+  that already exist plus the non-canonical, per-device state
+  (band labels, Settings, `specs/001-log-a-session` "Logging draft") that
+  isn't part of §3.1 but that this spec (FR-007) requires exported anyway,
+  per `docs/requirements.md` §6's "interchange format" language and §1.2's
+  "everything exportable" invariant.
 - **Import preview.** A computed, transient comparison between an export
   file's records and the device's current local records, grouped into
   "to add" and "to replace" by record kind. Never persisted — recomputed
@@ -441,9 +475,12 @@ just the seed set, and the app otherwise behaves like a fresh install.
 - **SC-006**: This feature's screens pass the `docs/requirements.md` §7.4
   accessibility audit with zero unresolved critical findings before Phase
   6 (`docs/agent-brief.md`) is considered closed.
-- **SC-007**: Export, import and delete-everything each have a recorded
-  performance measurement against `docs/requirements.md` §7.1, taken both
-  before and after any optimization needed to meet those targets.
+- **SC-007**: Export, import and delete-everything each have a recorded,
+  repeatable performance measurement against a representative data set,
+  taken both before and after any optimization — closing
+  `docs/agent-brief.md`'s Phase 6 performance-measurement requirement even
+  though `docs/requirements.md` §7.1 sets no number specific to these
+  three operations (FR-020).
 
 ## Assumptions
 

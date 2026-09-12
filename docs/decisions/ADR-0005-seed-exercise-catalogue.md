@@ -61,6 +61,12 @@ existing installs keep whatever catalogue they already have.
 - Export/import (FR-12): an exported file contains whatever catalogue the
   install has (seed entries included, as edited). Import does not treat seed
   entries specially.
+- "Does not re-seed on later launches" (above) describes ordinary app
+  launches, not a deliberate user-invoked reset: `specs/006-settings-data`
+  FR-16 (delete-everything) is a distinct, explicit user action that
+  intentionally restores the seed set as part of returning the device to
+  a fresh-install state — not a launch-time re-seed this ADR argued
+  against, and not a case this ADR anticipated when it was written.
 - The seed contents live in the app bundle, versioned with the app, not in
   the persisted schema — so revising the list is a normal app change, not a
   §6 migration.
