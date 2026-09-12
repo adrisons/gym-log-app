@@ -183,18 +183,56 @@ export class FileSystemStorageAdapter implements StoragePort {
     } catch {
       return undefined;
     }
+    // Validate before committing to this handle at all — a rejected
+    // (schema-too-new) directory must never be cached, or the *next* call
+    // would return it straight from `#tryDirectoryHandle`'s cache without
+    // ever revalidating, silently bypassing the "write nothing" refusal.
+    await this.#reconcileSchemaOnAcquire(handle);
     await this.#db.fileSystemHandle.put({
       key: FILE_SYSTEM_HANDLE_ROW_KEY,
       value: handle,
     });
     this.#root = handle;
     // Before flushing anything queued while this instance had no handle
-    // at all — see `#reconcileSchemaOnAcquire`'s own doc comment for why
-    // a schema check run in that shadow mode cannot be trusted once a
-    // real, possibly pre-existing directory is actually reachable.
-    await this.#reconcileSchemaOnAcquire(handle);
+    // at all: a queued *whole-file* write (`exercises.json`) was computed
+    // by code that could not read the real file yet and so assumed it was
+    // empty — flushing it as-is would silently discard every real
+    // pre-existing record the check above just migrated. Reconciling it
+    // against what's actually on disk first keeps both.
+    await this.#reconcileQueuedExercisesOnAcquire(handle);
     await this.#flushOverlay(handle);
     return handle;
+  }
+
+  /**
+   * A queued `EXERCISES_FILE` overlay write (from `saveExercise`/
+   * `mergeExercises`/`deleteExerciseCascade` running with no handle
+   * reachable yet) is a *whole-array* snapshot built from what those
+   * methods could read at the time — which, with no handle, is nothing.
+   * Flushing that snapshot as-is onto a directory that turns out to
+   * already hold real records (this instance's first-ever real
+   * acquisition) would silently drop every record the queued snapshot
+   * didn't know about. Replaces the queued entry with a merge — the real
+   * on-disk record for any id the overlay never touched, the overlay's
+   * own record (already `withTemplateDefaults`-shaped, since it went
+   * through the normal read/write path) for every id it did — so the
+   * flush that follows writes the combined result instead.
+   */
+  async #reconcileQueuedExercisesOnAcquire(
+    handle: FileSystemDirectoryHandle,
+  ): Promise<void> {
+    const queued = this.#overlay.get(EXERCISES_FILE);
+    if (!queued || queued.kind !== 'value') return;
+    const queuedExercises = queued.value as Exercise[];
+    const realExercises =
+      (await this.#readJsonFromHandle<Exercise[]>(handle, EXERCISES_FILE)) ??
+      [];
+    const queuedIds = new Set(queuedExercises.map((e) => e.id));
+    const merged = [
+      ...realExercises.filter((e) => !queuedIds.has(e.id)),
+      ...queuedExercises,
+    ];
+    this.#overlay.set(EXERCISES_FILE, { kind: 'value', value: merged });
   }
 
   /**

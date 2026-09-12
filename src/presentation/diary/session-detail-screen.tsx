@@ -9,7 +9,7 @@
  * block" sit at the bottom, and each exercise's set-entry template
  * (ADR-0006) is editable through its own menu.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { requireStorage } from '@/application/storage-access';
 import {
@@ -53,6 +53,12 @@ export function SessionDetailScreen() {
     Exercise | undefined
   >(undefined);
 
+  // Guards the very first `editable` a load populates from re-triggering
+  // the persist effect below with an unchanged snapshot — set right
+  // before that initial `setEditable`, for the mount *and* for a later
+  // `sessionId` change while this screen stays mounted.
+  const skipNextSaveRef = useRef(true);
+
   useEffect(() => {
     if (!sessionId) return;
     void (async () => {
@@ -63,6 +69,7 @@ export function SessionDetailScreen() {
         storage.listBandLabels(),
       ]);
       if (session) {
+        skipNextSaveRef.current = true;
         setOriginal(session);
         setEditable(sessionToEditable(session));
       }
@@ -71,23 +78,41 @@ export function SessionDetailScreen() {
     })();
   }, [sessionId]);
 
+  // Chains every save onto one queue, so completion always lands in call
+  // order regardless of individual network timing — without this, two
+  // edits fired close together could have their writes resolve out of
+  // order and leave the *older* edit persisted last, clobbering the
+  // newer one despite the UI already showing it.
+  const saveQueueRef = useRef(Promise.resolve());
+
+  // Persists `editable` itself (the effect below), not each individual
+  // edit's own snapshot — keeps this the single place that ever calls
+  // `saveSession`, so it's also the only place that needs to serialize.
+  useEffect(() => {
+    if (!editable || !original) return;
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
+    const snapshot = editable;
+    saveQueueRef.current = saveQueueRef.current.then(() =>
+      requireStorage().saveSession(editableToSession(snapshot, original)),
+    );
+  }, [editable, original]);
+
   // Takes an updater, not a next value: every call site (including the
   // async onCreateExercise handlers below) can run after an `await`, by
   // which point a *different* edit may already have landed — updating
   // from a `next` object built off the render-time `editable` closure
   // would silently overwrite that intervening edit. `setEditable`'s
-  // functional form always receives the true latest state, updater
-  // functions compose safely, and `saveSession` fires from the exact
-  // `next` this same call computed, never a second, possibly-stale read.
+  // functional form always receives the true latest state, so `update`
+  // always runs against it. The updater stays pure (no `saveSession` side
+  // effect inside it, unlike an earlier version of this function) —
+  // React may invoke a `setState` updater more than once for the same
+  // commit (StrictMode's own impurity check among other reasons), and a
+  // side effect inside one would fire that many times.
   const persist = (update: (current: EditableSession) => EditableSession) => {
-    setEditable((current) => {
-      if (!current) return current;
-      const next = update(current);
-      if (original) {
-        void requireStorage().saveSession(editableToSession(next, original));
-      }
-      return next;
-    });
+    setEditable((current) => (current ? update(current) : current));
   };
 
   const addExerciseToBlock = (blockId: string, exerciseId: Exercise['id']) => {
@@ -172,19 +197,18 @@ export function SessionDetailScreen() {
           key={editingTemplateFor.id}
           exercise={editingTemplateFor}
           onSave={(template) => {
+            setCatalogue((current) =>
+              current.map((exercise) =>
+                exercise.id === editingTemplateFor.id
+                  ? { ...exercise, ...template }
+                  : exercise,
+              ),
+            );
             void updateExerciseTemplate(
               requireStorage(),
               editingTemplateFor.id,
               template,
-            ).then(() => {
-              setCatalogue((current) =>
-                current.map((exercise) =>
-                  exercise.id === editingTemplateFor.id
-                    ? { ...exercise, ...template }
-                    : exercise,
-                ),
-              );
-            });
+            );
             setEditingTemplateFor(undefined);
           }}
           onClose={() => setEditingTemplateFor(undefined)}

@@ -85,6 +85,21 @@ test('ADR-0006 migration survives a gesture-less first write followed by a real 
   expect(outcome.rawFileMigrated).toBe(true);
 });
 
+test('a queued gesture-less exercise write merges with real pre-existing records instead of replacing them on first handle acquisition', async ({
+  page,
+  browserName,
+}) => {
+  test.setTimeout(90_000);
+  test.skip(browserName !== 'chromium', 'File System Access is chromium-only.');
+
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const outcome = await page.evaluate(() =>
+    window.__runQueuedExerciseMergeTest(),
+  );
+
+  expect(outcome.exerciseIds).toEqual(['legacy-1', 'new-1']);
+});
+
 test('a lost File System Access permission surfaces StorageError with kind "permission-lost", distinguishable from "no data yet"', async ({
   page,
   browserName,

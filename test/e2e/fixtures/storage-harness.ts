@@ -357,6 +357,64 @@ window.__runMigrationTest = (adapterKind) =>
 window.__runMigrationTestFreshAcquire = () =>
   runMigrationTestFileSystemFreshAcquire();
 
+export interface QueuedExerciseMergeResult {
+  exerciseIds: string[];
+}
+
+/**
+ * Reproduces a second Copilot finding on the same fresh-acquisition path:
+ * `saveExercise` running with no handle reachable yet queues a *whole*
+ * `exercises.json` snapshot built from what it could read at the time —
+ * nothing. If the directory later acquired for real already holds other
+ * records, flushing that queued snapshot as-is would silently drop them.
+ * `#reconcileQueuedExercisesOnAcquire` (file-system-storage-adapter.ts)
+ * merges the queued snapshot against the real on-disk file first.
+ */
+async function runQueuedExerciseMergeTest(): Promise<QueuedExerciseMergeResult> {
+  const { opfsRoot, dirName, storeDir } = await seedLegacyDirectory();
+
+  let gestureAvailable = false;
+  const getHandle = async (): Promise<FileSystemDirectoryHandle> => {
+    if (!gestureAvailable) {
+      throw new DOMException('No active user gesture.', 'NotAllowedError');
+    }
+    return storeDir;
+  };
+
+  const db = new GymLogDatabase(uniqueName('merge-fs-handles'));
+  const adapter = new FileSystemStorageAdapter(getHandle, db);
+
+  // Gesture-less: queues exercises.json = [newExercise] in the overlay,
+  // computed as if the catalogue were empty (no handle to read the real
+  // one, which already has `legacy-1`).
+  await adapter.saveExercise({
+    id: 'new-1' as ExerciseId,
+    canonicalName: 'New exercise',
+    aliases: [],
+    defaultLoadType: 'weight',
+    defaultVolumeKind: 'reps',
+    trackEffort: false,
+    unilateral: false,
+    discipline: 'Strength',
+  });
+
+  // A later write, now with a real gesture — first real handle
+  // acquisition against a directory that already holds `legacy-1`.
+  gestureAvailable = true;
+  await adapter.saveBandLabels(['after-gesture']);
+
+  const all = await adapter.listExercises();
+
+  db.close();
+  await opfsRoot
+    .removeEntry(dirName, { recursive: true })
+    .catch(() => undefined);
+
+  return { exerciseIds: all.map((e) => e.id).sort() };
+}
+
+window.__runQueuedExerciseMergeTest = () => runQueuedExerciseMergeTest();
+
 declare global {
   interface Window {
     __runContractSuite: (adapterKind: AdapterKind) => Promise<ContractResult>;
@@ -372,5 +430,6 @@ declare global {
       adapterKind: AdapterKind,
     ) => Promise<MigrationTestResult>;
     __runMigrationTestFreshAcquire: () => Promise<MigrationTestResult>;
+    __runQueuedExerciseMergeTest: () => Promise<QueuedExerciseMergeResult>;
   }
 }

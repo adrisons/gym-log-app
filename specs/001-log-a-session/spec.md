@@ -6,6 +6,16 @@
 
 **Status**: Implemented — merged to `main` via PR #9
 
+**Amended by ADR-0006** (schema v2): per-set load-type override and the
+weight quick-increment controls this spec originally required are retired
+— see the specific notes at Acceptance Scenarios 1–2 (User Story 3) and
+FR-009/FR-010 below. Load type, volume kind, and whether effort is tracked
+are now an exercise-level "template" (`docs/requirements.md` §3.2),
+changed through the exercise's own menu and applying only to new sets;
+`docs/requirements.md` FR-3 carries the current rule. This spec's own text
+is left otherwise unedited as the historical record of what actually
+shipped in PR #9.
+
 **Input**: User description: "The logging critical path from docs/requirements.md: FR-1 (log a session), FR-2 (blocks), FR-3 (sets and load), FR-4 (effort), FR-5 (exercise catalogue). Smallest complete, independently valuable slice; first spec in the build order in docs/agent-brief.md. Regenerated to fold in owner decisions of 2026-09-09: sessions have no open/closed lifecycle, effort is a 1–5 integer scale, a seed exercise catalogue ships, plus the merge/rename/block-delete/validation rules resolved in review."
 
 ## Context *(mandatory)*
@@ -236,11 +246,15 @@ independently verifiable per load type without needing blocks or effort.
 1. **Given** an exercise with no load type chosen yet, **When** the user
    records its first set, **Then** they choose a load type (Weight, Band,
    Bodyweight, Free text, or None) and it is remembered as that exercise's
-   default for future sets, overridable per set.
+   default for future sets, overridable per set. _(Amended by ADR-0006:
+   the per-set override is retired — a set always uses its exercise's
+   current template; changing the template is a separate action on the
+   exercise itself.)_
 2. **Given** a numeric load or volume field, **When** the user taps it,
    **Then** a numeric keypad appears by default, with quick-increment
    controls (e.g. ± 2.5 kg), and the controls never take the value below 0
-   (0 kg is a valid load).
+   (0 kg is a valid load). _(Amended: the quick-increment controls are
+   retired — numeric keypad entry only; see `docs/requirements.md` FR-3.)_
 3. **Given** a Band load, **When** the user picks one, **Then** it comes
    from their own reorderable list of band labels, not a fixed catalogue.
 4. **Given** a Free text load, **When** the user types, **Then** entry is
@@ -427,10 +441,13 @@ result — independently verifiable without blocks, load types, or effort.
   — it is re-entered or left blank on each set.
 - **FR-009**: The system MUST let the user choose a load type per exercise
   (Weight, Band, Bodyweight, Free text, or None), remember it as that
-  exercise's default, and allow overriding it per individual set.
+  exercise's default, and allow overriding it per individual set. _(Amended
+  by ADR-0006: the per-set override is retired — a set always uses its
+  exercise's current template; see `docs/requirements.md` FR-3.)_
 - **FR-010**: The system MUST present a numeric keypad by default on numeric
   load/volume fields, with configurable quick-increment controls. Quick
-  increments MUST NOT take a value below 0.
+  increments MUST NOT take a value below 0. _(Amended by ADR-0006: the
+  quick-increment controls are retired — numeric keypad entry only.)_
 - **FR-011**: The system MUST let the user maintain their own reorderable
   list of band labels for Band loads.
 - **FR-012**: The system MUST cap Free text loads at 40 characters and

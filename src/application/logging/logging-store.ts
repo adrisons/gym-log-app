@@ -257,12 +257,12 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     updateExerciseTemplate: async (exerciseId, template) => {
       const { storage } = get();
       if (!storage) return;
-      await updateExerciseTemplateUseCase(storage, exerciseId, template);
       set((state) => ({
         catalogue: state.catalogue.map((exercise) =>
           exercise.id === exerciseId ? { ...exercise, ...template } : exercise,
         ),
       }));
+      await updateExerciseTemplateUseCase(storage, exerciseId, template);
     },
 
     suggestFreeTextLoads: (exerciseId) => {
