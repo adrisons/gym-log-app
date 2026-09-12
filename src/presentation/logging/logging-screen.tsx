@@ -26,8 +26,19 @@
  * "Add exercise"/"Add block" sit at the bottom of the screen, after
  * whatever's already there, matching the natural order of adding to
  * something you can already see.
+ *
+ * `docs/requirements.md` FR-1 (design-refinement pass): reached from a
+ * floating action on the diary rather than a nav tab, so a "‹ Diary" link
+ * replaces what used to be implicit (the logging screen no longer lives
+ * at the app's root). It navigates with `{ justLogged: <has any set> }`
+ * router state, which `DiaryScreen` reads once to show its one-shot
+ * save acknowledgement (`docs/design.md` §1.1's bounded exception) — this
+ * is presentation-only signaling between two screens, not a change to
+ * D6/FR-024's draft lifecycle: the draft itself is already saved
+ * continuously and keeps no open/closed state.
  */
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useLoggingSession } from '@/application/logging/logging-store';
 import {
   toBlockViewModel,
@@ -41,6 +52,7 @@ import { SetRow } from './set-row';
 import { BlockCard } from './block-card';
 import { ExerciseEntryCard } from './exercise-entry-card';
 import { ExerciseTemplatePanel } from './exercise-template-panel';
+import { OverflowMenu } from './overflow-menu';
 import { UndoToast } from './undo-toast';
 import './logging.css';
 
@@ -100,9 +112,20 @@ export function LoggingScreen() {
   // that sole visible block as "Block 2") and would also offer it as a
   // synthetic, headerless move target.
   const nonLooseBlocks = draft.blocks.filter((b) => b.loose !== true);
+  const hasAnySets = draft.blocks.some((block) =>
+    block.exercises.some((entry) => entry.sets.length > 0),
+  );
 
   return (
     <main className="logging-screen" aria-label="Log a session">
+      <Link
+        to="/diary"
+        className="logging-button logging-button--icon-label"
+        state={{ justLogged: hasAnySets }}
+      >
+        <Icon name="chevron-right" style={{ transform: 'rotate(180deg)' }} />
+        Diary
+      </Link>
       <h1>Log a session</h1>
       <SessionDateTimeField
         value={draft.dateTime}
@@ -224,16 +247,20 @@ export function LoggingScreen() {
                         <li key={vm.id} className="set-summary">
                           <span>{vm.loadLabel}</span>
                           <span>{vm.volumeLabel}</span>
-                          <button
-                            type="button"
-                            className="logging-button logging-button--icon-label"
-                            onClick={() =>
-                              void deleteSet(block.id, entry.id, vm.id)
-                            }
+                          <OverflowMenu
+                            label={`${vm.loadLabel} ${vm.volumeLabel} actions`}
                           >
-                            <Icon name="trash" />
-                            Delete set
-                          </button>
+                            <button
+                              type="button"
+                              className="logging-button logging-button--icon-label"
+                              onClick={() =>
+                                void deleteSet(block.id, entry.id, vm.id)
+                              }
+                            >
+                              <Icon name="trash" />
+                              Delete set
+                            </button>
+                          </OverflowMenu>
                         </li>
                       );
                     })}
