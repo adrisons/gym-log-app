@@ -241,6 +241,12 @@ export class FileSystemStorageAdapter implements StoragePort {
         'schema-too-new',
       );
     }
+    if (action === 'migrate') {
+      // v1 -> v2 (ADR-0006): see IndexedDbStorageAdapter's own migration
+      // comment — every stored Exercise gains defaultVolumeKind/trackEffort
+      // with safe defaults.
+      await this.#migrateExerciseTemplateDefaults();
+    }
     if (action === 'migrate' || stored === 0) {
       // See IndexedDbStorageAdapter's #checkSchema for the full rationale
       // — the never-initialized sentinel (stored === 0) needs the same
@@ -250,6 +256,21 @@ export class FileSystemStorageAdapter implements StoragePort {
         schemaVersion: CURRENT_SCHEMA_VERSION,
       });
     }
+  }
+
+  /** ADR-0006's v1->v2 migration: see the call site's comment. */
+  async #migrateExerciseTemplateDefaults(): Promise<void> {
+    const exercises =
+      (await this.#readJson<Exercise[]>(EXERCISES_FILE, true)) ?? [];
+    if (exercises.length === 0) return;
+    await this.#writeJson(
+      EXERCISES_FILE,
+      exercises.map((exercise) => ({
+        ...exercise,
+        defaultVolumeKind: exercise.defaultVolumeKind ?? 'reps',
+        trackEffort: exercise.trackEffort ?? false,
+      })),
+    );
   }
 
   async #readSchemaVersionRaw(forceHandle: boolean): Promise<number> {

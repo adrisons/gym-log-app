@@ -104,9 +104,13 @@ One vocabulary, used identically in code, UI and documentation.
 ### 3.1 Entities
 
 - **Exercise (catalogue).** Canonical name, aliases, movement pattern, muscle
-  groups, default load type, unilateral flag, discipline (§1.4 — `Strength`
-  in v1; the field exists so a future discipline is additive, not a
-  reshape). The catalogue belongs to the user: they can create, rename and
+  groups, a set-entry template (default load type, default volume kind,
+  whether effort is tracked — ADR-0006), unilateral flag, discipline (§1.4
+  — `Strength` in v1; the field exists so a future discipline is additive,
+  not a reshape). The template only decides what a *new* set of this
+  exercise defaults to and which controls are offered; changing it never
+  touches an already-recorded `Set` (ADR-0006). The catalogue belongs to
+  the user: they can create, rename and
   merge entries. A custom name is free text set by the user — e.g. "hip
   thrust con barra" and "hip thrust en máquina" are two distinct entries
   (or one entry with the other as an alias) at the user's choice, never
@@ -202,9 +206,16 @@ Create a session and add blocks, exercises and sets.
 
 - Adding a set defaults to the previous set's values for that exercise (same
   load, same reps), so confirming is one tap.
-- Load type is chosen per exercise and remembered; it can be overridden per set,
-  via a collapsed "change load type" control rather than a picker shown by
-  default — the common case (Weight) needs no extra tap.
+- Load type and volume kind are chosen once per exercise, as that exercise's
+  set-entry template (ADR-0006), not re-offered as a picker on every set: the
+  set-entry form shows exactly the load input and volume control the
+  template says, and nothing else, by default — for a fresh exercise, that's
+  Weight + Reps. Changing the template (including switching to Band/
+  Bodyweight/Free text/None, or to Duration/Distance, or turning effort
+  tracking on) happens through the exercise's own menu, with a warning that
+  it changes what a *new* set defaults to going forward; it never touches an
+  already-recorded set (ADR-0006 — supersedes this FR's earlier per-set
+  override wording).
 - Weight uses the numeric keypad by default (`inputMode="decimal"`) with no
   dedicated quick-increment buttons — entering a value directly is the whole
   interaction. Reps are chosen with a scrollable wheel (1 to 100, plus an
@@ -225,6 +236,9 @@ Create a session and add blocks, exercises and sets.
 - Record a set's effort with a compact scrollable control on a 1–5 scale
   (ADR-0003) — one gesture to reach an adjacent level, an explicit "not
   recorded" position rather than a level always pre-selected.
+- The effort control only appears for an exercise whose template tracks
+  effort (`trackEffort`, ADR-0006) — off by default for every exercise, on
+  a per-exercise basis, via the same template editor FR-3 describes.
 - Recording it is optional on every set.
 - The scale always shows its meaning in words, never the number alone (§7.4).
 
@@ -468,6 +482,7 @@ before code.
 | D7 | Whether FR-13 (templates) is v1 or v1.1 | **Closed:** v1.1, to keep the logging critical path clean. |
 | D8 | Which exercise disciplines beyond Strength (§1.4) are in scope, and when | **Closed:** MVP and v1 ship Strength only; swimming (distance + time, no load) is the first documented candidate for a second discipline, deferred to v1.1 or later pending its own recorded decision — it must not be designed into the schema now, only kept representable (§1.4). |
 | D9 | Whether the app ships a seed exercise catalogue | **Closed:** yes — a seed set of common strength exercises is present from first launch so there is no empty state on the logging critical path; seed entries are ordinary editable catalogue entries and the list is app-bundle data, not persisted schema. → ADR-0005 |
+| D10 | What happens to a Set's history when an exercise's set-entry template changes | **Closed:** nothing — the template (default load type, default volume kind, whether effort is tracked) only decides what a *new* set defaults to; every already-recorded Set keeps exactly what it was given, no reconciliation or deprecation. Schema v2. → ADR-0006 |
 
 ---
 

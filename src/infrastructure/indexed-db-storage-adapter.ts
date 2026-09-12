@@ -63,14 +63,19 @@ export class IndexedDbStorageAdapter implements StoragePort {
         'schema-too-new',
       );
     }
+    if (action === 'migrate') {
+      // v1 -> v2 (ADR-0006): every stored Exercise gains
+      // defaultVolumeKind/trackEffort. Additive with safe defaults
+      // (reps / effort not tracked) — no other stored shape changes, so
+      // this is the whole v2 migration.
+      await this.#migrateExerciseTemplateDefaults();
+    }
     if (action === 'migrate' || stored === 0) {
-      // 'migrate': no real migration exists yet at CURRENT_SCHEMA_VERSION
-      // = 1 (spec 003 Non-Goals) — recording the version bump is the
-      // whole migration step until a real one is specified. `stored ===
-      // 0` (the never-initialized sentinel, itself decided as 'open'
-      // since there is nothing to migrate) still needs this same write:
-      // FR-007a requires the adapter to adopt CURRENT_SCHEMA_VERSION on
-      // its first real write, not leave the sentinel in place forever.
+      // `stored === 0` (the never-initialized sentinel, itself decided
+      // as 'open' since there is nothing to migrate) still needs this
+      // same write: FR-007a requires the adapter to adopt
+      // CURRENT_SCHEMA_VERSION on its first real write, not leave the
+      // sentinel in place forever.
       await this.setSchemaVersion(CURRENT_SCHEMA_VERSION);
     }
     // action === 'open' with stored already at CURRENT_SCHEMA_VERSION:
@@ -82,6 +87,20 @@ export class IndexedDbStorageAdapter implements StoragePort {
   async #readSchemaVersionRaw(): Promise<number> {
     const row = await this.#db.meta.get(SCHEMA_VERSION_ROW_KEY);
     return row?.value ?? 0;
+  }
+
+  /** ADR-0006's v1->v2 migration: see the call site's comment. */
+  async #migrateExerciseTemplateDefaults(): Promise<void> {
+    const exercises = await this.#db.exercises.toArray();
+    await this.#run(() =>
+      this.#db.exercises.bulkPut(
+        exercises.map((exercise) => ({
+          ...exercise,
+          defaultVolumeKind: exercise.defaultVolumeKind ?? 'reps',
+          trackEffort: exercise.trackEffort ?? false,
+        })),
+      ),
+    );
   }
 
   // Sessions

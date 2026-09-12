@@ -1,7 +1,8 @@
 /**
- * FR-009: chooses which of the five load kinds a set uses, remembered as
- * the exercise's default (the parent wires the chosen kind to
- * `recordLoadTypeDefault`).
+ * FR-009: chooses which of the five load kinds an exercise's sets use.
+ * Reused by `ExerciseTemplatePanel` (ADR-0006) — the only place this
+ * picker appears now; the set-entry form itself always shows the
+ * exercise's current template, not a per-set switch.
  */
 import type { Load } from '@/application/logging/use-cases';
 import './logging.css';

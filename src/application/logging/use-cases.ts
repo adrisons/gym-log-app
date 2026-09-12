@@ -19,6 +19,7 @@ import type { Exercise } from '@/domain/exercise';
 import type { Session } from '@/domain/session';
 import type { ExerciseId, SessionId } from '@/domain/ids';
 import type { Load } from '@/domain/load';
+import type { Volume } from '@/domain/volume';
 
 /**
  * Re-exported so `presentation/` can reference `Exercise` without
@@ -30,6 +31,8 @@ import type { Load } from '@/domain/load';
 export type { Exercise };
 /** Re-exported for the same reason as `Exercise` above — `LoadTypePicker` (US3) needs `Load['kind']`. */
 export type { Load };
+/** Re-exported for the same reason — `ExerciseTemplatePanel` (ADR-0006) needs `Volume['kind']`. */
+export type { Volume };
 /** Re-exported for the same reason — `ExerciseCataloguePanel` (US4) needs `ExerciseId` for its `onMerge` callback. */
 export type { ExerciseId };
 /** Re-exported for the same reason — spec 004's diary/progression screens need `Session`/`SessionId`. */
@@ -149,6 +152,8 @@ export interface CreateExerciseInput {
   movementPattern?: string;
   muscleGroups?: string[];
   defaultLoadType?: Load['kind'];
+  defaultVolumeKind?: Volume['kind'];
+  trackEffort?: boolean;
   unilateral?: boolean;
 }
 
@@ -167,7 +172,9 @@ export async function createExercise(
     ...(input.muscleGroups !== undefined
       ? { muscleGroups: input.muscleGroups }
       : {}),
-    defaultLoadType: input.defaultLoadType ?? 'none',
+    defaultLoadType: input.defaultLoadType ?? 'weight',
+    defaultVolumeKind: input.defaultVolumeKind ?? 'reps',
+    trackEffort: input.trackEffort ?? false,
     unilateral: input.unilateral ?? false,
     discipline: 'Strength',
   };
@@ -175,19 +182,28 @@ export async function createExercise(
   return exercise;
 }
 
+export interface ExerciseTemplate {
+  defaultLoadType: Load['kind'];
+  defaultVolumeKind: Volume['kind'];
+  trackEffort: boolean;
+}
+
 /**
- * FR-009, Acceptance Scenario US3-1: remembers the load type chosen for a
- * set as that exercise's default for future sets. A no-op if the id
- * doesn't resolve (nothing to update).
+ * Updates an exercise's set-entry template (load type, volume kind,
+ * whether effort is tracked). Forward-only: every already-recorded `Set`
+ * keeps exactly the load/volume/effort it was given — a `Set` stores
+ * those independently of the exercise's template, so there is nothing to
+ * reconcile or mark deprecated (ADR-0006). A no-op if the id doesn't
+ * resolve.
  */
-export async function recordLoadTypeDefault(
+export async function updateExerciseTemplate(
   storage: StoragePort,
   exerciseId: ExerciseId,
-  loadType: Load['kind'],
+  template: ExerciseTemplate,
 ): Promise<void> {
   const exercise = await storage.getExercise(exerciseId);
   if (!exercise) return;
-  await storage.saveExercise({ ...exercise, defaultLoadType: loadType });
+  await storage.saveExercise({ ...exercise, ...template });
 }
 
 /**

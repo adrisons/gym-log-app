@@ -3,6 +3,11 @@
  * Reuses spec 001's own block/exercise-entry/set-row components — see
  * `application/diary/session-editing.ts`'s doc comment for the exact
  * editable surface and why undo is out of scope here.
+ *
+ * Mirrors LoggingScreen's layout conventions: a block with no name renders
+ * `bare` (no header/menu) once it has exercises, "Add exercise"/"Add
+ * block" sit at the bottom, and each exercise's set-entry template
+ * (ADR-0006) is editable through its own menu.
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -18,6 +23,10 @@ import {
   toBlockViewModel,
   toSetSummaryViewModel,
 } from '@/application/logging/view-models';
+import {
+  createExercise,
+  updateExerciseTemplate,
+} from '@/application/logging/use-cases';
 import type {
   Exercise,
   Session,
@@ -26,6 +35,8 @@ import type {
 import { BlockCard } from '../logging/block-card';
 import { ExerciseEntryCard } from '../logging/exercise-entry-card';
 import { SetRow } from '../logging/set-row';
+import { AddExerciseControl } from '../logging/add-exercise-control';
+import { ExerciseTemplatePanel } from '../logging/exercise-template-panel';
 import './diary.css';
 
 export function SessionDetailScreen() {
@@ -37,6 +48,9 @@ export function SessionDetailScreen() {
   );
   const [catalogue, setCatalogue] = useState<Exercise[]>([]);
   const [bandLabels, setBandLabels] = useState<string[]>([]);
+  const [editingTemplateFor, setEditingTemplateFor] = useState<
+    Exercise | undefined
+  >(undefined);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -62,6 +76,29 @@ export function SessionDetailScreen() {
     void requireStorage().saveSession(editableToSession(next, original));
   };
 
+  const addExerciseToBlock = (blockId: string, exerciseId: Exercise['id']) => {
+    if (!editable) return;
+    persist({
+      ...editable,
+      blocks: editable.blocks.map((b) =>
+        b.id === blockId
+          ? {
+              ...b,
+              exercises: [
+                ...b.exercises,
+                {
+                  id: newEditableItemId(),
+                  exerciseId,
+                  notes: '',
+                  sets: [],
+                },
+              ],
+            }
+          : b,
+      ),
+    });
+  };
+
   if (!sessionId) {
     return null;
   }
@@ -84,29 +121,44 @@ export function SessionDetailScreen() {
         </button>
       </div>
 
-      <button
-        type="button"
-        className="logging-button"
-        onClick={() =>
-          persist({
-            ...editable,
-            blocks: [
-              ...editable.blocks,
-              { id: newEditableItemId(), type: 'straightSets', exercises: [] },
-            ],
-          })
-        }
-      >
-        Add block
-      </button>
+      {editingTemplateFor && (
+        <ExerciseTemplatePanel
+          exercise={editingTemplateFor}
+          onSave={(template) => {
+            void updateExerciseTemplate(
+              requireStorage(),
+              editingTemplateFor.id,
+              template,
+            ).then(() => {
+              setCatalogue((current) =>
+                current.map((exercise) =>
+                  exercise.id === editingTemplateFor.id
+                    ? { ...exercise, ...template }
+                    : exercise,
+                ),
+              );
+            });
+            setEditingTemplateFor(undefined);
+          }}
+          onClose={() => setEditingTemplateFor(undefined)}
+        />
+      )}
 
       {editable.blocks.map((block, blockIndex) => {
         const blockVm = toBlockViewModel(block, blockIndex, catalogue);
+        const totalSets = block.exercises.reduce(
+          (sum, entry) => sum + entry.sets.length,
+          0,
+        );
+        const isBare = block.name === undefined && block.exercises.length > 0;
+
         return (
           <BlockCard
             key={block.id}
             displayName={blockVm.displayName}
             hasName={block.name !== undefined}
+            bare={isBare}
+            subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'} logged`}
             onRename={(name) =>
               persist({
                 ...editable,
@@ -124,49 +176,30 @@ export function SessionDetailScreen() {
               })
             }
             footer={
-              <label className="logging-screen__field-label">
-                <span>Add exercise</span>
-                <select
-                  className="logging-field-input"
-                  value=""
-                  onChange={(event) => {
-                    const exerciseId = event.target.value;
-                    if (!exerciseId) return;
-                    persist({
-                      ...editable,
-                      blocks: editable.blocks.map((b) =>
-                        b.id === block.id
-                          ? {
-                              ...b,
-                              exercises: [
-                                ...b.exercises,
-                                {
-                                  id: newEditableItemId(),
-                                  exerciseId: exerciseId as Exercise['id'],
-                                  notes: '',
-                                  sets: [],
-                                },
-                              ],
-                            }
-                          : b,
-                      ),
-                    });
+              isBare ? undefined : (
+                <AddExerciseControl
+                  buttonLabel={`+ Add exercise to ${blockVm.displayName}`}
+                  fieldLabel={`Add exercise to ${blockVm.displayName}`}
+                  search={(query) => searchExercises(query, catalogue)}
+                  onSelectExercise={(exercise) =>
+                    addExerciseToBlock(block.id, exercise.id)
+                  }
+                  onCreateExercise={(name) => {
+                    void (async () => {
+                      const exercise = await createExercise(requireStorage(), {
+                        canonicalName: name,
+                      });
+                      setCatalogue((current) => [...current, exercise]);
+                      addExerciseToBlock(block.id, exercise.id);
+                    })();
                   }}
-                >
-                  <option value="" disabled>
-                    Search…
-                  </option>
-                  {searchExercises('', catalogue).map((exercise) => (
-                    <option key={exercise.id} value={exercise.id}>
-                      {exercise.canonicalName}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                />
+              )
             }
           >
             {block.exercises.map((entry, entryIndex) => {
               const entryVm = blockVm.entries[entryIndex]!;
+              const exercise = catalogue.find((e) => e.id === entry.exerciseId);
               return (
                 <div key={entry.id}>
                   <Link to={`/exercises/${entry.exerciseId}/progression`}>
@@ -180,6 +213,11 @@ export function SessionDetailScreen() {
                     onMoveDown={() => {}}
                     otherBlocks={[]}
                     onMoveToBlock={() => {}}
+                    onEditTemplate={
+                      exercise
+                        ? () => setEditingTemplateFor(exercise)
+                        : undefined
+                    }
                     onDelete={() =>
                       persist({
                         ...editable,
@@ -238,10 +276,9 @@ export function SessionDetailScreen() {
                     <SetRow
                       key={`${entry.id}-${entry.sets.length}`}
                       prefill={undefined}
-                      defaultLoadKind={
-                        catalogue.find((e) => e.id === entry.exerciseId)
-                          ?.defaultLoadType ?? 'none'
-                      }
+                      loadKind={exercise?.defaultLoadType ?? 'none'}
+                      volumeKind={exercise?.defaultVolumeKind ?? 'reps'}
+                      trackEffort={exercise?.trackEffort ?? false}
                       bandLabels={bandLabels}
                       freeTextSuggestions={[]}
                       onConfirm={(input) =>
@@ -278,7 +315,6 @@ export function SessionDetailScreen() {
                           ),
                         })
                       }
-                      onLoadTypeChange={() => {}}
                       onSaveBandLabels={(labels) => setBandLabels(labels)}
                     />
                   </ExerciseEntryCard>
@@ -288,6 +324,61 @@ export function SessionDetailScreen() {
           </BlockCard>
         );
       })}
+
+      <AddExerciseControl
+        buttonLabel="+ Add exercise"
+        fieldLabel="Exercise"
+        search={(query) => searchExercises(query, catalogue)}
+        onSelectExercise={(exercise) => {
+          const lastBlock = editable.blocks.at(-1);
+          if (lastBlock && lastBlock.name === undefined) {
+            addExerciseToBlock(lastBlock.id, exercise.id);
+            return;
+          }
+          const block = {
+            id: newEditableItemId(),
+            type: 'straightSets' as const,
+            exercises: [],
+          };
+          persist({ ...editable, blocks: [...editable.blocks, block] });
+          addExerciseToBlock(block.id, exercise.id);
+        }}
+        onCreateExercise={(name) => {
+          void (async () => {
+            const exercise = await createExercise(requireStorage(), {
+              canonicalName: name,
+            });
+            setCatalogue((current) => [...current, exercise]);
+            const lastBlock = editable.blocks.at(-1);
+            if (lastBlock && lastBlock.name === undefined) {
+              addExerciseToBlock(lastBlock.id, exercise.id);
+              return;
+            }
+            const block = {
+              id: newEditableItemId(),
+              type: 'straightSets' as const,
+              exercises: [],
+            };
+            persist({ ...editable, blocks: [...editable.blocks, block] });
+            addExerciseToBlock(block.id, exercise.id);
+          })();
+        }}
+      />
+      <button
+        type="button"
+        className="logging-button"
+        onClick={() =>
+          persist({
+            ...editable,
+            blocks: [
+              ...editable.blocks,
+              { id: newEditableItemId(), type: 'straightSets', exercises: [] },
+            ],
+          })
+        }
+      >
+        + Add block
+      </button>
     </main>
   );
 }

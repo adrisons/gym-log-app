@@ -143,6 +143,20 @@ describe('addExerciseEntry (FR-002; keeps US1 a flat single running list)', () =
     expect(updated.blocks[1]?.exercises).toHaveLength(0);
   });
 
+  it('with no blockId, starts a fresh unnamed block rather than nesting into a named last block', () => {
+    let draft = addBlock(
+      createDraft('2026-09-11T18:00:00.000Z'),
+      'Legs',
+      'straightSets',
+    );
+    draft = addExerciseEntry(draft, 'ex-1' as ExerciseId);
+
+    expect(draft.blocks).toHaveLength(2);
+    expect(draft.blocks[0]?.exercises).toHaveLength(0);
+    expect(draft.blocks[1]?.name).toBeUndefined();
+    expect(draft.blocks[1]?.exercises).toHaveLength(1);
+  });
+
   it('is a no-op when the given blockId does not resolve', () => {
     const draft = addBlock(
       createDraft('2026-09-11T18:00:00.000Z'),

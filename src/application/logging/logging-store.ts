@@ -34,7 +34,7 @@ import {
   openLoggingForm,
   searchExercises as searchExercisesUseCase,
   createExercise as createExerciseUseCase,
-  recordLoadTypeDefault as recordLoadTypeDefaultUseCase,
+  updateExerciseTemplate as updateExerciseTemplateUseCase,
   suggestFreeTextLoads as suggestFreeTextLoadsUseCase,
   saveBandLabels as saveBandLabelsUseCase,
   renameExerciseWithCollisionCheck as renameExerciseWithCollisionCheckUseCase,
@@ -44,8 +44,8 @@ import {
 import type {
   CreateExerciseInput,
   RenameExerciseResult,
+  ExerciseTemplate,
 } from '@/application/logging/use-cases';
-import type { Load } from '@/domain/load';
 import {
   addExerciseEntry as addExerciseEntryToDraft,
   addSet as addSetToDraft,
@@ -100,9 +100,9 @@ export interface LoggingSessionState {
   prefillNextSet: (blockId: string, entryId: string) => SetPrefill | undefined;
   searchExercises: (query: string) => Exercise[];
   createExercise: (input: CreateExerciseInput) => Promise<Exercise>;
-  recordLoadTypeDefault: (
+  updateExerciseTemplate: (
     exerciseId: ExerciseId,
-    loadType: Load['kind'],
+    template: ExerciseTemplate,
   ) => Promise<void>;
   suggestFreeTextLoads: (exerciseId: ExerciseId) => string[];
   saveBandLabels: (labels: string[]) => Promise<void>;
@@ -254,15 +254,13 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       return exercise;
     },
 
-    recordLoadTypeDefault: async (exerciseId, loadType) => {
+    updateExerciseTemplate: async (exerciseId, template) => {
       const { storage } = get();
       if (!storage) return;
-      await recordLoadTypeDefaultUseCase(storage, exerciseId, loadType);
+      await updateExerciseTemplateUseCase(storage, exerciseId, template);
       set((state) => ({
         catalogue: state.catalogue.map((exercise) =>
-          exercise.id === exerciseId
-            ? { ...exercise, defaultLoadType: loadType }
-            : exercise,
+          exercise.id === exerciseId ? { ...exercise, ...template } : exercise,
         ),
       }));
     },

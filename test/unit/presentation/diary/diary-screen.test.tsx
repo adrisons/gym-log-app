@@ -34,6 +34,8 @@ describe('DiaryScreen (FR-001..006)', () => {
       canonicalName: 'Squat',
       aliases: [],
       defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
       unilateral: false,
       discipline: 'Strength',
     });

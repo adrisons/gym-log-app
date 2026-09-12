@@ -93,18 +93,21 @@ export function draftToSession(draft: LoggingDraft, id: SessionId): Session {
 }
 
 /**
- * Adds an exercise entry to the draft (FR-002). With no `blockId`: appends
- * to the last existing block, or creates a default unnamed `straightSets`
- * block first if the draft has none yet — this is what lets User Story 1
- * read as "a single running list of sets" (spec.md User Story 2 context)
- * without any block-management UI existing yet; User Story 2 layers real
- * block creation/naming on top of the same structure. This is also the
- * "loose exercise" path a user reaches without ever tapping "Add block".
+ * Adds an exercise entry to the draft (FR-002). With no `blockId` (the
+ * "loose exercise" path a user reaches without ever tapping "Add block"):
+ * appends to the trailing block only if it's still unnamed, or creates a
+ * fresh unnamed block otherwise — this is what lets User Story 1 read as
+ * "a single running list of sets" (spec.md User Story 2 context) when
+ * nothing has been named yet, while never silently dropping a "loose" add
+ * into a block the user deliberately named (the presentation layer renders
+ * an unnamed block "bare" — no header/menu — so this is also what keeps a
+ * loose exercise from ever looking like it's inside a block once a real,
+ * named one exists alongside it).
  *
  * With an explicit `blockId` (a block's own "Add exercise" control, used
- * to group exercises on purpose): appends to that specific block instead
- * of always the last one. An id that doesn't resolve is a no-op, matching
- * `findEntry`'s defensive-lookup convention elsewhere in this module.
+ * to group exercises on purpose): appends to that specific block instead.
+ * An id that doesn't resolve is a no-op, matching `findEntry`'s defensive-
+ * lookup convention elsewhere in this module.
  */
 export function addExerciseEntry(
   draft: LoggingDraft,
@@ -131,16 +134,17 @@ export function addExerciseEntry(
     };
   }
 
-  if (draft.blocks.length === 0) {
+  const lastIndex = draft.blocks.length - 1;
+  const lastBlock = draft.blocks[lastIndex];
+  if (!lastBlock || lastBlock.name !== undefined) {
     const block: DraftBlock = {
       id: newId(),
       type: 'straightSets',
       exercises: [entry],
     };
-    return { ...draft, blocks: [block] };
+    return { ...draft, blocks: [...draft.blocks, block] };
   }
 
-  const lastIndex = draft.blocks.length - 1;
   return {
     ...draft,
     blocks: draft.blocks.map((block, index) =>

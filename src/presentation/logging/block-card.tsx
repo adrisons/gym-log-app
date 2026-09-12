@@ -13,6 +13,11 @@
  * `footer`, when given, renders after the exercise entries — the block's
  * own "add exercise" control, so grouping exercises into this block is a
  * single tap from where its contents already are.
+ *
+ * `bare`, when true, skips the header/border chrome entirely and renders
+ * only `children`/`footer` — a block the user never named (an implicit
+ * home for a "loose" exercise added outside any block) shouldn't look
+ * like a block at all.
  */
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -22,6 +27,8 @@ import './logging.css';
 export interface BlockCardProps {
   displayName: string;
   hasName: boolean;
+  subtitle?: string;
+  bare?: boolean;
   onRename: (name: string | undefined) => void;
   onDelete: () => void;
   children: ReactNode;
@@ -31,6 +38,8 @@ export interface BlockCardProps {
 export function BlockCard({
   displayName,
   hasName,
+  subtitle,
+  bare = false,
   onRename,
   onDelete,
   children,
@@ -38,6 +47,15 @@ export function BlockCard({
 }: BlockCardProps) {
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState(hasName ? displayName : '');
+
+  if (bare) {
+    return (
+      <>
+        {children}
+        {footer}
+      </>
+    );
+  }
 
   return (
     <section className="block-card" aria-label={displayName}>
@@ -66,7 +84,12 @@ export function BlockCard({
           </form>
         ) : (
           <>
-            <h2>{displayName}</h2>
+            <div className="block-card__title">
+              <h2>{displayName}</h2>
+              {subtitle && (
+                <span className="block-card__subtitle">{subtitle}</span>
+              )}
+            </div>
             <div className="block-card__actions--inline">
               <button
                 type="button"

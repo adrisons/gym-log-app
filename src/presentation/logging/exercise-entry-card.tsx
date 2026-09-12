@@ -18,6 +18,8 @@ export interface ExerciseEntryCardProps {
   otherBlocks: { id: string; displayName: string }[];
   onMoveToBlock: (blockId: string) => void;
   onDelete: () => void;
+  /** Opens the exercise's set-entry template editor (ADR-0006). Omit/undefined hides the menu item (e.g. screens that don't support editing it). */
+  onEditTemplate?: (() => void) | undefined;
   children: ReactNode;
 }
 
@@ -30,6 +32,7 @@ export function ExerciseEntryCard({
   otherBlocks,
   onMoveToBlock,
   onDelete,
+  onEditTemplate,
   children,
 }: ExerciseEntryCardProps) {
   return (
@@ -77,6 +80,16 @@ export function ExerciseEntryCard({
                 ))}
               </select>
             </label>
+          )}
+          {onEditTemplate && (
+            <button
+              type="button"
+              role="menuitem"
+              className="logging-button"
+              onClick={onEditTemplate}
+            >
+              Edit tracked fields…
+            </button>
           )}
           <button
             type="button"

@@ -9,6 +9,7 @@
  */
 
 import type { Load } from './load';
+import type { Volume } from './volume';
 import type { ExerciseId } from './ids';
 import {
   ExerciseMergeError,
@@ -24,6 +25,16 @@ export interface Exercise {
   /** Optional (`docs/requirements.md` §3.1). */
   muscleGroups?: string[];
   defaultLoadType: Load['kind'];
+  /**
+   * The set-entry template (schema v2): which volume kind and whether
+   * effort is tracked by default for this exercise's sets. Forward-only —
+   * changing it changes what a *new* set of this exercise defaults to;
+   * every already-recorded `Set` keeps exactly the load/volume/effort it
+   * was given, unaffected (each `Set` already stores those independently,
+   * per FR-3's "stored exactly as entered"). See ADR-0006.
+   */
+  defaultVolumeKind: Volume['kind'];
+  trackEffort: boolean;
   unilateral: boolean;
   /** Fixed in v1 (canonical casing per `docs/requirements.md` §1.4); FR-001 — present so a future value is additive. */
   discipline: 'Strength';

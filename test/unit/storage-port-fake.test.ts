@@ -21,6 +21,8 @@ function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
     canonicalName: 'Back squat',
     aliases: [],
     defaultLoadType: 'weight',
+    defaultVolumeKind: 'reps',
+    trackEffort: false,
     unilateral: false,
     discipline: 'Strength',
     ...overrides,

@@ -1,10 +1,14 @@
 /**
- * The "add a new set" row for one exercise entry — every load type
- * (Weight/Band/Bodyweight/Free text/None), every volume kind (reps/
- * duration/distance), and effort (US3), pre-filled from the entry's
- * previous set (FR-008, load/volume only, never effort). Confirming
- * builds an `AddSetInput` and hands it to the parent, which calls the
- * store's `addSet` action (this component has no `StoragePort` access —
+ * The "add a new set" row for one exercise entry. Shows exactly the load
+ * input and volume control the exercise's set-entry template says
+ * (ADR-0006) — for a fresh exercise, that's Weight + Reps and nothing
+ * else. There is no per-set switch between load types or volume kinds
+ * any more; that only happens through the exercise's own "Edit tracked
+ * fields" menu item (`ExerciseTemplatePanel`). Effort only appears when
+ * the template tracks it. Pre-filled from the entry's previous set
+ * (FR-008, load/volume only, never effort). Confirming builds an
+ * `AddSetInput` and hands it to the parent, which calls the store's
+ * `addSet` action (this component has no `StoragePort` access —
  * `docs/architecture.md`'s presentation row).
  *
  * Keyed by the parent on the entry's set count (`key={entryId}-${sets.length}`)
@@ -14,7 +18,6 @@
  * (FR-008) without a manual state-sync effect.
  */
 import { useState } from 'react';
-import { LoadTypePicker, LOAD_TYPE_LABELS } from './load-type-picker';
 import { WeightLoadInput } from './weight-load-input';
 import { BandLoadInput } from './band-load-input';
 import { BodyweightLoadInput } from './bodyweight-load-input';
@@ -29,23 +32,21 @@ import './logging.css';
 
 export interface SetRowProps {
   prefill: SetPrefill | undefined;
-  defaultLoadKind: Load['kind'];
+  loadKind: Load['kind'];
+  volumeKind: VolumeKind;
+  trackEffort: boolean;
   bandLabels: string[];
   freeTextSuggestions: string[];
   onConfirm: (input: AddSetInput) => void;
-  onLoadTypeChange: (kind: Load['kind']) => void;
   onSaveBandLabels: (labels: string[]) => void;
-}
-
-function initialVolumeKind(prefill: SetPrefill | undefined): VolumeKind {
-  return prefill?.volume?.kind ?? 'reps';
 }
 
 function initialVolumeValue(
   prefill: SetPrefill | undefined,
+  volumeKind: VolumeKind,
 ): number | undefined {
   const volume = prefill?.volume;
-  if (!volume) return undefined;
+  if (!volume || volume.kind !== volumeKind) return undefined;
   if (volume.kind === 'reps') return volume.count;
   if (volume.kind === 'duration') return volume.seconds;
   return volume.metres;
@@ -53,40 +54,41 @@ function initialVolumeValue(
 
 export function SetRow({
   prefill,
-  defaultLoadKind,
+  loadKind,
+  volumeKind,
+  trackEffort,
   bandLabels,
   freeTextSuggestions,
   onConfirm,
-  onLoadTypeChange,
   onSaveBandLabels,
 }: SetRowProps) {
-  const [loadKind, setLoadKind] = useState<Load['kind']>(
-    prefill?.load.kind ?? defaultLoadKind,
-  );
+  const prefillMatchesLoadKind = prefill?.load.kind === loadKind;
   const [weightKg, setWeightKg] = useState<number | undefined>(
-    prefill?.load.kind === 'weight' ? prefill.load.value : undefined,
+    prefillMatchesLoadKind && prefill!.load.kind === 'weight'
+      ? prefill!.load.value
+      : undefined,
   );
   const [bandLabel, setBandLabel] = useState<string | undefined>(
-    prefill?.load.kind === 'band' ? prefill.load.label : undefined,
+    prefillMatchesLoadKind && prefill!.load.kind === 'band'
+      ? prefill!.load.label
+      : undefined,
   );
   const [bodyweightKg, setBodyweightKg] = useState<number | undefined>(
-    prefill?.load.kind === 'bodyweight'
-      ? prefill.load.addedOrAssistedKg
+    prefillMatchesLoadKind && prefill!.load.kind === 'bodyweight'
+      ? prefill!.load.addedOrAssistedKg
       : undefined,
   );
   const [freeText, setFreeText] = useState<string>(
-    prefill?.load.kind === 'freeText' ? prefill.load.text : '',
-  );
-  const [volumeKind, setVolumeKind] = useState<VolumeKind>(
-    initialVolumeKind(prefill),
+    prefillMatchesLoadKind && prefill!.load.kind === 'freeText'
+      ? prefill!.load.text
+      : '',
   );
   const [volumeValue, setVolumeValue] = useState<number | undefined>(
-    initialVolumeValue(prefill),
+    initialVolumeValue(prefill, volumeKind),
   );
   const [effort, setEffort] = useState<1 | 2 | 3 | 4 | 5 | undefined>(
     undefined,
   );
-  const [loadTypeOpen, setLoadTypeOpen] = useState(false);
 
   const load: { kind: Load['kind']; present: boolean } = (() => {
     switch (loadKind) {
@@ -104,11 +106,6 @@ export function SetRow({
   })();
 
   const canConfirm = load.present || volumeValue !== undefined;
-
-  const handleLoadTypeChange = (kind: Load['kind']) => {
-    setLoadKind(kind);
-    onLoadTypeChange(kind);
-  };
 
   const handleConfirm = () => {
     if (!canConfirm) return;
@@ -149,23 +146,6 @@ export function SetRow({
 
   return (
     <div className="set-row">
-      {loadTypeOpen ? (
-        <LoadTypePicker
-          selected={loadKind}
-          onSelect={(kind) => {
-            handleLoadTypeChange(kind);
-            setLoadTypeOpen(false);
-          }}
-        />
-      ) : (
-        <button
-          type="button"
-          className="logging-button"
-          onClick={() => setLoadTypeOpen(true)}
-        >
-          Change load type ({LOAD_TYPE_LABELS[loadKind]})
-        </button>
-      )}
       {loadKind === 'weight' && (
         <WeightLoadInput valueKg={weightKg} onChange={setWeightKg} />
       )}
@@ -193,10 +173,9 @@ export function SetRow({
       <VolumeInput
         kind={volumeKind}
         value={volumeValue}
-        onKindChange={setVolumeKind}
         onValueChange={setVolumeValue}
       />
-      <EffortPicker value={effort} onChange={setEffort} />
+      {trackEffort && <EffortPicker value={effort} onChange={setEffort} />}
       <SetConfirmControl canConfirm={canConfirm} onConfirm={handleConfirm} />
     </div>
   );

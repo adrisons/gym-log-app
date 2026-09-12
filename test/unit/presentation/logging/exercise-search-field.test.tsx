@@ -10,6 +10,8 @@ const squat: Exercise = {
   canonicalName: 'Back squat',
   aliases: [],
   defaultLoadType: 'weight',
+  defaultVolumeKind: 'reps',
+  trackEffort: false,
   unilateral: false,
   discipline: 'Strength',
 };

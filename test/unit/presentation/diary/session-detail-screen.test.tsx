@@ -22,6 +22,8 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       canonicalName: 'Squat',
       aliases: [],
       defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
       unilateral: false,
       discipline: 'Strength',
     });

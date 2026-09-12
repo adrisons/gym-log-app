@@ -4,20 +4,15 @@ import userEvent from '@testing-library/user-event';
 import { SetRow } from '@/presentation/logging/set-row';
 
 const baseProps = {
-  defaultLoadKind: 'weight' as const,
+  loadKind: 'weight' as const,
+  volumeKind: 'reps' as const,
+  trackEffort: false,
   bandLabels: ['Red', 'Blue'],
   freeTextSuggestions: [],
-  onLoadTypeChange: () => {},
   onSaveBandLabels: () => {},
 };
 
-async function expandLoadTypePicker() {
-  await userEvent.click(
-    screen.getByRole('button', { name: /change load type/i }),
-  );
-}
-
-describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
+describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006)', () => {
   it('confirm is disabled with a stated reason until a load or volume is entered (FR-019)', () => {
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
 
@@ -28,12 +23,42 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows only the load input and volume control the template says — no load-type or volume-kind switcher', () => {
+    render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
+
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /change load type/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('effort is hidden unless the template tracks it', () => {
+    const { rerender } = render(
+      <SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />,
+    );
+    expect(
+      screen.queryByRole('listbox', { name: /effort/i }),
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <SetRow
+        {...baseProps}
+        trackEffort
+        prefill={undefined}
+        onConfirm={() => {}}
+      />,
+    );
+    expect(
+      screen.getByRole('listbox', { name: /effort/i }),
+    ).toBeInTheDocument();
+  });
+
   it('confirming with only reps entered appends a set with load "none" and no visible Save control (FR-003, FR-019)', async () => {
     const onConfirm = vi.fn();
     render(
       <SetRow
         {...baseProps}
-        defaultLoadKind="none"
+        loadKind="none"
         prefill={undefined}
         onConfirm={onConfirm}
       />,
@@ -67,7 +92,7 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
     });
   });
 
-  it("pre-fills from the previous set's load/volume (FR-008)", () => {
+  it("pre-fills from the previous set's load/volume when it matches the current template (FR-008)", () => {
     render(
       <SetRow
         {...baseProps}
@@ -89,6 +114,25 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
     expect(screen.getByRole('button', { name: /add set/i })).toBeEnabled();
   });
 
+  it("ignores a prefill whose load kind no longer matches the exercise's template", () => {
+    render(
+      <SetRow
+        {...baseProps}
+        loadKind="band"
+        prefill={{
+          volume: { kind: 'reps', count: 5 },
+          load: { kind: 'weight', value: 100, unit: 'kg' },
+        }}
+        onConfirm={() => {}}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('spinbutton', { name: /weight/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Red' })).toBeInTheDocument();
+  });
+
   it('the weight field has no dedicated quick-increment buttons (numeric keypad only)', () => {
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
 
@@ -100,12 +144,17 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('switching to Band and picking a label produces a Band load (US3)', async () => {
+  it('switching the template to Band shows the band picker directly, no expand step', async () => {
     const onConfirm = vi.fn();
-    render(<SetRow {...baseProps} prefill={undefined} onConfirm={onConfirm} />);
+    render(
+      <SetRow
+        {...baseProps}
+        loadKind="band"
+        prefill={undefined}
+        onConfirm={onConfirm}
+      />,
+    );
 
-    await expandLoadTypePicker();
-    await userEvent.click(screen.getByRole('radio', { name: 'Band' }));
     await userEvent.click(screen.getByRole('radio', { name: 'Red' }));
     await userEvent.click(screen.getByRole('button', { name: /add set/i }));
 
@@ -115,12 +164,17 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
     });
   });
 
-  it('switching to Bodyweight with no component is a valid, confirmable load (US3, Acceptance Scenario 3.5)', async () => {
+  it('Bodyweight with no component is a valid, confirmable load (US3, Acceptance Scenario 3.5)', async () => {
     const onConfirm = vi.fn();
-    render(<SetRow {...baseProps} prefill={undefined} onConfirm={onConfirm} />);
+    render(
+      <SetRow
+        {...baseProps}
+        loadKind="bodyweight"
+        prefill={undefined}
+        onConfirm={onConfirm}
+      />,
+    );
 
-    await expandLoadTypePicker();
-    await userEvent.click(screen.getByRole('radio', { name: 'Bodyweight' }));
     await userEvent.click(screen.getByRole('button', { name: /add set/i }));
 
     expect(onConfirm).toHaveBeenCalledWith({
@@ -131,7 +185,14 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
 
   it('selecting an effort level includes it, always paired with its word label (ADR-0003)', async () => {
     const onConfirm = vi.fn();
-    render(<SetRow {...baseProps} prefill={undefined} onConfirm={onConfirm} />);
+    render(
+      <SetRow
+        {...baseProps}
+        trackEffort
+        prefill={undefined}
+        onConfirm={onConfirm}
+      />,
+    );
 
     await userEvent.type(
       screen.getByRole('spinbutton', { name: /weight/i }),
@@ -144,22 +205,5 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
     expect(onConfirm).toHaveBeenCalledWith(
       expect.objectContaining({ effort: 3 }),
     );
-  });
-
-  it('calls onLoadTypeChange when the load type is switched (FR-009)', async () => {
-    const onLoadTypeChange = vi.fn();
-    render(
-      <SetRow
-        {...baseProps}
-        onLoadTypeChange={onLoadTypeChange}
-        prefill={undefined}
-        onConfirm={() => {}}
-      />,
-    );
-
-    await expandLoadTypePicker();
-    await userEvent.click(screen.getByRole('radio', { name: 'Free text' }));
-
-    expect(onLoadTypeChange).toHaveBeenCalledWith('freeText');
   });
 });

@@ -15,6 +15,8 @@ describe('ExerciseSearchScreen (FR-007..012)', () => {
       canonicalName: 'Sentadilla',
       aliases: [],
       defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
       unilateral: false,
       discipline: 'Strength',
     });

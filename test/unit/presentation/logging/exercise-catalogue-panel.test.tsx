@@ -10,6 +10,8 @@ const exercise: Exercise = {
   canonicalName: 'Glute bridge',
   aliases: [],
   defaultLoadType: 'weight',
+  defaultVolumeKind: 'reps',
+  trackEffort: false,
   unilateral: false,
   discipline: 'Strength',
 };
@@ -19,6 +21,8 @@ const other: Exercise = {
   canonicalName: 'Hip thrust',
   aliases: [],
   defaultLoadType: 'weight',
+  defaultVolumeKind: 'reps',
+  trackEffort: false,
   unilateral: false,
   discipline: 'Strength',
 };

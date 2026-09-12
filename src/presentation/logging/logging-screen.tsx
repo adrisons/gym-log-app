@@ -15,21 +15,27 @@
  * replacing US1's flat list. Exercise catalogue management (rename/merge/
  * delete) lives on its own `/exercises` screen so this one stays focused
  * on the single primary action of recording a set (docs/design.md §2).
- * The top search field always adds a "loose" exercise (no block target,
- * FR-002's existing single-running-list default); each block's own
- * footer search field groups an exercise into that specific block.
+ *
+ * A block with no explicit name renders `bare` — no header, no menu, its
+ * exercises shown directly — so a "loose" exercise (added without ever
+ * tapping "Add block") never looks like it's sitting inside a block the
+ * user didn't ask for. "Add exercise"/"Add block" sit at the bottom of
+ * the screen, after whatever's already there, matching the natural order
+ * of adding to something you can already see.
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLoggingSession } from '@/application/logging/logging-store';
 import {
   toBlockViewModel,
   toSetSummaryViewModel,
 } from '@/application/logging/view-models';
+import type { Exercise } from '@/application/logging/use-cases';
 import { SessionDateTimeField } from './session-date-time-field';
-import { ExerciseSearchField } from './exercise-search-field';
+import { AddExerciseControl } from './add-exercise-control';
 import { SetRow } from './set-row';
 import { BlockCard } from './block-card';
 import { ExerciseEntryCard } from './exercise-entry-card';
+import { ExerciseTemplatePanel } from './exercise-template-panel';
 import { UndoToast } from './undo-toast';
 import './logging.css';
 
@@ -51,8 +57,8 @@ export function LoggingScreen() {
   const searchExercises = useLoggingSession((s) => s.searchExercises);
   const createExercise = useLoggingSession((s) => s.createExercise);
   const bandLabels = useLoggingSession((s) => s.bandLabels);
-  const recordLoadTypeDefault = useLoggingSession(
-    (s) => s.recordLoadTypeDefault,
+  const updateExerciseTemplate = useLoggingSession(
+    (s) => s.updateExerciseTemplate,
   );
   const suggestFreeTextLoads = useLoggingSession((s) => s.suggestFreeTextLoads);
   const saveBandLabels = useLoggingSession((s) => s.saveBandLabels);
@@ -66,6 +72,10 @@ export function LoggingScreen() {
   const deleteExerciseEntry = useLoggingSession((s) => s.deleteExerciseEntry);
   const deleteSet = useLoggingSession((s) => s.deleteSet);
   const undo = useLoggingSession((s) => s.undo);
+
+  const [editingTemplateFor, setEditingTemplateFor] = useState<
+    Exercise | undefined
+  >(undefined);
 
   useEffect(() => {
     void initialize();
@@ -84,24 +94,17 @@ export function LoggingScreen() {
         value={draft.dateTime}
         onChange={(iso) => void setSessionDateTime(iso)}
       />
-      <ExerciseSearchField
-        search={searchExercises}
-        onSelectExercise={(exercise) => void addExerciseEntry(exercise.id)}
-        onCreateExercise={(name) => {
-          void (async () => {
-            const exercise = await createExercise({ canonicalName: name });
-            await addExerciseEntry(exercise.id);
-          })();
-        }}
-      />
 
-      <button
-        type="button"
-        className="logging-button"
-        onClick={() => void addBlock(undefined, 'straightSets')}
-      >
-        Add block
-      </button>
+      {editingTemplateFor && (
+        <ExerciseTemplatePanel
+          exercise={editingTemplateFor}
+          onSave={(template) => {
+            void updateExerciseTemplate(editingTemplateFor.id, template);
+            setEditingTemplateFor(undefined);
+          }}
+          onClose={() => setEditingTemplateFor(undefined)}
+        />
+      )}
 
       {draft.blocks.map((block, blockIndex) => {
         const blockVm = toBlockViewModel(block, blockIndex, catalogue);
@@ -109,35 +112,45 @@ export function LoggingScreen() {
           .map((b, i) => toBlockViewModel(b, i, catalogue))
           .filter((vm) => vm.id !== block.id)
           .map((vm) => ({ id: vm.id, displayName: vm.displayName }));
+        const totalSets = block.exercises.reduce(
+          (sum, entry) => sum + entry.sets.length,
+          0,
+        );
+        const isBare = block.name === undefined && block.exercises.length > 0;
 
         return (
           <BlockCard
             key={block.id}
             displayName={blockVm.displayName}
             hasName={block.name !== undefined}
+            bare={isBare}
+            subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'} logged`}
             onRename={(name) => void renameBlock(block.id, name)}
             onDelete={() => void deleteBlock(block.id)}
             footer={
-              <ExerciseSearchField
-                label="Add exercise to this block"
-                placeholder="Search or create an exercise"
-                search={searchExercises}
-                onSelectExercise={(exercise) =>
-                  void addExerciseEntry(exercise.id, block.id)
-                }
-                onCreateExercise={(name) => {
-                  void (async () => {
-                    const exercise = await createExercise({
-                      canonicalName: name,
-                    });
-                    await addExerciseEntry(exercise.id, block.id);
-                  })();
-                }}
-              />
+              isBare ? undefined : (
+                <AddExerciseControl
+                  buttonLabel={`+ Add exercise to ${blockVm.displayName}`}
+                  fieldLabel={`Add exercise to ${blockVm.displayName}`}
+                  search={searchExercises}
+                  onSelectExercise={(exercise) =>
+                    void addExerciseEntry(exercise.id, block.id)
+                  }
+                  onCreateExercise={(name) => {
+                    void (async () => {
+                      const exercise = await createExercise({
+                        canonicalName: name,
+                      });
+                      await addExerciseEntry(exercise.id, block.id);
+                    })();
+                  }}
+                />
+              )
             }
           >
             {block.exercises.map((entry, entryIndex) => {
               const entryVm = blockVm.entries[entryIndex]!;
+              const exercise = catalogue.find((e) => e.id === entry.exerciseId);
               return (
                 <ExerciseEntryCard
                   key={entry.id}
@@ -163,6 +176,9 @@ export function LoggingScreen() {
                     void moveExerciseAcrossBlocks(block.id, entry.id, toBlockId)
                   }
                   onDelete={() => void deleteExerciseEntry(block.id, entry.id)}
+                  onEditTemplate={
+                    exercise ? () => setEditingTemplateFor(exercise) : undefined
+                  }
                 >
                   <ul className="set-list">
                     {entry.sets.map((set) => {
@@ -187,17 +203,13 @@ export function LoggingScreen() {
                   <SetRow
                     key={`${entry.id}-${entry.sets.length}`}
                     prefill={prefillNextSet(block.id, entry.id)}
-                    defaultLoadKind={
-                      catalogue.find((e) => e.id === entry.exerciseId)
-                        ?.defaultLoadType ?? 'none'
-                    }
+                    loadKind={exercise?.defaultLoadType ?? 'none'}
+                    volumeKind={exercise?.defaultVolumeKind ?? 'reps'}
+                    trackEffort={exercise?.trackEffort ?? false}
                     bandLabels={bandLabels}
                     freeTextSuggestions={suggestFreeTextLoads(entry.exerciseId)}
                     onConfirm={(input) =>
                       void addSet(block.id, entry.id, input)
-                    }
-                    onLoadTypeChange={(kind) =>
-                      void recordLoadTypeDefault(entry.exerciseId, kind)
                     }
                     onSaveBandLabels={(labels) => void saveBandLabels(labels)}
                   />
@@ -218,6 +230,26 @@ export function LoggingScreen() {
           />
         ))}
       </div>
+
+      <AddExerciseControl
+        buttonLabel="+ Add exercise"
+        fieldLabel="Exercise"
+        search={searchExercises}
+        onSelectExercise={(exercise) => void addExerciseEntry(exercise.id)}
+        onCreateExercise={(name) => {
+          void (async () => {
+            const exercise = await createExercise({ canonicalName: name });
+            await addExerciseEntry(exercise.id);
+          })();
+        }}
+      />
+      <button
+        type="button"
+        className="logging-button"
+        onClick={() => void addBlock(undefined, 'straightSets')}
+      >
+        + Add block
+      </button>
     </main>
   );
 }
