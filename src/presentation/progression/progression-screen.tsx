@@ -13,6 +13,7 @@ import type {
   ProgressionMetric,
   ProgressionRange,
 } from '@/application/progression/progression-series';
+import { mostRecentNumericLoad } from '@/application/progression/most-recent-load';
 import type {
   Exercise,
   ExerciseId,
@@ -21,32 +22,6 @@ import type {
 import { ProgressionList } from './progression-list';
 import { ProgressionChart } from './progression-chart';
 import './progression.css';
-
-function mostRecentNumericLoad(
-  sessions: Session[],
-  exerciseId: ExerciseId,
-): number | undefined {
-  const sorted = [...sessions].sort(
-    (a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime(),
-  );
-  for (const session of sorted) {
-    for (const block of session.blocks) {
-      for (const entry of block.exercises) {
-        if (entry.exerciseId !== exerciseId) continue;
-        for (const set of entry.sets) {
-          if (set.load.kind === 'weight') return set.load.value;
-          if (
-            set.load.kind === 'bodyweight' &&
-            set.load.addedOrAssistedKg !== undefined
-          ) {
-            return set.load.addedOrAssistedKg;
-          }
-        }
-      }
-    }
-  }
-  return undefined;
-}
 
 export function ProgressionScreen() {
   const { exerciseId } = useParams<{ exerciseId: string }>();

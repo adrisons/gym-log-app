@@ -40,6 +40,7 @@ import { DiaryScreen } from './diary/diary-screen';
 import { SessionDetailScreen } from './diary/session-detail-screen';
 import { ExerciseSearchScreen } from './search/exercise-search-screen';
 import { ProgressionScreen } from './progression/progression-screen';
+import { InsightsScreen } from './insights/insights-screen';
 import { useLoggingSession } from '../application/logging/logging-store';
 import { useStorageAccess } from '../application/storage-access';
 import type { StoragePort } from '../application/ports/storage-port';
@@ -93,6 +94,7 @@ function mount(): void {
             path="/exercises/:exerciseId/progression"
             element={<ProgressionScreen />}
           />
+          <Route path="/insights" element={<InsightsScreen />} />
         </Routes>
       </BrowserRouter>
     </StrictMode>,

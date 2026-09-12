@@ -14,6 +14,8 @@ import { expect, test } from '@playwright/test';
 // "/" still renders the logging screen exactly as before (plan.md
 // Constitution Check, Principle II: no regression to the logging critical
 // path), and a second test confirms the new "/diary" route is reachable.
+//
+// Spec 005 adds "/insights" alongside the others — same pattern.
 
 test('the app boots to the logging screen and the service worker registers', async ({
   page,
@@ -41,4 +43,15 @@ test('the diary route is reachable and shows the empty state with no sessions lo
 
   await expect(page.getByRole('heading', { name: 'Diary' })).toBeVisible();
   await expect(page.getByText(/no sessions logged yet/i)).toBeVisible();
+});
+
+test('the insights route is reachable and shows missing-data notices with no sessions logged', async ({
+  page,
+}) => {
+  await page.goto('/insights');
+
+  await expect(page.getByRole('heading', { name: 'Insights' })).toBeVisible();
+  await expect(
+    page.getByText(/log an exercise a few more times/i),
+  ).toBeVisible();
 });
