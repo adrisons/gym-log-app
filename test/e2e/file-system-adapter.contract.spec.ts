@@ -43,6 +43,25 @@ for (const scenario of CONTRACT_SCENARIOS) {
   });
 }
 
+test('ADR-0006 v1->v2 migration backfills a legacy Exercise and bumps the stored schema version', async ({
+  page,
+  browserName,
+}) => {
+  test.setTimeout(90_000);
+  test.skip(browserName !== 'chromium', 'File System Access is chromium-only.');
+
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const outcome = await page.evaluate(() =>
+    window.__runMigrationTest('file-system'),
+  );
+
+  expect(outcome.canonicalNamePreserved).toBe(true);
+  expect(outcome.defaultLoadTypePreserved).toBe(true);
+  expect(outcome.defaultVolumeKind).toBe('reps');
+  expect(outcome.trackEffort).toBe(false);
+  expect(outcome.storedSchemaVersion).toBe(2);
+});
+
 test('a lost File System Access permission surfaces StorageError with kind "permission-lost", distinguishable from "no data yet"', async ({
   page,
   browserName,

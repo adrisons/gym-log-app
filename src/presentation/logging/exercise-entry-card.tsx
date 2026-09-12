@@ -43,7 +43,6 @@ export function ExerciseEntryCard({
         <OverflowMenu label={`${exerciseName} actions`}>
           <button
             type="button"
-            role="menuitem"
             className="logging-button logging-button--icon-label"
             disabled={!canMoveUp}
             aria-disabled={!canMoveUp}
@@ -54,7 +53,6 @@ export function ExerciseEntryCard({
           </button>
           <button
             type="button"
-            role="menuitem"
             className="logging-button logging-button--icon-label"
             disabled={!canMoveDown}
             aria-disabled={!canMoveDown}
@@ -90,7 +88,6 @@ export function ExerciseEntryCard({
           {onEditTemplate && (
             <button
               type="button"
-              role="menuitem"
               className="logging-button logging-button--icon-label"
               onClick={onEditTemplate}
             >
@@ -100,7 +97,6 @@ export function ExerciseEntryCard({
           )}
           <button
             type="button"
-            role="menuitem"
             className="logging-button logging-button--icon-label"
             onClick={onDelete}
           >

@@ -18,8 +18,16 @@
  * Managing an existing exercise (rename/merge/delete) now lives on its
  * own catalogue screen (`/exercises`), so this field only ever finds or
  * creates.
+ *
+ * Deliberately a plain text input plus a plain labelled list of buttons,
+ * not an ARIA combobox/listbox: that pattern additionally requires
+ * `aria-activedescendant`-driven option focus and arrow-key navigation,
+ * neither of which this control implements, and a half-implemented
+ * combobox is worse for assistive tech than a correctly plain one — every
+ * result is still a real, individually tab-reachable `<button>`.
  */
 import { useId, useState } from 'react';
+import { normalize } from '@/application/logging/use-cases';
 import type { Exercise } from '@/application/logging/use-cases';
 import './logging.css';
 
@@ -43,9 +51,11 @@ export function ExerciseSearchField({
   const [open, setOpen] = useState(false);
   const trimmed = query.trim();
   const results = search(query);
-  const hasExactMatch = results.some(
-    (exercise) =>
-      exercise.canonicalName.toLowerCase() === trimmed.toLowerCase(),
+  const normalizedQuery = normalize(trimmed);
+  const hasExactMatch = results.some((exercise) =>
+    [exercise.canonicalName, ...exercise.aliases].some(
+      (name) => normalize(name) === normalizedQuery,
+    ),
   );
   const showCreate = trimmed !== '' && !hasExactMatch;
 
@@ -71,7 +81,6 @@ export function ExerciseSearchField({
             if (event.key === 'Escape') setOpen(false);
           }}
           placeholder={placeholder}
-          role="combobox"
           aria-expanded={open}
           aria-controls={resultsId}
         />
@@ -80,7 +89,7 @@ export function ExerciseSearchField({
         <ul
           id={resultsId}
           className="exercise-search-field__results"
-          role="listbox"
+          aria-label={`${label} results`}
         >
           {results.map((exercise) => (
             <li key={exercise.id}>

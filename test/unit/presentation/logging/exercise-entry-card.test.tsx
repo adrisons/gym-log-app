@@ -24,13 +24,11 @@ describe('ExerciseEntryCard', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /back squat actions/i }),
     );
-    const up = screen.getByRole('menuitem', { name: /^move up$/i });
+    const up = screen.getByRole('button', { name: /^move up$/i });
     await userEvent.click(up);
     expect(onMoveUp).toHaveBeenCalled();
 
-    expect(
-      screen.getByRole('menuitem', { name: /^move down$/i }),
-    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^move down$/i })).toBeDisabled();
   });
 
   it('moving to another block calls onMoveToBlock', async () => {
@@ -82,7 +80,7 @@ describe('ExerciseEntryCard', () => {
       screen.getByRole('button', { name: /back squat actions/i }),
     );
     await userEvent.click(
-      screen.getByRole('menuitem', { name: /delete exercise/i }),
+      screen.getByRole('button', { name: /delete exercise/i }),
     );
 
     expect(onDelete).toHaveBeenCalled();

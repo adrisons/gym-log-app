@@ -31,9 +31,14 @@ import {
 } from '../../contract/storage-adapter-contract';
 import { IndexedDbStorageAdapter } from '../../../src/infrastructure/indexed-db-storage-adapter';
 import { FileSystemStorageAdapter } from '../../../src/infrastructure/file-system-storage-adapter';
-import { GymLogDatabase } from '../../../src/infrastructure/indexed-db/schema';
+import {
+  GymLogDatabase,
+  SCHEMA_VERSION_ROW_KEY,
+} from '../../../src/infrastructure/indexed-db/schema';
 import type { StoragePort } from '../../../src/application/ports/storage-port';
 import { StorageError } from '../../../src/application/errors';
+import type { Exercise } from '../../../src/domain/exercise';
+import type { ExerciseId } from '../../../src/domain/ids';
 
 type AdapterKind = 'indexed-db' | 'file-system';
 
@@ -133,6 +138,129 @@ window.__runPermissionLossTest = async () => {
   }
 };
 
+export interface MigrationTestResult {
+  /** The pre-migration record's own fields survived untouched. */
+  canonicalNamePreserved: boolean;
+  defaultLoadTypePreserved: boolean;
+  /** Backfilled by the v1->v2 migration (ADR-0006), read back through the port. */
+  defaultVolumeKind: Exercise['defaultVolumeKind'] | undefined;
+  trackEffort: Exercise['trackEffort'] | undefined;
+  /** The *stored* schema version after a write has actually run — see
+   * this function's own doc comment for why File System needs an extra
+   * write to reach this, unlike IndexedDB. */
+  storedSchemaVersion: number;
+}
+
+/**
+ * ADR-0006's v1->v2 migration, exercised below the public `StoragePort` —
+ * seeding a genuinely pre-migration record (missing `defaultVolumeKind`/
+ * `trackEffort`) directly in the adapter's own underlying storage, the one
+ * thing the contract suite itself cannot do (see
+ * `test/contract/storage-adapter-contract.ts`'s own doc comment: every
+ * public write runs the schema check first, so a legacy-shaped record
+ * saved through the port would already be migrated by the time it lands).
+ *
+ * IndexedDB's schema check runs on every read (`#ensureSchemaChecked`), so
+ * `getExercise` alone both returns the backfilled shape and physically
+ * migrates the stored record. File System's check is write-only by design
+ * (`FileSystemStorageAdapter`'s own doc comment — a read must never
+ * prompt), so its `getExercise` normalizes the *returned* shape without
+ * touching disk; a real write (`saveBandLabels` here, chosen only because
+ * it touches no exercise data) is what actually backfills the stored
+ * `exercises.json` and bumps `_meta.json`. Both paths are asserted here.
+ */
+async function runMigrationTestIndexedDb(): Promise<MigrationTestResult> {
+  const legacyExercise = {
+    id: 'legacy-1',
+    canonicalName: 'Legacy squat',
+    aliases: [],
+    defaultLoadType: 'weight',
+    unilateral: false,
+    discipline: 'Strength',
+    // defaultVolumeKind/trackEffort deliberately absent — a genuine v1 shape.
+  } as unknown as Exercise;
+
+  const db = new GymLogDatabase(uniqueName('migration-idb'));
+  await db.exercises.put(legacyExercise);
+  await db.meta.put({ key: SCHEMA_VERSION_ROW_KEY, value: 1 });
+
+  const adapter = new IndexedDbStorageAdapter(db);
+  const migrated = await adapter.getExercise('legacy-1' as ExerciseId);
+  const storedSchemaVersion = await adapter.getSchemaVersion();
+  db.close();
+
+  return {
+    canonicalNamePreserved: migrated?.canonicalName === 'Legacy squat',
+    defaultLoadTypePreserved: migrated?.defaultLoadType === 'weight',
+    defaultVolumeKind: migrated?.defaultVolumeKind,
+    trackEffort: migrated?.trackEffort,
+    storedSchemaVersion,
+  };
+}
+
+async function runMigrationTestFileSystem(): Promise<MigrationTestResult> {
+  const legacyExercise = {
+    id: 'legacy-1',
+    canonicalName: 'Legacy squat',
+    aliases: [],
+    defaultLoadType: 'weight',
+    unilateral: false,
+    discipline: 'Strength',
+  };
+
+  const opfsRoot = await navigator.storage.getDirectory();
+  const dirName = uniqueName('migration-fs');
+  const storeDir = await opfsRoot.getDirectoryHandle(dirName, {
+    create: true,
+  });
+
+  const exercisesHandle = await storeDir.getFileHandle('exercises.json', {
+    create: true,
+  });
+  const exercisesWritable = await exercisesHandle.createWritable();
+  await exercisesWritable.write(JSON.stringify([legacyExercise]));
+  await exercisesWritable.close();
+
+  const metaHandle = await storeDir.getFileHandle('_meta.json', {
+    create: true,
+  });
+  const metaWritable = await metaHandle.createWritable();
+  await metaWritable.write(JSON.stringify({ schemaVersion: 1 }));
+  await metaWritable.close();
+
+  const db = new GymLogDatabase(uniqueName('migration-fs-handles'));
+  const adapter = new FileSystemStorageAdapter(
+    async () => storeDir,
+    db,
+    storeDir,
+  );
+
+  // Read-time normalization, before any write has touched disk.
+  const readNormalized = await adapter.getExercise('legacy-1' as ExerciseId);
+
+  // A real write is what actually migrates the on-disk files + version.
+  await adapter.saveBandLabels([]);
+  const storedSchemaVersion = await adapter.getSchemaVersion();
+
+  db.close();
+  await opfsRoot
+    .removeEntry(dirName, { recursive: true })
+    .catch(() => undefined);
+
+  return {
+    canonicalNamePreserved: readNormalized?.canonicalName === 'Legacy squat',
+    defaultLoadTypePreserved: readNormalized?.defaultLoadType === 'weight',
+    defaultVolumeKind: readNormalized?.defaultVolumeKind,
+    trackEffort: readNormalized?.trackEffort,
+    storedSchemaVersion,
+  };
+}
+
+window.__runMigrationTest = (adapterKind) =>
+  adapterKind === 'indexed-db'
+    ? runMigrationTestIndexedDb()
+    : runMigrationTestFileSystem();
+
 declare global {
   interface Window {
     __runContractSuite: (adapterKind: AdapterKind) => Promise<ContractResult>;
@@ -144,5 +272,8 @@ declare global {
       | { threw: false }
       | { threw: true; isStorageError: boolean; kind: string | undefined }
     >;
+    __runMigrationTest: (
+      adapterKind: AdapterKind,
+    ) => Promise<MigrationTestResult>;
   }
 }

@@ -38,6 +38,8 @@ export type { ExerciseId };
 /** Re-exported for the same reason — spec 004's diary/progression screens need `Session`/`SessionId`. */
 export type { Session };
 export type { SessionId };
+/** Re-exported so `ExerciseSearchField` can check for an exact name/alias match the same accent/case-insensitive way `matchExercise` itself does, instead of a narrower ad hoc comparison. */
+export { normalize };
 
 function isSameLocalDay(isoA: string, isoB: string): boolean {
   const a = new Date(isoA);

@@ -117,7 +117,6 @@ export function BlockCard({
               <OverflowMenu label={`${displayName} actions`}>
                 <button
                   type="button"
-                  role="menuitem"
                   className="logging-button logging-button--icon-label"
                   onClick={() => setEditing(true)}
                 >
@@ -126,7 +125,6 @@ export function BlockCard({
                 </button>
                 <button
                   type="button"
-                  role="menuitem"
                   className="logging-button logging-button--icon-label"
                   onClick={onDelete}
                 >

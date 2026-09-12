@@ -28,3 +28,19 @@ for (const scenario of CONTRACT_SCENARIOS) {
     expect(outcome.passed, outcome.passed ? '' : outcome.error).toBe(true);
   });
 }
+
+test('ADR-0006 v1->v2 migration backfills a legacy Exercise and bumps the stored schema version', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const outcome = await page.evaluate(() =>
+    window.__runMigrationTest('indexed-db'),
+  );
+
+  expect(outcome.canonicalNamePreserved).toBe(true);
+  expect(outcome.defaultLoadTypePreserved).toBe(true);
+  expect(outcome.defaultVolumeKind).toBe('reps');
+  expect(outcome.trackEffort).toBe(false);
+  expect(outcome.storedSchemaVersion).toBe(2);
+});

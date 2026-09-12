@@ -19,7 +19,7 @@ uses, and whether effort is tracked at all. Adding persisted fields to a
 domain entity is a schema change under `docs/requirements.md` §6 (version
 bump, ADR, migration) — this document is that ADR.
 
-The open design question was what happens to a exercise's **history** when
+The open design question was what happens to an exercise's **history** when
 its template changes — e.g. switching an exercise from Reps to Duration.
 The alternatives considered:
 
@@ -46,7 +46,7 @@ and which controls are offered. It never rewrites, reconciles, or flags any
 already-recorded `Set`.
 
 This isn't a compromise — it's already how the domain works. `Set` stores
-its own `load` and `volume` independently or every set
+its own `load` and `volume` independently for every set
 (`docs/requirements.md` §3.2), and FR-3 already allowed a load type to be
 "overridden per set" — meaning the domain has never guaranteed that every
 set of an exercise shares one shape. Progression and insights already

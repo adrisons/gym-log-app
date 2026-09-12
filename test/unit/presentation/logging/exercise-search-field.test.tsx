@@ -61,6 +61,24 @@ describe('ExerciseSearchField (FR-002, FR-015, FR-016)', () => {
     expect(screen.queryByText('Create "Back squat"')).not.toBeInTheDocument();
   });
 
+  it('does not offer "create" when the query exactly matches an existing alias, accent/case-insensitively (FR-016)', async () => {
+    const withAlias = { ...squat, aliases: ['Barbell squat'] };
+    const search = vi.fn(() => [withAlias]);
+    render(
+      <ExerciseSearchField
+        search={search}
+        onSelectExercise={() => {}}
+        onCreateExercise={() => {}}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText(/exercise/i), 'BARBELL SQUAT');
+
+    expect(
+      screen.queryByText('Create "BARBELL SQUAT"'),
+    ).not.toBeInTheDocument();
+  });
+
   it('offers "create" once the query has no exact match', async () => {
     const search = vi.fn(() => []);
     render(

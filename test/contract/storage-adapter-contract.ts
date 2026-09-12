@@ -19,22 +19,27 @@
  * Schema-version scope note: `CURRENT_SCHEMA_VERSION` is 2 as of ADR-0006
  * (Exercise gained `defaultVolumeKind`/`trackEffort`), so a real v1->v2
  * `decideSchemaAction` "migrate" transition now exists in both real
- * adapters (`#backfillExerciseTemplateDefaults`). It has no scenario in
+ * adapters (`#migrateExerciseTemplateDefaults`). It has no scenario in
  * *this* suite: `setSchemaVersion` is the only public, schema-check-free
  * way to seed a stale version, and every other `StoragePort` write
  * (including `saveExercise`) runs `#ensureSchemaChecked` first — so a
  * legacy-shaped record saved through this harness would trigger the
  * migrate transition (against whatever already exists, empty here)
  * *before* that same call's own write lands, never producing a genuinely
- * pre-migration stored record to migrate. A real device doesn't hit this
- * gap: its v1 exercises are already sitting in storage from earlier
- * sessions before the upgraded app's first call ever runs the check. The
- * migration's own logic is covered by code review, not a contract
- * scenario — `decideSchemaAction` itself stays proven at the pure-function
- * level, `test/unit/infrastructure/schema-version.test.ts`, against
- * synthetic current/stored fixtures. This suite proves the three
- * adapter-level cases reachable through the public port:
- * never-initialized, same, newer.
+ * pre-migration stored record to migrate. `decideSchemaAction` itself
+ * stays proven at the pure-function level,
+ * `test/unit/infrastructure/schema-version.test.ts`, against synthetic
+ * current/stored fixtures. This suite proves the three adapter-level
+ * cases reachable through the public port: never-initialized, same,
+ * newer.
+ *
+ * The actual v1->v2 migration — seeding a genuinely pre-migration record
+ * below the port and confirming it comes back backfilled with the stored
+ * version bumped — is instead covered directly against each real
+ * adapter's own underlying storage: see `window.__runMigrationTest` in
+ * `test/e2e/fixtures/storage-harness.ts` and its callers in
+ * `test/e2e/indexed-db-adapter.contract.spec.ts` /
+ * `test/e2e/file-system-adapter.contract.spec.ts`.
  */
 import type {
   StoragePort,

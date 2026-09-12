@@ -50,7 +50,7 @@ describe('AddExerciseControl', () => {
     await userEvent.click(
       screen.getByRole('button', { name: '+ Add exercise' }),
     );
-    const input = screen.getByRole('combobox');
+    const input = screen.getByRole('textbox');
     await userEvent.click(input);
     await userEvent.click(screen.getByText('Back squat'));
 
@@ -58,6 +58,6 @@ describe('AddExerciseControl', () => {
     expect(
       screen.getByRole('button', { name: '+ Add exercise' }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 });

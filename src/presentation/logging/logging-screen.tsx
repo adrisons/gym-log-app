@@ -203,7 +203,7 @@ export function LoggingScreen() {
                     })}
                   </ul>
                   <SetRow
-                    key={`${entry.id}-${entry.sets.length}`}
+                    key={`${entry.id}-${entry.sets.length}-${exercise?.defaultLoadType ?? 'none'}-${exercise?.defaultVolumeKind ?? 'reps'}-${exercise?.trackEffort ?? false}`}
                     prefill={prefillNextSet(block.id, entry.id)}
                     loadKind={exercise?.defaultLoadType ?? 'none'}
                     volumeKind={exercise?.defaultVolumeKind ?? 'reps'}

@@ -100,6 +100,27 @@ export function SessionDetailScreen() {
     });
   };
 
+  // Attaches to the trailing unnamed block, or creates a fresh one WITH
+  // the exercise already in it and persists once — building the block and
+  // its first entry in two separate `persist` calls would have the second
+  // (`addExerciseToBlock`) close over the pre-first-persist `editable`
+  // (React state updates aren't synchronous), so it could never find the
+  // block it just asked to create and would silently drop it.
+  const addExerciseAtTopLevel = (exerciseId: Exercise['id']) => {
+    if (!editable) return;
+    const lastBlock = editable.blocks.at(-1);
+    if (lastBlock && lastBlock.name === undefined) {
+      addExerciseToBlock(lastBlock.id, exerciseId);
+      return;
+    }
+    const block = {
+      id: newEditableItemId(),
+      type: 'straightSets' as const,
+      exercises: [{ id: newEditableItemId(), exerciseId, notes: '', sets: [] }],
+    };
+    persist({ ...editable, blocks: [...editable.blocks, block] });
+  };
+
   if (!sessionId) {
     return null;
   }
@@ -276,7 +297,7 @@ export function SessionDetailScreen() {
                       })}
                     </ul>
                     <SetRow
-                      key={`${entry.id}-${entry.sets.length}`}
+                      key={`${entry.id}-${entry.sets.length}-${exercise?.defaultLoadType ?? 'none'}-${exercise?.defaultVolumeKind ?? 'reps'}-${exercise?.trackEffort ?? false}`}
                       prefill={undefined}
                       loadKind={exercise?.defaultLoadType ?? 'none'}
                       volumeKind={exercise?.defaultVolumeKind ?? 'reps'}
@@ -331,38 +352,14 @@ export function SessionDetailScreen() {
         buttonLabel="Add exercise"
         fieldLabel="Exercise"
         search={(query) => searchExercises(query, catalogue)}
-        onSelectExercise={(exercise) => {
-          const lastBlock = editable.blocks.at(-1);
-          if (lastBlock && lastBlock.name === undefined) {
-            addExerciseToBlock(lastBlock.id, exercise.id);
-            return;
-          }
-          const block = {
-            id: newEditableItemId(),
-            type: 'straightSets' as const,
-            exercises: [],
-          };
-          persist({ ...editable, blocks: [...editable.blocks, block] });
-          addExerciseToBlock(block.id, exercise.id);
-        }}
+        onSelectExercise={(exercise) => addExerciseAtTopLevel(exercise.id)}
         onCreateExercise={(name) => {
           void (async () => {
             const exercise = await createExercise(requireStorage(), {
               canonicalName: name,
             });
             setCatalogue((current) => [...current, exercise]);
-            const lastBlock = editable.blocks.at(-1);
-            if (lastBlock && lastBlock.name === undefined) {
-              addExerciseToBlock(lastBlock.id, exercise.id);
-              return;
-            }
-            const block = {
-              id: newEditableItemId(),
-              type: 'straightSets' as const,
-              exercises: [],
-            };
-            persist({ ...editable, blocks: [...editable.blocks, block] });
-            addExerciseToBlock(block.id, exercise.id);
+            addExerciseAtTopLevel(exercise.id);
           })();
         }}
       />

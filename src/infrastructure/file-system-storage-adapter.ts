@@ -34,6 +34,27 @@ const SESSION_KEY_PREFIX = 'session:';
 type OverlayEntry = { kind: 'value'; value: unknown } | { kind: 'deleted' };
 
 /**
+ * ADR-0006's v1->v2 backfill, applied wherever an `Exercise` crosses this
+ * adapter's boundary — not only inside `#migrateExerciseTemplateDefaults`.
+ * This adapter's schema check only runs on a write path (the doc comment
+ * above), so `getExercise`/`listExercises` can otherwise hand back a
+ * pre-migration v1 record whose `defaultVolumeKind`/`trackEffort` are
+ * missing; a caller that then round-trips that record through
+ * `saveExercise` (e.g. `renameExerciseWithCollisionCheck`) would have its
+ * own write's schema-check migration immediately overwritten by that
+ * stale, still-v1-shaped object — permanently, since the stored version
+ * is already 2 by the time that happens. Applying the same defaults on
+ * every read closes that gap at the source.
+ */
+function withTemplateDefaults(exercise: Exercise): Exercise {
+  return {
+    ...exercise,
+    defaultVolumeKind: exercise.defaultVolumeKind ?? 'reps',
+    trackEffort: exercise.trackEffort ?? false,
+  };
+}
+
+/**
  * Durable `StoragePort` implementation backed by the File System Access
  * API (ADR-0002; spec 003 FR-002). Selected by the composition root
  * wherever the API is available (spec 003 FR-004).
@@ -261,14 +282,7 @@ export class FileSystemStorageAdapter implements StoragePort {
     const exercises =
       (await this.#readJson<Exercise[]>(EXERCISES_FILE, true)) ?? [];
     if (exercises.length === 0) return;
-    await this.#writeJson(
-      EXERCISES_FILE,
-      exercises.map((exercise) => ({
-        ...exercise,
-        defaultVolumeKind: exercise.defaultVolumeKind ?? 'reps',
-        trackEffort: exercise.trackEffort ?? false,
-      })),
-    );
+    await this.#writeJson(EXERCISES_FILE, exercises.map(withTemplateDefaults));
   }
 
   async #readSchemaVersionRaw(forceHandle: boolean): Promise<number> {
@@ -482,11 +496,13 @@ export class FileSystemStorageAdapter implements StoragePort {
 
   async getExercise(id: ExerciseId): Promise<Exercise | undefined> {
     const exercises = (await this.#readJson<Exercise[]>(EXERCISES_FILE)) ?? [];
-    return exercises.find((e) => e.id === id);
+    const exercise = exercises.find((e) => e.id === id);
+    return exercise && withTemplateDefaults(exercise);
   }
 
   async listExercises(): Promise<Exercise[]> {
-    return (await this.#readJson<Exercise[]>(EXERCISES_FILE)) ?? [];
+    const exercises = (await this.#readJson<Exercise[]>(EXERCISES_FILE)) ?? [];
+    return exercises.map(withTemplateDefaults);
   }
 
   async mergeExercises(
