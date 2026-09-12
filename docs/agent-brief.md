@@ -123,15 +123,23 @@ against §7.1, before and after any optimisation.
 
 Session templates, kept off the logging critical path (D7).
 
-### Phase 8 — Swimming, the first non-Strength discipline — v1.1
+### Swimming, the first non-Strength discipline — v1.1, not yet sequenced
 
 D8 is closed for swimming (ADR-0006): the `discipline` field becomes a real
 enum, a distance/duration-based progression metric and its own insight card
 type are added, with a schema version bump — to whatever version the
 schema is at when this phase starts, plus one, not assumed to be a fixed
-1 → 2; `specs/006-settings-data` claims Phase 6 leaves it at 1, but that is
-for `schema-guardian` to confirm, not this document to assume — and a
-tested migration (existing exercises default to `Strength`) per
-`docs/requirements.md` §6. Not yet specced. Ordering relative to Phase 7 is
-not fixed by ADR-0006 — either can go first; decide when this phase is
-picked up.
+1 → 2. `specs/006-settings-data`'s own claim that Phase 6 leaves the schema
+at 1 was confirmed sound by `schema-guardian` (spec 006's Non-Goals and
+Assumptions, and its quality checklist), against the constitution's
+Principle III specifically — `docs/requirements.md` §6's broader wording is
+not identically reconciled, so this phase's own eventual spec should
+address §6 explicitly too, not just re-cite Principle III. A tested
+migration (existing exercises default to `Strength`) ships with it per
+`docs/requirements.md` §6. Not yet specced, and deliberately **not**
+numbered "Phase 8": this document's own rule (§3 above) is strict build
+order — a phase does not start before the previous one closes — and
+ADR-0006 left this item's order relative to Phase 7 (Templates) explicitly
+undecided, so assigning it a sequential number here would claim an
+ordering this document hasn't actually settled. It gets a real phase
+number, in its correct sequence, once that ordering is decided.

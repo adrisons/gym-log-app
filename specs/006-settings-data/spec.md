@@ -81,9 +81,12 @@ whether import (User Story 2) exists yet.
    export, **Then** they receive a spreadsheet-friendly file listing their
    session/set history in a form a spreadsheet application can open
    directly.
-3. **Given** a brand-new install with no data yet, **When** the user
-   exports, **Then** they receive a valid, schema-versioned file describing
-   an empty data set, not an error.
+3. **Given** a brand-new install with no sessions, no custom catalogue
+   entries, and no settings changed yet — never truly "empty," since D9/
+   ADR-0005 guarantees the seed exercise catalogue is present from first
+   launch — **When** the user exports, **Then** they receive a valid,
+   schema-versioned file describing that seed-only, no-history state, not
+   an error.
 
 ---
 
@@ -463,10 +466,12 @@ just the seed set, and the app otherwise behaves like a fresh install.
   or unrelated) for import always results in a clear rejection message and
   zero changes to local data — verified across every rejection path
   (User Story 2, Scenarios 4-5; Edge Cases).
-- **SC-003**: Every setting change is visible in the app's behavior
-  (unit shown, theme applied, week start, quick increments offered)
-  without the user needing to leave the Settings screen to confirm it took
-  effect.
+- **SC-003**: Every setting change applies immediately, with no restart
+  needed, and is verifiable on whichever screen actually shows its effect
+  — unit and quick increments while logging a set, theme and first day of
+  week wherever they're rendered, first day of week specifically in the
+  Insights consistency card (FR-018) — not all from the Settings screen
+  itself, since most of these settings have no effect visible there.
 - **SC-004**: Users can reach the point of irreversible data deletion only
   after two distinct, deliberate confirmations — zero cases of accidental
   full deletion from a single tap or click.
@@ -512,8 +517,12 @@ just the seed set, and the app otherwise behaves like a fresh install.
   reshape of an existing canonical entity (Session, Exercise, Set) — on
   the same footing as the already-shipped band-label list and the logging
   draft itself (Non-Goals; `specs/001-log-a-session/research.md` §7). This
-  spec's own claim that no version bump is needed is still confirmed by
-  `schema-guardian` at `/speckit-plan` time, not taken as already settled.
+  spec's own claim that no version bump is needed was reviewed and
+  confirmed sound by `schema-guardian` against Principle III's literal
+  scope (Non-Goals) — settled for this spec, though the reconciliation
+  with `docs/requirements.md` §6's broader wording that review flagged is
+  not, and is left for whichever future spec next relies on this
+  precedent to address explicitly.
 - **Seed exercise IDs are not deterministic across installs.** Catalogue
   entry IDs are generated with `crypto.randomUUID()` per install
   (`specs/001-log-a-session/research.md` §2), including for the seed set
