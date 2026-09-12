@@ -7,6 +7,29 @@
          can't read a CSS custom property, so this is duplicated by hand —
          see the note in vite.config.ts. -->
     <meta name="theme-color" content="#f3f4f6" />
+    <!-- Defense-in-depth for an offline-first personal training diary that
+         has no backend of its own: everything the app stores (sessions,
+         exercises, body metrics) lives only in this origin's IndexedDB /
+         local file system, so the one thing worth actively defending
+         against is a future XSS turning into data exfiltration or a
+         supply-chain script injection. `script-src 'self'` (no
+         'unsafe-inline'/'unsafe-eval') stops any injected/inline script
+         from running at all; `connect-src 'self'` stops a compromised
+         script from phoning stored data out to a third-party origin;
+         `object-src 'none'`/`base-uri 'self'`/`form-action 'self'` close
+         the usual plugin- and base-tag-hijack escape hatches. `style-src`
+         needs 'unsafe-inline' for React's own inline `style={{...}}` usage
+         (no per-attribute nonce mechanism exists for that); `font-src`/the
+         `style-src` Google Fonts origin mirror the actual stylesheet/font
+         requests below. `frame-ancestors`/`sandbox` are omitted since the
+         CSP spec ignores them when delivered via <meta> rather than a real
+         HTTP header — GitHub Pages (this app's static host) cannot set
+         custom response headers, so <meta> is the only lever available
+         here. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';"
+    />
     <!-- vite-plugin-pwa injects the <link rel="manifest"> tag itself, at
          build time, already correctly base-rooted (vite.config.ts's BASE) —
          a hand-written one here would need the same base-path handling and
