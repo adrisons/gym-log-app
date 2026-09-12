@@ -415,6 +415,104 @@ async function runQueuedExerciseMergeTest(): Promise<QueuedExerciseMergeResult> 
 
 window.__runQueuedExerciseMergeTest = () => runQueuedExerciseMergeTest();
 
+export interface QueuedMergeTombstoneResult {
+  exerciseIds: string[];
+}
+
+/**
+ * A third Copilot finding on `#reconcileQueuedExercisesOnAcquire`
+ * (file-system-storage-adapter.ts): the merge above can't tell "this id is
+ * absent from the queued snapshot because shadow mode never touched it"
+ * (keep the real record) apart from "absent because a queued
+ * `mergeExercises`/`deleteExerciseCascade` call folded/removed it" (must
+ * NOT resurrect it from disk) — both look identical from the queued array
+ * alone. `#tombstonedExerciseIds` is the fix.
+ *
+ * Reproduces it directly: seeds two *real* pre-existing exercises
+ * (`legacy-a`, `legacy-b`), then — still with no gesture available —
+ * re-creates both under the same ids (simulating the app already knowing
+ * about them from before this adapter instance existed) and merges
+ * `legacy-b` into `legacy-a`, all while queued. Acquiring a real handle
+ * afterwards must not bring `legacy-b` back from the real, pre-merge file.
+ */
+async function runQueuedMergeTombstoneTest(): Promise<QueuedMergeTombstoneResult> {
+  const opfsRoot = await navigator.storage.getDirectory();
+  const dirName = uniqueName('merge-tombstone-fs');
+  const storeDir = await opfsRoot.getDirectoryHandle(dirName, {
+    create: true,
+  });
+  const seedExercises = [
+    { ...LEGACY_EXERCISE, id: 'legacy-a', canonicalName: 'Legacy A' },
+    { ...LEGACY_EXERCISE, id: 'legacy-b', canonicalName: 'Legacy B' },
+  ];
+  const exercisesHandle = await storeDir.getFileHandle('exercises.json', {
+    create: true,
+  });
+  const exercisesWritable = await exercisesHandle.createWritable();
+  await exercisesWritable.write(JSON.stringify(seedExercises));
+  await exercisesWritable.close();
+  const metaHandle = await storeDir.getFileHandle('_meta.json', {
+    create: true,
+  });
+  const metaWritable = await metaHandle.createWritable();
+  await metaWritable.write(JSON.stringify({ schemaVersion: 2 }));
+  await metaWritable.close();
+
+  let gestureAvailable = false;
+  const getHandle = async (): Promise<FileSystemDirectoryHandle> => {
+    if (!gestureAvailable) {
+      throw new DOMException('No active user gesture.', 'NotAllowedError');
+    }
+    return storeDir;
+  };
+
+  const db = new GymLogDatabase(uniqueName('merge-tombstone-fs-handles'));
+  const adapter = new FileSystemStorageAdapter(getHandle, db);
+
+  // Gesture-less: queues both records into the overlay, then merges them
+  // there — `legacy-b` never touches the real handle, all in shadow mode.
+  await adapter.saveExercise({
+    id: 'legacy-a' as ExerciseId,
+    canonicalName: 'Legacy A',
+    aliases: [],
+    defaultLoadType: 'weight',
+    defaultVolumeKind: 'reps',
+    trackEffort: false,
+    unilateral: false,
+    discipline: 'Strength',
+  });
+  await adapter.saveExercise({
+    id: 'legacy-b' as ExerciseId,
+    canonicalName: 'Legacy B',
+    aliases: [],
+    defaultLoadType: 'weight',
+    defaultVolumeKind: 'reps',
+    trackEffort: false,
+    unilateral: false,
+    discipline: 'Strength',
+  });
+  await adapter.mergeExercises(
+    'legacy-a' as ExerciseId,
+    'legacy-b' as ExerciseId,
+  );
+
+  // A later write, now with a real gesture — first real handle
+  // acquisition against a directory whose *real* file still has both.
+  gestureAvailable = true;
+  await adapter.saveBandLabels(['after-gesture']);
+
+  const all = await adapter.listExercises();
+
+  db.close();
+  await opfsRoot
+    .removeEntry(dirName, { recursive: true })
+    .catch(() => undefined);
+
+  return { exerciseIds: all.map((e) => e.id).sort() };
+}
+
+window.__runQueuedMergeTombstoneTest = () => runQueuedMergeTombstoneTest();
+
 declare global {
   interface Window {
     __runContractSuite: (adapterKind: AdapterKind) => Promise<ContractResult>;
@@ -431,5 +529,6 @@ declare global {
     ) => Promise<MigrationTestResult>;
     __runMigrationTestFreshAcquire: () => Promise<MigrationTestResult>;
     __runQueuedExerciseMergeTest: () => Promise<QueuedExerciseMergeResult>;
+    __runQueuedMergeTombstoneTest: () => Promise<QueuedMergeTombstoneResult>;
   }
 }

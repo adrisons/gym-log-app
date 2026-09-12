@@ -38,6 +38,8 @@ export interface DraftExerciseEntry {
 export interface DraftBlock {
   id: string;
   name?: string;
+  /** See `domain/block.ts`'s `Block.loose` doc comment. */
+  loose?: boolean;
   type: 'straightSets' | 'superset' | 'circuit';
   exercises: DraftExerciseEntry[];
 }

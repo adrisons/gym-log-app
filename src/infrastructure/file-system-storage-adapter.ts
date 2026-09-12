@@ -95,6 +95,16 @@ export class FileSystemStorageAdapter implements StoragePort {
   #permissionVerified = false;
   #schemaCheck: Promise<void> | undefined;
   readonly #overlay = new Map<string, OverlayEntry>();
+  /**
+   * Every exercise id ever removed by `mergeExercises` (the loser) or
+   * `deleteExerciseCascade` while running against the `EXERCISES_FILE`
+   * overlay. `#reconcileQueuedExercisesOnAcquire` can't otherwise tell "id
+   * absent from the queued snapshot because shadow mode never touched it"
+   * (keep the real on-disk record) apart from "absent because shadow mode
+   * merged/deleted it away" (must NOT resurrect it from disk) — both look
+   * identical from the queued array alone. This set is the difference.
+   */
+  readonly #tombstonedExerciseIds = new Set<ExerciseId>();
 
   /**
    * `knownHandle` is a testability seam only — production (the
@@ -217,6 +227,12 @@ export class FileSystemStorageAdapter implements StoragePort {
    * own record (already `withTemplateDefaults`-shaped, since it went
    * through the normal read/write path) for every id it did — so the
    * flush that follows writes the combined result instead.
+   *
+   * An id absent from the queued array is ambiguous on its own: it could
+   * mean shadow mode never touched it (keep the real record), or that a
+   * queued `mergeExercises`/`deleteExerciseCascade` call removed it (must
+   * NOT resurrect it from disk — `#tombstonedExerciseIds` is exactly the
+   * set of ids that fall in the second case).
    */
   async #reconcileQueuedExercisesOnAcquire(
     handle: FileSystemDirectoryHandle,
@@ -229,7 +245,9 @@ export class FileSystemStorageAdapter implements StoragePort {
       [];
     const queuedIds = new Set(queuedExercises.map((e) => e.id));
     const merged = [
-      ...realExercises.filter((e) => !queuedIds.has(e.id)),
+      ...realExercises.filter(
+        (e) => !queuedIds.has(e.id) && !this.#tombstonedExerciseIds.has(e.id),
+      ),
       ...queuedExercises,
     ];
     this.#overlay.set(EXERCISES_FILE, { kind: 'value', value: merged });
@@ -656,6 +674,7 @@ export class FileSystemStorageAdapter implements StoragePort {
           ? { ...e, aliases: [...e.aliases, loser.canonicalName] }
           : e,
       );
+    this.#tombstonedExerciseIds.add(loserId);
     await this.#writeJson(EXERCISES_FILE, nextExercises);
 
     for (const session of await this.listSessions({
@@ -698,6 +717,7 @@ export class FileSystemStorageAdapter implements StoragePort {
         'deleteExerciseCascade: id must resolve to an existing Exercise.',
       );
     }
+    this.#tombstonedExerciseIds.add(id);
     await this.#writeJson(
       EXERCISES_FILE,
       exercises.filter((e) => e.id !== id),

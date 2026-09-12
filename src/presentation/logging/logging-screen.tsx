@@ -16,12 +16,15 @@
  * delete) lives on its own `/exercises` screen so this one stays focused
  * on the single primary action of recording a set (docs/design.md §2).
  *
- * A block with no explicit name renders `bare` — no header, no menu, its
- * exercises shown directly — so a "loose" exercise (added without ever
- * tapping "Add block") never looks like it's sitting inside a block the
- * user didn't ask for. "Add exercise"/"Add block" sit at the bottom of
- * the screen, after whatever's already there, matching the natural order
- * of adding to something you can already see.
+ * A `loose` block renders `bare` — no header, no menu, its exercises
+ * shown directly — so an exercise added without ever tapping "Add block"
+ * never looks like it's sitting inside a block the user didn't ask for.
+ * `loose` is distinct from having no name: an explicitly created block
+ * that hasn't been named yet is never `loose` and always keeps its
+ * header (position label, rename, delete — FR-2). "Add exercise"/"Add
+ * block" sit at the bottom of the screen, after whatever's already
+ * there, matching the natural order of adding to something you can
+ * already see.
  */
 import { useEffect, useState } from 'react';
 import { useLoggingSession } from '@/application/logging/logging-store';
@@ -118,7 +121,7 @@ export function LoggingScreen() {
           (sum, entry) => sum + entry.sets.length,
           0,
         );
-        const isBare = block.name === undefined && block.exercises.length > 0;
+        const isBare = block.loose === true && block.exercises.length > 0;
 
         return (
           <BlockCard

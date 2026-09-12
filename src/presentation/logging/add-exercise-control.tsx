@@ -29,16 +29,24 @@ export function AddExerciseControl({
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
+  // Set only by a selection/creation closing this control (never by
+  // blur) — see the effect below.
+  const restoreFocusRef = useRef(false);
 
-  // The trigger button unmounts while expanded, so closing (select,
-  // create, or blur) would otherwise leave keyboard focus nowhere — hand
-  // it back once the button exists again. Skipped on first mount:
-  // `wasOpenRef` only turns true once this component has actually been
-  // open, so a page that renders this collapsed and untouched never
-  // steals focus on its own.
+  // The trigger button unmounts while expanded, so a selection/creation
+  // closing this control would otherwise leave keyboard focus nowhere —
+  // hand it back once the button exists again. A blur-driven close (e.g.
+  // Tab moving on to the next control) must NOT do this: the focus the
+  // browser just moved to is exactly where the user meant it to go, and
+  // yanking it back to this button would send a keyboard user backwards
+  // and trap them here. `restoreFocusRef` is what tells the two apart.
+  // Skipped on first mount: `wasOpenRef` only turns true once this
+  // component has actually been open, so a page that renders this
+  // collapsed and untouched never steals focus on its own.
   useEffect(() => {
-    if (wasOpenRef.current && !open) {
+    if (wasOpenRef.current && !open && restoreFocusRef.current) {
       buttonRef.current?.focus();
+      restoreFocusRef.current = false;
     }
     wasOpenRef.current = open;
   }, [open]);
@@ -71,10 +79,12 @@ export function AddExerciseControl({
         autoFocus
         onSelectExercise={(exercise) => {
           onSelectExercise(exercise);
+          restoreFocusRef.current = true;
           setOpen(false);
         }}
         onCreateExercise={(name) => {
           onCreateExercise(name);
+          restoreFocusRef.current = true;
           setOpen(false);
         }}
       />

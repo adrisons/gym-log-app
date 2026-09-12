@@ -15,9 +15,12 @@
  * single tap from where its contents already are.
  *
  * `bare`, when true, skips the header/border chrome entirely and renders
- * only `children`/`footer` — a block the user never named (an implicit
- * home for a "loose" exercise added outside any block) shouldn't look
- * like a block at all.
+ * only `children`/`footer` — an implicit home for a "loose" exercise
+ * added outside any block (`domain/block.ts`'s `Block.loose`) shouldn't
+ * look like a block at all. This is distinct from having no `name`: an
+ * explicitly created block the user simply hasn't renamed yet is never
+ * `bare` — FR-2 requires it to keep showing its position label and stay
+ * renameable/deletable.
  */
 import { useState } from 'react';
 import type { ReactNode } from 'react';

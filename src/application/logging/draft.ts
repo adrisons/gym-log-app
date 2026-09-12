@@ -61,6 +61,7 @@ export function draftToSession(draft: LoggingDraft, id: SessionId): Session {
   const blocks = draft.blocks.map((block) =>
     createBlock({
       ...(block.name !== undefined ? { name: block.name } : {}),
+      ...(block.loose !== undefined ? { loose: block.loose } : {}),
       type: block.type,
       exercises: block.exercises.map((entry) => ({
         exerciseId: entry.exerciseId,
@@ -95,14 +96,18 @@ export function draftToSession(draft: LoggingDraft, id: SessionId): Session {
 /**
  * Adds an exercise entry to the draft (FR-002). With no `blockId` (the
  * "loose exercise" path a user reaches without ever tapping "Add block"):
- * appends to the trailing block only if it's still unnamed, or creates a
- * fresh unnamed block otherwise — this is what lets User Story 1 read as
- * "a single running list of sets" (spec.md User Story 2 context) when
- * nothing has been named yet, while never silently dropping a "loose" add
- * into a block the user deliberately named (the presentation layer renders
- * an unnamed block "bare" — no header/menu — so this is also what keeps a
- * loose exercise from ever looking like it's inside a block once a real,
- * named one exists alongside it).
+ * appends to the trailing block only if it's itself `loose` (an implicit
+ * container this same path created earlier), or creates a fresh `loose`
+ * block otherwise — this is what lets User Story 1 read as "a single
+ * running list of sets" (spec.md User Story 2 context) when nothing has
+ * been named yet, while never silently dropping a "loose" add into a
+ * block the user *explicitly* created via "Add block" just because that
+ * block also happens to have no name yet (FR-2 requires an unnamed block
+ * to still show its position label and stay renameable/deletable — it
+ * must not be mistaken for a `loose` one). The presentation layer renders
+ * only `loose` blocks "bare" (no header/menu), so this is also what keeps
+ * a loose exercise from ever looking like it's inside a block once a
+ * real, explicitly created one exists alongside it.
  *
  * With an explicit `blockId` (a block's own "Add exercise" control, used
  * to group exercises on purpose): appends to that specific block instead.
@@ -136,9 +141,14 @@ export function addExerciseEntry(
 
   const lastIndex = draft.blocks.length - 1;
   const lastBlock = draft.blocks[lastIndex];
-  if (!lastBlock || lastBlock.name !== undefined) {
+  // Only ever piggybacks on the trailing block if it's itself `loose` —
+  // an explicitly created block the user hasn't named yet (`loose` is
+  // unset) must stay its own block, never silently absorb a loose add
+  // just because it currently has no name (FR-2).
+  if (!lastBlock || lastBlock.loose !== true) {
     const block: DraftBlock = {
       id: newId(),
+      loose: true,
       type: 'straightSets',
       exercises: [entry],
     };

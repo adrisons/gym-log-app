@@ -52,4 +52,51 @@ describe('LoggingScreen (FR-001)', () => {
       expect(draft?.blocks[0]?.exercises[0]?.sets).toHaveLength(1);
     });
   });
+
+  it('a block created via "Add block" keeps its header/controls after an exercise is added to it (FR-2 regression)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    render(<LoggingScreen />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Add block' }),
+      ).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Add block' }));
+
+    // Still unnamed, still explicitly created: FR-2 requires it to show
+    // its position label and stay renameable/deletable — never collapse
+    // to "bare" (chrome-less) rendering just because it has no name yet.
+    await waitFor(() => {
+      expect(screen.getByText('Block 1')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /rename/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /delete block/i }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
+    );
+    await userEvent.type(
+      screen.getByPlaceholderText(/search or create an exercise/i),
+      'Overhead press',
+    );
+    await userEvent.click(screen.getByText('Create "Overhead press"'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Overhead press' }),
+      ).toBeInTheDocument();
+    });
+
+    // The block this exercise landed in must still be a real block, not
+    // a bare/chrome-less one, even though it's unnamed and now non-empty.
+    expect(screen.getByText('Block 1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /rename/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /delete block/i }),
+    ).toBeInTheDocument();
+  });
 });

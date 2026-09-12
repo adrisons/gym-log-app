@@ -334,9 +334,12 @@ describe('reorderBlockExercise/moveExerciseAcrossBlocks (FR-006)', () => {
       undefined,
       'straightSets',
     );
-    draft = addExerciseEntry(draft, 'ex-1' as ExerciseId);
-    draft = addExerciseEntry(draft, 'ex-2' as ExerciseId);
     const blockId = draft.blocks[0]!.id;
+    // Explicit `blockId`: an explicitly created block (even unnamed) is
+    // not `loose`, so a `blockId`-less add would open a fresh block of
+    // its own here instead of joining this one (FR-2).
+    draft = addExerciseEntry(draft, 'ex-1' as ExerciseId, blockId);
+    draft = addExerciseEntry(draft, 'ex-2' as ExerciseId, blockId);
     const [first, second] = draft.blocks[0]!.exercises;
 
     const reordered = reorderBlockExercise(draft, blockId, 0, 1);
@@ -353,9 +356,9 @@ describe('reorderBlockExercise/moveExerciseAcrossBlocks (FR-006)', () => {
       undefined,
       'straightSets',
     );
-    draft = addExerciseEntry(draft, 'ex-1' as ExerciseId);
-    draft = addBlock(draft, undefined, 'straightSets');
     const fromBlockId = draft.blocks[0]!.id;
+    draft = addExerciseEntry(draft, 'ex-1' as ExerciseId, fromBlockId);
+    draft = addBlock(draft, undefined, 'straightSets');
     const toBlockId = draft.blocks[1]!.id;
     const entryId = draft.blocks[0]!.exercises[0]!.id;
 

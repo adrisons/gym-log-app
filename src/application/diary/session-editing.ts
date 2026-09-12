@@ -40,6 +40,7 @@ export function sessionToEditable(session: Session): EditableSession {
     blocks: session.blocks.map((block): DraftBlock => ({
       id: newId(),
       ...(block.name !== undefined ? { name: block.name } : {}),
+      ...(block.loose !== undefined ? { loose: block.loose } : {}),
       type: block.type,
       exercises: block.exercises.map((entry): DraftExerciseEntry => ({
         id: newId(),
@@ -78,6 +79,7 @@ export function editableToSession(
     blocks: editable.blocks.map((block) =>
       createBlock({
         ...(block.name !== undefined ? { name: block.name } : {}),
+        ...(block.loose !== undefined ? { loose: block.loose } : {}),
         type: block.type,
         exercises: block.exercises.map((entry) => ({
           exerciseId: entry.exerciseId,

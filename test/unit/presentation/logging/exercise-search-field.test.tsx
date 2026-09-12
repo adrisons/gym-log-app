@@ -147,4 +147,27 @@ describe('ExerciseSearchField (FR-002, FR-015, FR-016)', () => {
 
     expect(screen.queryByText('Back squat')).not.toBeInTheDocument();
   });
+
+  it('reopens suggestions on the next keystroke after Escape, without needing to leave and refocus the field (keyboard-reachability regression)', async () => {
+    const search = vi.fn(() => [squat]);
+    render(
+      <ExerciseSearchField
+        search={search}
+        onSelectExercise={() => {}}
+        onCreateExercise={() => {}}
+      />,
+    );
+
+    const input = screen.getByLabelText(/exercise/i);
+    await userEvent.click(input);
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByText('Back squat')).not.toBeInTheDocument();
+
+    // `userEvent.keyboard` (unlike `.type`) fires no click of its own, so
+    // this exercises exactly the keys-only path: still focused in the
+    // input, no blur, no re-click/re-focus in between — just keeps typing.
+    await userEvent.keyboard('s');
+
+    expect(screen.getByText('Back squat')).toBeInTheDocument();
+  });
 });

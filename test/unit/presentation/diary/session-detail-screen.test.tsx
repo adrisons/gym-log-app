@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -253,5 +253,184 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       );
       expect(exerciseIds).toContain(deadliftId);
     });
+  });
+
+  it('a save that fails does not permanently block later saves from persisting (queue-recovery regression)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const sessionId = 's1' as SessionId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [
+          createBlock({
+            type: 'straightSets',
+            exercises: [{ exerciseId, notes: '', sets: [] }],
+          }),
+        ],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+
+    // The first save this screen attempts (triggered by the "Add exercise"
+    // edit below) rejects, simulating a transient storage failure (e.g. a
+    // lost File System Access permission). Every save after that succeeds.
+    let nextSaveShouldFail = true;
+    const realSaveSession = storage.saveSession.bind(storage);
+    storage.saveSession = async (session) => {
+      if (nextSaveShouldFail) {
+        nextSaveShouldFail = false;
+        throw new Error('simulated transient save failure');
+      }
+      return realSaveSession(session);
+    };
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <Routes>
+          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Squat' }),
+      ).toBeInTheDocument();
+    });
+
+    // First edit: its save is the one rejected above.
+    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.type(
+      screen.getByPlaceholderText(/search or create an exercise/i),
+      'Deadlift',
+    );
+    await userEvent.click(screen.getByText('Create "Deadlift"'));
+
+    await waitFor(() => {
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to save session',
+        expect.any(Error),
+      );
+    });
+
+    // Second edit, after the first save's rejection: a broken queue would
+    // never call `saveSession` again from this point on, so this edit
+    // would silently never persist.
+    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.type(
+      screen.getByPlaceholderText(/search or create an exercise/i),
+      'Bench press',
+    );
+    await userEvent.click(screen.getByText('Create "Bench press"'));
+
+    await waitFor(async () => {
+      const saved = await storage.getSession(sessionId);
+      const catalogue = await storage.listExercises();
+      const benchPressId = catalogue.find(
+        (e) => e.canonicalName === 'Bench press',
+      )?.id;
+      expect(benchPressId).toBeDefined();
+      const exerciseIds = saved?.blocks.flatMap((block) =>
+        block.exercises.map((entry) => entry.exerciseId),
+      );
+      expect(exerciseIds).toContain(benchPressId);
+    });
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('a block created via "Add block" keeps its header/controls after an exercise is added to it (FR-2 regression)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const sessionId = 's1' as SessionId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [
+          createBlock({
+            type: 'straightSets',
+            name: 'Push day',
+            exercises: [{ exerciseId, notes: '', sets: [] }],
+          }),
+        ],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <Routes>
+          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Squat' }),
+      ).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add block' }));
+
+    // Still unnamed, still explicitly created: FR-2 requires it to show
+    // its position label and stay renameable/deletable — never collapse
+    // to "bare" (chrome-less) rendering just because it has no name yet.
+    await waitFor(() => {
+      expect(screen.getByText('Block 2')).toBeInTheDocument();
+    });
+    expect(
+      screen.getAllByRole('button', { name: /rename/i }).length,
+    ).toBeGreaterThan(0);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Block 2' }),
+    );
+    await userEvent.type(
+      screen.getByPlaceholderText(/search or create an exercise/i),
+      'Deadlift',
+    );
+    await userEvent.click(screen.getByText('Create "Deadlift"'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Deadlift' }),
+      ).toBeInTheDocument();
+    });
+
+    // The block this exercise landed in must still be a real block, not
+    // a bare/chrome-less one, even though it's unnamed and now non-empty.
+    expect(screen.getByText('Block 2')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('button', { name: /rename/i }).length,
+    ).toBeGreaterThan(0);
   });
 });

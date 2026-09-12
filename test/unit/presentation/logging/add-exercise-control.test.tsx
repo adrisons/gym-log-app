@@ -60,4 +60,60 @@ describe('AddExerciseControl', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
+
+  it('restores focus to the trigger button after a selection collapses the field', async () => {
+    render(
+      <AddExerciseControl
+        buttonLabel="+ Add exercise"
+        fieldLabel="Exercise"
+        search={() => [squat]}
+        onSelectExercise={() => {}}
+        onCreateExercise={() => {}}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: '+ Add exercise' }),
+    );
+    await userEvent.click(screen.getByRole('textbox'));
+    await userEvent.click(screen.getByText('Back squat'));
+
+    expect(
+      screen.getByRole('button', { name: '+ Add exercise' }),
+    ).toHaveFocus();
+  });
+
+  it('does not steal focus back to the trigger when the field closes because the user tabbed away (blur-driven close regression)', async () => {
+    render(
+      <>
+        <AddExerciseControl
+          buttonLabel="+ Add exercise"
+          fieldLabel="Exercise"
+          search={() => []}
+          onSelectExercise={() => {}}
+          onCreateExercise={() => {}}
+        />
+        <button type="button">Next control</button>
+      </>,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: '+ Add exercise' }),
+    );
+    expect(screen.getByRole('textbox')).toHaveFocus();
+
+    // No results/create button rendered for an empty query, so the input
+    // is the only focusable element inside the expanded field — Tab moves
+    // straight to "Next control".
+    await userEvent.tab();
+
+    // Confirms the blur actually closed the field back to the trigger
+    // button (the collapsed state)...
+    expect(
+      screen.getByRole('button', { name: '+ Add exercise' }),
+    ).toBeInTheDocument();
+    // ...but the close must leave focus exactly where Tab just put it —
+    // never yank it back to the now-remounted trigger button.
+    expect(screen.getByRole('button', { name: 'Next control' })).toHaveFocus();
+  });
 });

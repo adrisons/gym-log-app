@@ -77,7 +77,14 @@ export function ExerciseSearchField({
           type="text"
           className="logging-field-input"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            // Escape closes the results without moving focus out of this
+            // input — reopening on the next keystroke (not just on a fresh
+            // focus/click) is what lets a keyboard user resume typing and
+            // see results again without leaving and returning to the field.
+            setOpen(true);
+          }}
           onFocus={() => setOpen(true)}
           onClick={() => setOpen(true)}
           onKeyDown={(event) => {

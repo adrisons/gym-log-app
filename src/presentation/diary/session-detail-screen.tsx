@@ -4,10 +4,13 @@
  * `application/diary/session-editing.ts`'s doc comment for the exact
  * editable surface and why undo is out of scope here.
  *
- * Mirrors LoggingScreen's layout conventions: a block with no name renders
- * `bare` (no header/menu) once it has exercises, "Add exercise"/"Add
- * block" sit at the bottom, and each exercise's set-entry template
- * (ADR-0006) is editable through its own menu.
+ * Mirrors LoggingScreen's layout conventions: a `loose` block (an implicit
+ * container for an exercise added outside any block — `domain/block.ts`'s
+ * `Block.loose`) renders `bare` (no header/menu) once it has exercises; an
+ * explicitly created block that just hasn't been named yet is never
+ * `loose` and always keeps its header (FR-2). "Add exercise"/"Add block"
+ * sit at the bottom, and each exercise's set-entry template (ADR-0006) is
+ * editable through its own menu.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -95,9 +98,22 @@ export function SessionDetailScreen() {
       return;
     }
     const snapshot = editable;
-    saveQueueRef.current = saveQueueRef.current.then(() =>
+    const attempt = saveQueueRef.current.then(() =>
       requireStorage().saveSession(editableToSession(snapshot, original)),
     );
+    // Attaches `.catch` synchronously, in this same expression, so the
+    // promise stored back into the ref is one that never itself rejects —
+    // logging this attempt's failure (if any) right here rather than
+    // leaving it for whichever later save happens to chain onto this ref
+    // next. Without this, a rejected `saveQueueRef.current` would
+    // permanently short-circuit every later `.then` in the chain past its
+    // own `saveSession` call, silently dropping every edit from then on;
+    // and attaching the recovery only when the *next* save chains onto it
+    // would still report this rejection as unhandled in the meantime,
+    // since nothing observes it before then.
+    saveQueueRef.current = attempt.catch((error: unknown) => {
+      console.error('Failed to save session', error);
+    });
   }, [editable, original]);
 
   // Takes an updater, not a next value: every call site (including the
@@ -137,9 +153,14 @@ export function SessionDetailScreen() {
     }));
   };
 
-  // Attaches to the trailing unnamed block, or creates a fresh one WITH
-  // the exercise already in it — computed entirely inside the updater
-  // (see `persist`'s own doc comment) so both the "which block is
+  // Attaches to the trailing block only if it's itself `loose` — an
+  // implicit container this same path created earlier — or creates a
+  // fresh `loose` one WITH the exercise already in it. An explicitly
+  // created block the user hasn't named yet is NOT `loose` and must stay
+  // its own block (FR-2: an unnamed block still shows its position and
+  // stays renameable/deletable), never silently absorb a loose add just
+  // because it currently has no name. Computed entirely inside the
+  // updater (see `persist`'s own doc comment) so both the "which block is
   // trailing" decision and the append happen against the true latest
   // state, never a stale render-time snapshot.
   const addExerciseAtTopLevel = (exerciseId: Exercise['id']) => {
@@ -151,7 +172,7 @@ export function SessionDetailScreen() {
         notes: '',
         sets: [],
       };
-      if (lastBlock && lastBlock.name === undefined) {
+      if (lastBlock && lastBlock.loose === true) {
         return {
           ...current,
           blocks: current.blocks.map((b) =>
@@ -163,6 +184,7 @@ export function SessionDetailScreen() {
       }
       const block = {
         id: newEditableItemId(),
+        loose: true,
         type: 'straightSets' as const,
         exercises: [newEntry],
       };
@@ -221,7 +243,7 @@ export function SessionDetailScreen() {
           (sum, entry) => sum + entry.sets.length,
           0,
         );
-        const isBare = block.name === undefined && block.exercises.length > 0;
+        const isBare = block.loose === true && block.exercises.length > 0;
 
         return (
           <BlockCard
