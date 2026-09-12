@@ -38,6 +38,7 @@ const EXPECTED_NON_COLOR_TOKENS = [
   '--radius-sm',
   '--radius-md',
   '--radius-lg',
+  '--radius-pill',
   '--duration-instant',
   '--duration-short',
   '--duration-medium',
