@@ -48,15 +48,27 @@ export function WheelPicker<T>({
     options.findIndex((option) => option.value === value),
   );
 
+  // Our own `scrollToIndex` calls (the sync effect below, and `moveBy`'s
+  // keyboard navigation) fire native `scroll` events too — a `smooth`
+  // scroll in particular animates over time, emitting several. Without
+  // distinguishing those from a real user gesture, `commitFromScroll`
+  // would treat its own animation's intermediate positions as commits
+  // (fighting the exact index `moveBy` already set) and would also mark
+  // it as "user scrolling", suppressing the sync effect for a still-wrong
+  // position. `suppressCommitUntilRef` is a short deadline set whenever we
+  // scroll programmatically; `commitFromScroll` ignores everything until
+  // it passes, so only a genuine touch/wheel/trackpad scroll — never one
+  // of our own — reaches `isUserScrollingRef` below.
+  const suppressCommitUntilRef = useRef(0);
+
   const scrollToIndex = (index: number, smooth: boolean) => {
+    const behavior = smooth && !prefersReducedMotion() ? 'smooth' : 'instant';
+    suppressCommitUntilRef.current = Date.now() + (smooth ? 300 : 0);
     // Optional chaining on the method itself, not just the ref: jsdom (unit
     // tests) has no scrollTo implementation at all, and this must degrade
     // to a silent no-op there rather than throw — real browsers always
     // have it, so this changes nothing outside tests.
-    containerRef.current?.scrollTo?.({
-      top: index * ITEM_HEIGHT_PX,
-      behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'instant',
-    });
+    containerRef.current?.scrollTo?.({ top: index * ITEM_HEIGHT_PX, behavior });
   };
 
   // A user-driven scroll (touch drag, momentum, wheel) fires many `scroll`
@@ -82,6 +94,7 @@ export function WheelPicker<T>({
   }, [selectedIndex]);
 
   const commitFromScroll = () => {
+    if (Date.now() < suppressCommitUntilRef.current) return;
     isUserScrollingRef.current = true;
     clearTimeout(scrollIdleTimeoutRef.current);
     scrollIdleTimeoutRef.current = setTimeout(() => {
