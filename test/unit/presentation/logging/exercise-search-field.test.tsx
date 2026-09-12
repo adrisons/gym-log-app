@@ -170,4 +170,27 @@ describe('ExerciseSearchField (FR-002, FR-015, FR-016)', () => {
 
     expect(screen.getByText('Back squat')).toBeInTheDocument();
   });
+
+  it('closes on Escape from a focused result button too, and returns focus to the input (keyboard-escape regression)', async () => {
+    const search = vi.fn(() => [squat]);
+    render(
+      <ExerciseSearchField
+        search={search}
+        onSelectExercise={() => {}}
+        onCreateExercise={() => {}}
+      />,
+    );
+
+    const input = screen.getByLabelText(/exercise/i);
+    await userEvent.click(input);
+    // Tab from the input onto the result button — Escape's handler used
+    // to live only on the input itself, so it did nothing from here.
+    await userEvent.tab();
+    expect(screen.getByText('Back squat')).toHaveFocus();
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByText('Back squat')).not.toBeInTheDocument();
+    expect(input).toHaveFocus();
+  });
 });

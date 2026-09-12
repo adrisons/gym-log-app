@@ -60,6 +60,10 @@ test('ADR-0006 v1->v2 migration backfills a legacy Exercise and bumps the stored
   expect(outcome.defaultVolumeKind).toBe('reps');
   expect(outcome.trackEffort).toBe(false);
   expect(outcome.storedSchemaVersion).toBe(2);
+  // The port's own read-time normalization would report a correctly
+  // shaped record either way — this is the field that actually tells a
+  // real physical migration apart from that safety net alone.
+  expect(outcome.rawFileMigrated).toBe(true);
 });
 
 test('ADR-0006 migration survives a gesture-less first write followed by a real handle acquisition against a pre-existing v1 directory', async ({

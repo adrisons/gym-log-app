@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { useState } from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ExerciseTemplatePanel } from '@/presentation/logging/exercise-template-panel';
 import type { Exercise } from '@/domain/exercise';
@@ -73,5 +74,44 @@ describe('ExerciseTemplatePanel (ADR-0006)', () => {
 
     expect(onClose).toHaveBeenCalled();
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('restores focus to the trigger that opened it once Save/Cancel unmounts the dialog (focus-restoration regression)', async () => {
+    function Wrapper() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Edit tracked fields…
+          </button>
+          {open && (
+            <ExerciseTemplatePanel
+              exercise={squat}
+              onSave={() => setOpen(false)}
+              onClose={() => setOpen(false)}
+            />
+          )}
+        </>
+      );
+    }
+    render(<Wrapper />);
+
+    const trigger = screen.getByRole('button', {
+      name: /edit tracked fields/i,
+    });
+    await userEvent.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toHaveFocus();
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /edit tracked fields/i }),
+    ).toHaveFocus();
   });
 });

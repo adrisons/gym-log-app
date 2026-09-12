@@ -26,7 +26,7 @@
  * combobox is worse for assistive tech than a correctly plain one — every
  * result is still a real, individually tab-reachable `<button>`.
  */
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { normalize } from '@/application/logging/use-cases';
 import type { Exercise } from '@/application/logging/use-cases';
 import './logging.css';
@@ -50,6 +50,7 @@ export function ExerciseSearchField({
   autoFocus = false,
 }: ExerciseSearchFieldProps) {
   const resultsId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const trimmed = query.trim();
@@ -70,10 +71,27 @@ export function ExerciseSearchField({
           setOpen(false);
         }
       }}
+      onKeyDown={(event) => {
+        // On the container, not just the input: once a keyboard user has
+        // tabbed from the input into a result/create button, that button
+        // is what has focus, and Escape must still close the disclosure
+        // from there. Refocusing the input afterward matters because
+        // closing unmounts whatever result button was focused — without
+        // it, focus would fall back to the document body.
+        if (event.key === 'Escape') {
+          // Focus first, `setOpen(false)` after: focusing the input
+          // synchronously fires its own `onFocus` (which reopens), so
+          // closing has to be the last state update in this batch to win
+          // — reversing this order would leave the suggestions open.
+          inputRef.current?.focus();
+          setOpen(false);
+        }
+      }}
     >
       <label className="logging-screen__field-label">
         <span>{label}</span>
         <input
+          ref={inputRef}
           type="text"
           className="logging-field-input"
           value={query}
@@ -87,9 +105,6 @@ export function ExerciseSearchField({
           }}
           onFocus={() => setOpen(true)}
           onClick={() => setOpen(true)}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') setOpen(false);
-          }}
           placeholder={placeholder}
           aria-expanded={open}
           aria-controls={resultsId}

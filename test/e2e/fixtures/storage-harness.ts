@@ -264,6 +264,19 @@ async function runMigrationTestFileSystem(): Promise<MigrationTestResult> {
   await adapter.saveBandLabels([]);
   const storedSchemaVersion = await adapter.getSchemaVersion();
 
+  // Read the raw file directly — bypassing the port's own read-time
+  // normalization (`readNormalized` above, which reports a correctly
+  // shaped record either way, migrated or not) — to prove the *disk*
+  // itself was actually rewritten by this, the ordinary (non-fresh-
+  // acquisition) migration path, not just the metadata version bump.
+  const rawExercisesFile = await storeDir.getFileHandle('exercises.json');
+  const rawExercises = JSON.parse(
+    await (await rawExercisesFile.getFile()).text(),
+  ) as { defaultVolumeKind?: string; trackEffort?: boolean }[];
+  const rawFileMigrated =
+    rawExercises[0]?.defaultVolumeKind === 'reps' &&
+    rawExercises[0]?.trackEffort === false;
+
   db.close();
   await opfsRoot
     .removeEntry(dirName, { recursive: true })
@@ -275,6 +288,7 @@ async function runMigrationTestFileSystem(): Promise<MigrationTestResult> {
     defaultVolumeKind: readNormalized?.defaultVolumeKind,
     trackEffort: readNormalized?.trackEffort,
     storedSchemaVersion,
+    rawFileMigrated,
   };
 }
 

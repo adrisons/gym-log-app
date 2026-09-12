@@ -48,9 +48,15 @@ export function ExerciseTemplatePanel({
   // the screen, not next to the menu item that opened it) without moving
   // focus on its own — without this, opening it leaves focus on that now
   // possibly-unmounted menu item and forward Tab navigation never reaches
-  // the dialog at all.
+  // the dialog at all. The cleanup restores focus to whatever had it
+  // before (the "Edit tracked fields…" trigger) once Save/Cancel unmounts
+  // this dialog — without it, focus falls back to the document body.
   useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     dialogRef.current?.focus();
+    return () => {
+      previouslyFocused?.focus();
+    };
   }, []);
 
   return (
