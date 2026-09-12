@@ -1,12 +1,11 @@
 /**
- * FR-009, FR-010, FR-026: a Weight load's numeric value. Numeric keypad by
- * default (`inputMode="decimal"`); quick-increment buttons (research.md
- * §9) never take the value below 0 — the down button shows
- * disabled-with-reason at 0 rather than silently no-opping. Value is
+ * FR-009, FR-026: a Weight load's numeric value. Numeric keypad by default
+ * (`inputMode="decimal"`) is the sole entry path — no quick-increment
+ * buttons (a deliberate product decision superseding the ± buttons FR-3
+ * used to require; see docs/requirements.md FR-3's updated text). Value is
  * `undefined` when empty (treated as "no Weight load entered", not `0` —
  * `0` is itself a valid FR-026 value once the user actually enters it).
  */
-import { WEIGHT_INCREMENT_KG } from '@/application/logging/quick-increments';
 import './logging.css';
 
 export interface WeightLoadInputProps {
@@ -15,8 +14,6 @@ export interface WeightLoadInputProps {
 }
 
 export function WeightLoadInput({ valueKg, onChange }: WeightLoadInputProps) {
-  const current = valueKg ?? 0;
-
   return (
     <div className="set-row__field">
       <label>
@@ -39,30 +36,6 @@ export function WeightLoadInput({ valueKg, onChange }: WeightLoadInputProps) {
           }}
         />
       </label>
-      <div className="set-row__inputs">
-        <button
-          type="button"
-          className="logging-button"
-          disabled={current <= 0}
-          aria-disabled={current <= 0}
-          aria-label={
-            current <= 0
-              ? `Decrease weight (already at the 0 kg minimum)`
-              : `Decrease weight by ${WEIGHT_INCREMENT_KG} kg`
-          }
-          onClick={() => onChange(Math.max(0, current - WEIGHT_INCREMENT_KG))}
-        >
-          −{WEIGHT_INCREMENT_KG} kg
-        </button>
-        <button
-          type="button"
-          className="logging-button"
-          aria-label={`Increase weight by ${WEIGHT_INCREMENT_KG} kg`}
-          onClick={() => onChange(current + WEIGHT_INCREMENT_KG)}
-        >
-          +{WEIGHT_INCREMENT_KG} kg
-        </button>
-      </div>
     </div>
   );
 }

@@ -1,80 +1,85 @@
 /**
- * FR-008, FR-026: a set's Volume — reps, duration, or distance, with
- * quick-increment buttons (research.md §9) that never go below the
- * FR-026 bound (reps: 1; duration/distance: > 0, enforced by the domain
- * `createVolume` constructor as defense in depth).
+ * FR-008, FR-026: a set's Volume — reps, duration, or distance, whichever
+ * one the exercise's template (ADR-0006) says; the set-entry form no
+ * longer offers a per-set switch between them (that only happens through
+ * `ExerciseTemplatePanel`, ADR-0006's own component). Reps has no numeric
+ * field of its own: it's a scrollable wheel from 1 to 100 with a leading
+ * "unset" position (a set can be logged with a load and no volume at all,
+ * so the wheel needs a way to represent "nothing chosen yet" too), rather
+ * than a keypad + quick-increment buttons — the wheel itself is the
+ * quick-increment mechanism. Duration/distance keep their numeric field
+ * and quick-increment buttons unchanged (research.md §9); only reps was
+ * asked to move to a wheel.
  */
 import {
-  REPS_INCREMENT,
   DURATION_INCREMENT_SECONDS,
   DISTANCE_INCREMENT_METRES,
 } from '@/application/logging/quick-increments';
+import { WheelPicker } from './wheel-picker';
+import type { WheelPickerOption } from './wheel-picker';
 import './logging.css';
 
 export type VolumeKind = 'reps' | 'duration' | 'distance';
 
-const KIND_META: Record<
-  VolumeKind,
-  { label: string; unit: string; increment: number; min: number }
+const TIMED_KIND_META: Record<
+  'duration' | 'distance',
+  { label: string; increment: number; min: number }
 > = {
-  reps: { label: 'Reps', unit: '', increment: REPS_INCREMENT, min: 1 },
   duration: {
     label: 'Duration (s)',
-    unit: 's',
     increment: DURATION_INCREMENT_SECONDS,
     min: 1,
   },
   distance: {
     label: 'Distance (m)',
-    unit: 'm',
     increment: DISTANCE_INCREMENT_METRES,
     min: 1,
   },
 };
 
+export const MAX_REPS = 100;
+const REPS_OPTIONS: WheelPickerOption<number | undefined>[] = [
+  { value: undefined, label: '—' },
+  ...Array.from({ length: MAX_REPS }, (_, i) => ({
+    value: i + 1,
+    label: String(i + 1),
+  })),
+];
+
 export interface VolumeInputProps {
   kind: VolumeKind;
   value: number | undefined;
-  onKindChange: (kind: VolumeKind) => void;
   onValueChange: (value: number | undefined) => void;
 }
 
-export function VolumeInput({
-  kind,
-  value,
-  onKindChange,
-  onValueChange,
-}: VolumeInputProps) {
-  const meta = KIND_META[kind];
+export function VolumeInput({ kind, value, onValueChange }: VolumeInputProps) {
+  if (kind === 'reps') {
+    return (
+      <div className="set-row__field">
+        <span>Reps</span>
+        <WheelPicker
+          className="wheel-picker--numeric"
+          ariaLabel="Reps"
+          options={REPS_OPTIONS}
+          value={value}
+          onChange={onValueChange}
+        />
+      </div>
+    );
+  }
+
+  const meta = TIMED_KIND_META[kind];
   const current = value ?? 0;
 
   return (
     <div className="set-row__field">
-      <div
-        role="radiogroup"
-        aria-label="Volume kind"
-        className="set-row__inputs"
-      >
-        {(Object.keys(KIND_META) as VolumeKind[]).map((k) => (
-          <button
-            key={k}
-            type="button"
-            role="radio"
-            aria-checked={k === kind}
-            className="logging-button"
-            onClick={() => onKindChange(k)}
-          >
-            {KIND_META[k].label}
-          </button>
-        ))}
-      </div>
       <label>
         <span>{meta.label}</span>
         <input
           type="number"
-          inputMode={kind === 'reps' ? 'numeric' : 'decimal'}
+          inputMode="decimal"
           min={0}
-          step={kind === 'reps' ? 1 : 0.5}
+          step={0.5}
           className="logging-field-input"
           value={value ?? ''}
           onChange={(event) => {
@@ -83,10 +88,7 @@ export function VolumeInput({
               onValueChange(undefined);
               return;
             }
-            const parsed =
-              kind === 'reps'
-                ? Number.parseInt(raw, 10)
-                : Number.parseFloat(raw);
+            const parsed = Number.parseFloat(raw);
             onValueChange(
               Number.isFinite(parsed) && parsed >= meta.min
                 ? parsed

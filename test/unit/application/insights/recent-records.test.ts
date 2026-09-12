@@ -22,6 +22,8 @@ function exercise(
     canonicalName,
     aliases: [],
     defaultLoadType,
+    defaultVolumeKind: 'reps',
+    trackEffort: false,
     unilateral: false,
     discipline: 'Strength',
   };

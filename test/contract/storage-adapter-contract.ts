@@ -16,14 +16,30 @@
  * underlying store (spec 003 quickstart.md's "a fresh script context, not
  * just a re-render").
  *
- * Schema-version scope note: `CURRENT_SCHEMA_VERSION` is 1 (FR-007a) and
- * `decideSchemaAction`'s "migrate" branch only fires for
- * `0 < stored < current` — with only one real schema version in
- * existence, that range is empty, so the "migrate" *transition* has no
- * adapter-level scenario here (it is proven at the pure-function level,
+ * Schema-version scope note: `CURRENT_SCHEMA_VERSION` is 2 as of ADR-0006
+ * (Exercise gained `defaultVolumeKind`/`trackEffort`), so a real v1->v2
+ * `decideSchemaAction` "migrate" transition now exists in both real
+ * adapters (`#migrateExerciseTemplateDefaults`). It has no scenario in
+ * *this* suite: `setSchemaVersion` is the only public, schema-check-free
+ * way to seed a stale version, and every other `StoragePort` write
+ * (including `saveExercise`) runs `#ensureSchemaChecked` first — so a
+ * legacy-shaped record saved through this harness would trigger the
+ * migrate transition (against whatever already exists, empty here)
+ * *before* that same call's own write lands, never producing a genuinely
+ * pre-migration stored record to migrate. `decideSchemaAction` itself
+ * stays proven at the pure-function level,
  * `test/unit/infrastructure/schema-version.test.ts`, against synthetic
- * current/stored fixtures). This suite proves the three reachable
- * adapter-level cases: never-initialized, same, newer.
+ * current/stored fixtures. This suite proves the three adapter-level
+ * cases reachable through the public port: never-initialized, same,
+ * newer.
+ *
+ * The actual v1->v2 migration — seeding a genuinely pre-migration record
+ * below the port and confirming it comes back backfilled with the stored
+ * version bumped — is instead covered directly against each real
+ * adapter's own underlying storage: see `window.__runMigrationTest` in
+ * `test/e2e/fixtures/storage-harness.ts` and its callers in
+ * `test/e2e/indexed-db-adapter.contract.spec.ts` /
+ * `test/e2e/file-system-adapter.contract.spec.ts`.
  */
 import type {
   StoragePort,
@@ -77,6 +93,8 @@ function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
     canonicalName: 'Back squat',
     aliases: [],
     defaultLoadType: 'weight',
+    defaultVolumeKind: 'reps',
+    trackEffort: false,
     unilateral: false,
     discipline: 'Strength',
     ...overrides,

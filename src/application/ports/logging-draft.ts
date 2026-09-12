@@ -38,6 +38,18 @@ export interface DraftExerciseEntry {
 export interface DraftBlock {
   id: string;
   name?: string;
+  /**
+   * Marks an implicit container the presentation layer synthesizes for
+   * an exercise logged outside any explicit block (`docs/requirements.md`
+   * FR-2's "loose" logging path) — rendered with no header/controls at
+   * all, even while empty. Distinct from having no `name`: an explicitly
+   * created block that simply hasn't been named yet is *not* `loose` and
+   * must still show its position label and stay renameable/deletable
+   * (FR-2). Presentation-only: deliberately never carried into the
+   * persisted domain `Block` (`domain/block.ts`) — a purely cosmetic
+   * rendering choice isn't a schema change (`docs/requirements.md` §6).
+   */
+  loose?: boolean; // stripped before either real adapter writes a draft (`application/logging/draft.ts`'s `toPersistableDraft`) — never reaches disk/IndexedDB, so it needs no ADR/migration of its own
   type: 'straightSets' | 'superset' | 'circuit';
   exercises: DraftExerciseEntry[];
 }

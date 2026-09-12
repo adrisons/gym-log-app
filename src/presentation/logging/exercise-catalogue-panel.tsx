@@ -10,6 +10,7 @@ import type {
   RenameExerciseResult,
   ExerciseId,
 } from '@/application/logging/use-cases';
+import { Icon } from '@/presentation/design/icons';
 import './logging.css';
 
 export interface ExerciseCataloguePanelProps {
@@ -69,9 +70,10 @@ export function ExerciseCataloguePanel({
           </label>
           <button
             type="button"
-            className="logging-button"
+            className="logging-button logging-button--icon-label"
             onClick={() => void handleRenameSubmit()}
           >
+            <Icon name="check" />
             Save name
           </button>
 
@@ -95,13 +97,14 @@ export function ExerciseCataloguePanel({
               </button>
               <button
                 type="button"
-                className="logging-button"
+                className="logging-button logging-button--icon-label"
                 onClick={() => {
                   onMerge(collision.collidesWith.id, exercise.id);
                   setCollision(undefined);
                   onClose();
                 }}
               >
+                <Icon name="move-to" />
                 Merge (not undoable)
               </button>
             </div>
@@ -109,9 +112,10 @@ export function ExerciseCataloguePanel({
 
           <button
             type="button"
-            className="logging-button"
+            className="logging-button logging-button--icon-label"
             onClick={() => setMode('delete')}
           >
+            <Icon name="trash" />
             Delete exercise…
           </button>
         </>
@@ -128,33 +132,37 @@ export function ExerciseCataloguePanel({
               </p>
               <button
                 type="button"
-                className="logging-button"
+                className="logging-button logging-button--icon-label"
                 onClick={() => setMode('delete-merge-search')}
               >
+                <Icon name="move-to" />
                 Merge instead
               </button>
               <button
                 type="button"
-                className="logging-button"
+                className="logging-button logging-button--icon-label"
                 onClick={onDeleteConfirm}
               >
+                <Icon name="trash" />
                 Delete anyway
               </button>
             </>
           ) : (
             <button
               type="button"
-              className="logging-button"
+              className="logging-button logging-button--icon-label"
               onClick={onDeleteConfirm}
             >
+              <Icon name="trash" />
               Confirm delete
             </button>
           )}
           <button
             type="button"
-            className="logging-button"
+            className="logging-button logging-button--icon-label"
             onClick={() => setMode('rename')}
           >
+            <Icon name="close" />
             Cancel
           </button>
         </div>
@@ -178,12 +186,13 @@ export function ExerciseCataloguePanel({
                 <li key={candidate.id}>
                   <button
                     type="button"
-                    className="logging-button"
+                    className="logging-button logging-button--icon-label"
                     onClick={() => {
                       onMerge(candidate.id, exercise.id);
                       onClose();
                     }}
                   >
+                    <Icon name="move-to" />
                     Merge into {candidate.canonicalName} (not undoable)
                   </button>
                 </li>
@@ -192,7 +201,12 @@ export function ExerciseCataloguePanel({
         </div>
       )}
 
-      <button type="button" className="logging-button" onClick={onClose}>
+      <button
+        type="button"
+        className="logging-button logging-button--icon-label"
+        onClick={onClose}
+      >
+        <Icon name="close" />
         Close
       </button>
     </div>

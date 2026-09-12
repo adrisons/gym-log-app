@@ -1,10 +1,14 @@
 /**
- * The "add a new set" row for one exercise entry — every load type
- * (Weight/Band/Bodyweight/Free text/None), every volume kind (reps/
- * duration/distance), and effort (US3), pre-filled from the entry's
- * previous set (FR-008, load/volume only, never effort). Confirming
- * builds an `AddSetInput` and hands it to the parent, which calls the
- * store's `addSet` action (this component has no `StoragePort` access —
+ * The "add a new set" row for one exercise entry. Shows exactly the load
+ * input and volume control the exercise's set-entry template says
+ * (ADR-0006) — for a fresh exercise, that's Weight + Reps and nothing
+ * else. There is no per-set switch between load types or volume kinds
+ * any more; that only happens through the exercise's own "Edit tracked
+ * fields" menu item (`ExerciseTemplatePanel`). Effort only appears when
+ * the template tracks it. Pre-filled from the entry's previous set
+ * (FR-008, load/volume only, never effort). Confirming builds an
+ * `AddSetInput` and hands it to the parent, which calls the store's
+ * `addSet` action (this component has no `StoragePort` access —
  * `docs/architecture.md`'s presentation row).
  *
  * Keyed by the parent on the entry's set count (`key={entryId}-${sets.length}`)
@@ -14,12 +18,11 @@
  * (FR-008) without a manual state-sync effect.
  */
 import { useState } from 'react';
-import { LoadTypePicker } from './load-type-picker';
 import { WeightLoadInput } from './weight-load-input';
 import { BandLoadInput } from './band-load-input';
 import { BodyweightLoadInput } from './bodyweight-load-input';
 import { FreeTextLoadInput } from './free-text-load-input';
-import { VolumeInput } from './volume-input';
+import { VolumeInput, MAX_REPS } from './volume-input';
 import type { VolumeKind } from './volume-input';
 import { EffortPicker } from './effort-picker';
 import { SetConfirmControl } from './set-confirm-control';
@@ -29,59 +32,68 @@ import './logging.css';
 
 export interface SetRowProps {
   prefill: SetPrefill | undefined;
-  defaultLoadKind: Load['kind'];
+  loadKind: Load['kind'];
+  volumeKind: VolumeKind;
+  trackEffort: boolean;
   bandLabels: string[];
   freeTextSuggestions: string[];
   onConfirm: (input: AddSetInput) => void;
-  onLoadTypeChange: (kind: Load['kind']) => void;
   onSaveBandLabels: (labels: string[]) => void;
-}
-
-function initialVolumeKind(prefill: SetPrefill | undefined): VolumeKind {
-  return prefill?.volume?.kind ?? 'reps';
 }
 
 function initialVolumeValue(
   prefill: SetPrefill | undefined,
+  volumeKind: VolumeKind,
 ): number | undefined {
   const volume = prefill?.volume;
-  if (!volume) return undefined;
-  if (volume.kind === 'reps') return volume.count;
+  if (!volume || volume.kind !== volumeKind) return undefined;
+  if (volume.kind === 'reps') {
+    // A legal historical `Set` can hold a rep count the reps wheel
+    // doesn't offer (it only goes to `MAX_REPS` — domain `createVolume`
+    // has no upper bound). Left as-is, `WheelPicker` would silently fall
+    // back to its "unset" position while this out-of-range value stayed
+    // held here, letting Add set confirm it despite the wheel visibly
+    // showing nothing selected. Normalizing to `undefined` here keeps
+    // what's held in sync with what's shown.
+    return volume.count <= MAX_REPS ? volume.count : undefined;
+  }
   if (volume.kind === 'duration') return volume.seconds;
   return volume.metres;
 }
 
 export function SetRow({
   prefill,
-  defaultLoadKind,
+  loadKind,
+  volumeKind,
+  trackEffort,
   bandLabels,
   freeTextSuggestions,
   onConfirm,
-  onLoadTypeChange,
   onSaveBandLabels,
 }: SetRowProps) {
-  const [loadKind, setLoadKind] = useState<Load['kind']>(
-    prefill?.load.kind ?? defaultLoadKind,
-  );
+  const prefillMatchesLoadKind = prefill?.load.kind === loadKind;
   const [weightKg, setWeightKg] = useState<number | undefined>(
-    prefill?.load.kind === 'weight' ? prefill.load.value : undefined,
+    prefillMatchesLoadKind && prefill!.load.kind === 'weight'
+      ? prefill!.load.value
+      : undefined,
   );
   const [bandLabel, setBandLabel] = useState<string | undefined>(
-    prefill?.load.kind === 'band' ? prefill.load.label : undefined,
+    prefillMatchesLoadKind && prefill!.load.kind === 'band'
+      ? prefill!.load.label
+      : undefined,
   );
   const [bodyweightKg, setBodyweightKg] = useState<number | undefined>(
-    prefill?.load.kind === 'bodyweight'
-      ? prefill.load.addedOrAssistedKg
+    prefillMatchesLoadKind && prefill!.load.kind === 'bodyweight'
+      ? prefill!.load.addedOrAssistedKg
       : undefined,
   );
   const [freeText, setFreeText] = useState<string>(
-    prefill?.load.kind === 'freeText' ? prefill.load.text : '',
-  );
-  const [volumeKind, setVolumeKind] = useState<VolumeKind>(
-    initialVolumeKind(prefill),
+    prefillMatchesLoadKind && prefill!.load.kind === 'freeText'
+      ? prefill!.load.text
+      : '',
   );
   const [volumeValue, setVolumeValue] = useState<number | undefined>(
-    initialVolumeValue(prefill),
+    initialVolumeValue(prefill, volumeKind),
   );
   const [effort, setEffort] = useState<1 | 2 | 3 | 4 | 5 | undefined>(
     undefined,
@@ -103,11 +115,6 @@ export function SetRow({
   })();
 
   const canConfirm = load.present || volumeValue !== undefined;
-
-  const handleLoadTypeChange = (kind: Load['kind']) => {
-    setLoadKind(kind);
-    onLoadTypeChange(kind);
-  };
 
   const handleConfirm = () => {
     if (!canConfirm) return;
@@ -148,7 +155,6 @@ export function SetRow({
 
   return (
     <div className="set-row">
-      <LoadTypePicker selected={loadKind} onSelect={handleLoadTypeChange} />
       {loadKind === 'weight' && (
         <WeightLoadInput valueKg={weightKg} onChange={setWeightKg} />
       )}
@@ -176,10 +182,9 @@ export function SetRow({
       <VolumeInput
         kind={volumeKind}
         value={volumeValue}
-        onKindChange={setVolumeKind}
         onValueChange={setVolumeValue}
       />
-      <EffortPicker value={effort} onChange={setEffort} />
+      {trackEffort && <EffortPicker value={effort} onChange={setEffort} />}
       <SetConfirmControl canConfirm={canConfirm} onConfirm={handleConfirm} />
     </div>
   );

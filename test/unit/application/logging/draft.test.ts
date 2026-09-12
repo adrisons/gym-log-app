@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createDraft,
   draftToSession,
+  toPersistableDraft,
   addExerciseEntry,
   prefillNextSet,
   addSet,
@@ -102,6 +103,46 @@ describe('LoggingDraft (data-model.md "LoggingDraft")', () => {
     const session = draftToSession(draft, 'session-2' as SessionId);
     expect(session.blocks).toEqual([]);
   });
+
+  it('toPersistableDraft strips the presentation-only `loose` flag so it never reaches disk/IndexedDB (undocumented-schema-field regression)', () => {
+    const draft: LoggingDraft = {
+      id: 'draft-1',
+      dateTime: '2026-09-11T18:00:00.000Z',
+      lastEditedAt: '2026-09-11T18:00:00.000Z',
+      notes: '',
+      blocks: [
+        {
+          id: 'block-1',
+          loose: true,
+          type: 'straightSets',
+          exercises: [],
+        },
+        {
+          id: 'block-2',
+          name: 'Named block',
+          type: 'straightSets',
+          exercises: [],
+        },
+      ],
+    };
+
+    const persistable = toPersistableDraft(draft);
+
+    expect(persistable.blocks[0]).not.toHaveProperty('loose');
+    expect(persistable.blocks[1]).not.toHaveProperty('loose');
+    // Every other field survives unchanged.
+    expect(persistable.blocks[0]).toEqual({
+      id: 'block-1',
+      type: 'straightSets',
+      exercises: [],
+    });
+    expect(persistable.blocks[1]).toEqual({
+      id: 'block-2',
+      name: 'Named block',
+      type: 'straightSets',
+      exercises: [],
+    });
+  });
 });
 
 describe('addExerciseEntry (FR-002; keeps US1 a flat single running list)', () => {
@@ -126,6 +167,47 @@ describe('addExerciseEntry (FR-002; keeps US1 a flat single running list)', () =
 
     expect(withSecond.blocks).toHaveLength(1);
     expect(withSecond.blocks[0]?.exercises).toHaveLength(2);
+  });
+
+  it('with an explicit blockId, appends to that block instead of the last one', () => {
+    let draft = addBlock(
+      createDraft('2026-09-11T18:00:00.000Z'),
+      'Legs',
+      'straightSets',
+    );
+    draft = addBlock(draft, undefined, 'straightSets');
+    const firstBlockId = draft.blocks[0]!.id;
+
+    const updated = addExerciseEntry(draft, 'ex-1' as ExerciseId, firstBlockId);
+
+    expect(updated.blocks[0]?.exercises).toHaveLength(1);
+    expect(updated.blocks[1]?.exercises).toHaveLength(0);
+  });
+
+  it('with no blockId, starts a fresh unnamed block rather than nesting into a named last block', () => {
+    let draft = addBlock(
+      createDraft('2026-09-11T18:00:00.000Z'),
+      'Legs',
+      'straightSets',
+    );
+    draft = addExerciseEntry(draft, 'ex-1' as ExerciseId);
+
+    expect(draft.blocks).toHaveLength(2);
+    expect(draft.blocks[0]?.exercises).toHaveLength(0);
+    expect(draft.blocks[1]?.name).toBeUndefined();
+    expect(draft.blocks[1]?.exercises).toHaveLength(1);
+  });
+
+  it('is a no-op when the given blockId does not resolve', () => {
+    const draft = addBlock(
+      createDraft('2026-09-11T18:00:00.000Z'),
+      undefined,
+      'straightSets',
+    );
+
+    const updated = addExerciseEntry(draft, 'ex-1' as ExerciseId, 'missing');
+
+    expect(updated).toBe(draft);
   });
 });
 
@@ -293,9 +375,12 @@ describe('reorderBlockExercise/moveExerciseAcrossBlocks (FR-006)', () => {
       undefined,
       'straightSets',
     );
-    draft = addExerciseEntry(draft, 'ex-1' as ExerciseId);
-    draft = addExerciseEntry(draft, 'ex-2' as ExerciseId);
     const blockId = draft.blocks[0]!.id;
+    // Explicit `blockId`: an explicitly created block (even unnamed) is
+    // not `loose`, so a `blockId`-less add would open a fresh block of
+    // its own here instead of joining this one (FR-2).
+    draft = addExerciseEntry(draft, 'ex-1' as ExerciseId, blockId);
+    draft = addExerciseEntry(draft, 'ex-2' as ExerciseId, blockId);
     const [first, second] = draft.blocks[0]!.exercises;
 
     const reordered = reorderBlockExercise(draft, blockId, 0, 1);
@@ -312,9 +397,9 @@ describe('reorderBlockExercise/moveExerciseAcrossBlocks (FR-006)', () => {
       undefined,
       'straightSets',
     );
-    draft = addExerciseEntry(draft, 'ex-1' as ExerciseId);
-    draft = addBlock(draft, undefined, 'straightSets');
     const fromBlockId = draft.blocks[0]!.id;
+    draft = addExerciseEntry(draft, 'ex-1' as ExerciseId, fromBlockId);
+    draft = addBlock(draft, undefined, 'straightSets');
     const toBlockId = draft.blocks[1]!.id;
     const entryId = draft.blocks[0]!.exercises[0]!.id;
 

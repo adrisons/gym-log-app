@@ -57,6 +57,8 @@ interface Exercise {
   movementPattern?: string; // optional (docs/requirements.md §3.1)
   muscleGroups?: string[]; // optional (docs/requirements.md §3.1)
   defaultLoadType: Load['kind'];
+  defaultVolumeKind: Volume['kind']; // added by ADR-0006 (schema v2) — the set-entry template's volume-kind half; see the ADR for the forward-only migration rule
+  trackEffort: boolean; // added by ADR-0006 (schema v2) — whether the effort control appears at all for this exercise's sets
   unilateral: boolean;
   discipline: 'Strength'; // fixed in v1, canonical casing per docs/requirements.md §1.4/§3.1; FR-001 — present so a future value is additive
 }

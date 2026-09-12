@@ -5,7 +5,7 @@ import {
   discardDraft,
   searchExercises,
   createExercise,
-  recordLoadTypeDefault,
+  updateExerciseTemplate,
   suggestFreeTextLoads,
   listBandLabels,
   saveBandLabels,
@@ -98,6 +98,8 @@ function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
     canonicalName: 'Back squat',
     aliases: [],
     defaultLoadType: 'weight',
+    defaultVolumeKind: 'reps',
+    trackEffort: false,
     unilateral: false,
     discipline: 'Strength',
     ...overrides,
@@ -207,18 +209,46 @@ describe('createExercise (FR-002, FR-015)', () => {
     expect(exercise.discipline).toBe('Strength');
     expect(await storage.getExercise(exercise.id)).toEqual(exercise);
   });
+
+  it('defaults the set-entry template to Weight + Reps, effort untracked (ADR-0006)', async () => {
+    const storage = new InMemoryStorage();
+    const exercise = await createExercise(storage, {
+      canonicalName: 'Hip thrust',
+    });
+
+    expect(exercise.defaultLoadType).toBe('weight');
+    expect(exercise.defaultVolumeKind).toBe('reps');
+    expect(exercise.trackEffort).toBe(false);
+  });
 });
 
-describe('recordLoadTypeDefault (FR-009, Acceptance Scenario US3-1)', () => {
-  it("updates and saves the exercise's defaultLoadType", async () => {
+describe('updateExerciseTemplate (ADR-0006)', () => {
+  it("updates the exercise's load type, volume kind and trackEffort", async () => {
     const storage = new InMemoryStorage();
-    const exercise = await createExercise(storage, { canonicalName: 'Row' });
+    const exercise = await createExercise(storage, { canonicalName: 'Plank' });
 
-    await recordLoadTypeDefault(storage, exercise.id, 'band');
+    await updateExerciseTemplate(storage, exercise.id, {
+      defaultLoadType: 'none',
+      defaultVolumeKind: 'duration',
+      trackEffort: true,
+    });
 
-    expect((await storage.getExercise(exercise.id))?.defaultLoadType).toBe(
-      'band',
-    );
+    const updated = await storage.getExercise(exercise.id);
+    expect(updated?.defaultLoadType).toBe('none');
+    expect(updated?.defaultVolumeKind).toBe('duration');
+    expect(updated?.trackEffort).toBe(true);
+  });
+
+  it('is a no-op when the exercise id does not resolve', async () => {
+    const storage = new InMemoryStorage();
+
+    await expect(
+      updateExerciseTemplate(storage, 'missing' as ExerciseId, {
+        defaultLoadType: 'weight',
+        defaultVolumeKind: 'reps',
+        trackEffort: false,
+      }),
+    ).resolves.toBeUndefined();
   });
 });
 

@@ -61,6 +61,8 @@ export function draftToSession(draft: LoggingDraft, id: SessionId): Session {
   const blocks = draft.blocks.map((block) =>
     createBlock({
       ...(block.name !== undefined ? { name: block.name } : {}),
+      // `block.loose` is deliberately dropped here — presentation-only,
+      // never part of the persisted `Block` (see `domain/block.ts`).
       type: block.type,
       exercises: block.exercises.map((entry) => ({
         exerciseId: entry.exerciseId,
@@ -93,16 +95,52 @@ export function draftToSession(draft: LoggingDraft, id: SessionId): Session {
 }
 
 /**
- * Adds an exercise entry to the draft (FR-002). Appends to the last
- * existing block, or creates a default unnamed `straightSets` block first
- * if the draft has none yet — this is what lets User Story 1 read as "a
- * single running list of sets" (spec.md User Story 2 context) without any
- * block-management UI existing yet; User Story 2 layers real block
- * creation/naming on top of the same structure.
+ * Drops presentation-only fields before a draft is written to storage.
+ * `DraftBlock.loose` is a rendering hint (docs/requirements.md §6: an
+ * undocumented field reaching the actual persisted bytes is an implicit
+ * schema change, the same reasoning `draftToSession` already applies when
+ * promoting a draft to a `Session`). Both real adapters call this at their
+ * write boundary so `loose` never reaches disk/IndexedDB; a block that was
+ * loose simply shows its header again after a reload, matching what a
+ * freshly-migrated v1 record (which never had the field) already renders.
+ */
+export function toPersistableDraft(draft: LoggingDraft): LoggingDraft {
+  return {
+    ...draft,
+    blocks: draft.blocks.map((block) => ({
+      id: block.id,
+      ...(block.name !== undefined ? { name: block.name } : {}),
+      type: block.type,
+      exercises: block.exercises,
+    })),
+  };
+}
+
+/**
+ * Adds an exercise entry to the draft (FR-002). With no `blockId` (the
+ * "loose exercise" path a user reaches without ever tapping "Add block"):
+ * appends to the trailing block only if it's itself `loose` (an implicit
+ * container this same path created earlier), or creates a fresh `loose`
+ * block otherwise — this is what lets User Story 1 read as "a single
+ * running list of sets" (spec.md User Story 2 context) when nothing has
+ * been named yet, while never silently dropping a "loose" add into a
+ * block the user *explicitly* created via "Add block" just because that
+ * block also happens to have no name yet (FR-2 requires an unnamed block
+ * to still show its position label and stay renameable/deletable — it
+ * must not be mistaken for a `loose` one). The presentation layer renders
+ * only `loose` blocks "bare" (no header/menu), so this is also what keeps
+ * a loose exercise from ever looking like it's inside a block once a
+ * real, explicitly created one exists alongside it.
+ *
+ * With an explicit `blockId` (a block's own "Add exercise" control, used
+ * to group exercises on purpose): appends to that specific block instead.
+ * An id that doesn't resolve is a no-op, matching `findEntry`'s defensive-
+ * lookup convention elsewhere in this module.
  */
 export function addExerciseEntry(
   draft: LoggingDraft,
   exerciseId: ExerciseId,
+  blockId?: string,
 ): LoggingDraft {
   const entry: DraftExerciseEntry = {
     id: newId(),
@@ -111,16 +149,35 @@ export function addExerciseEntry(
     sets: [],
   };
 
-  if (draft.blocks.length === 0) {
-    const block: DraftBlock = {
-      id: newId(),
-      type: 'straightSets',
-      exercises: [entry],
+  if (blockId !== undefined) {
+    const targetExists = draft.blocks.some((block) => block.id === blockId);
+    if (!targetExists) return draft;
+    return {
+      ...draft,
+      blocks: draft.blocks.map((block) =>
+        block.id === blockId
+          ? { ...block, exercises: [...block.exercises, entry] }
+          : block,
+      ),
     };
-    return { ...draft, blocks: [block] };
   }
 
   const lastIndex = draft.blocks.length - 1;
+  const lastBlock = draft.blocks[lastIndex];
+  // Only ever piggybacks on the trailing block if it's itself `loose` —
+  // an explicitly created block the user hasn't named yet (`loose` is
+  // unset) must stay its own block, never silently absorb a loose add
+  // just because it currently has no name (FR-2).
+  if (!lastBlock || lastBlock.loose !== true) {
+    const block: DraftBlock = {
+      id: newId(),
+      loose: true,
+      type: 'straightSets',
+      exercises: [entry],
+    };
+    return { ...draft, blocks: [...draft.blocks, block] };
+  }
+
   return {
     ...draft,
     blocks: draft.blocks.map((block, index) =>

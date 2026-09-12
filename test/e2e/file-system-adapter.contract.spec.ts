@@ -43,6 +43,82 @@ for (const scenario of CONTRACT_SCENARIOS) {
   });
 }
 
+test('ADR-0006 v1->v2 migration backfills a legacy Exercise and bumps the stored schema version', async ({
+  page,
+  browserName,
+}) => {
+  test.setTimeout(90_000);
+  test.skip(browserName !== 'chromium', 'File System Access is chromium-only.');
+
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const outcome = await page.evaluate(() =>
+    window.__runMigrationTest('file-system'),
+  );
+
+  expect(outcome.canonicalNamePreserved).toBe(true);
+  expect(outcome.defaultLoadTypePreserved).toBe(true);
+  expect(outcome.defaultVolumeKind).toBe('reps');
+  expect(outcome.trackEffort).toBe(false);
+  expect(outcome.storedSchemaVersion).toBe(2);
+  // The port's own read-time normalization would report a correctly
+  // shaped record either way — this is the field that actually tells a
+  // real physical migration apart from that safety net alone.
+  expect(outcome.rawFileMigrated).toBe(true);
+});
+
+test('ADR-0006 migration survives a gesture-less first write followed by a real handle acquisition against a pre-existing v1 directory', async ({
+  page,
+  browserName,
+}) => {
+  test.setTimeout(90_000);
+  test.skip(browserName !== 'chromium', 'File System Access is chromium-only.');
+
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const outcome = await page.evaluate(() =>
+    window.__runMigrationTestFreshAcquire(),
+  );
+
+  expect(outcome.canonicalNamePreserved).toBe(true);
+  expect(outcome.defaultLoadTypePreserved).toBe(true);
+  expect(outcome.defaultVolumeKind).toBe('reps');
+  expect(outcome.trackEffort).toBe(false);
+  expect(outcome.storedSchemaVersion).toBe(2);
+  // The port's own read-time normalization would report a correctly
+  // shaped record either way — this is the field that actually tells a
+  // real physical migration apart from that safety net alone.
+  expect(outcome.rawFileMigrated).toBe(true);
+});
+
+test('a queued gesture-less exercise write merges with real pre-existing records instead of replacing them on first handle acquisition', async ({
+  page,
+  browserName,
+}) => {
+  test.setTimeout(90_000);
+  test.skip(browserName !== 'chromium', 'File System Access is chromium-only.');
+
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const outcome = await page.evaluate(() =>
+    window.__runQueuedExerciseMergeTest(),
+  );
+
+  expect(outcome.exerciseIds).toEqual(['legacy-1', 'new-1']);
+});
+
+test('a queued merge of two exercises does not resurrect the merged-away loser from its real pre-existing record on first handle acquisition', async ({
+  page,
+  browserName,
+}) => {
+  test.setTimeout(90_000);
+  test.skip(browserName !== 'chromium', 'File System Access is chromium-only.');
+
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const outcome = await page.evaluate(() =>
+    window.__runQueuedMergeTombstoneTest(),
+  );
+
+  expect(outcome.exerciseIds).toEqual(['legacy-a']);
+});
+
 test('a lost File System Access permission surfaces StorageError with kind "permission-lost", distinguishable from "no data yet"', async ({
   page,
   browserName,

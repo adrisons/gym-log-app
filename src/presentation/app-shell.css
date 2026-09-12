@@ -1,0 +1,22 @@
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--color-canvas);
+}
+
+.app-shell__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Every screen's own root element (`.logging-screen`, `.diary-screen`, …)
+   keeps `min-height: 100%` rather than `100vh` now that it renders inside
+   this flex column instead of directly under <body> — see each screen's
+   stylesheet. */
+.app-shell__content > * {
+  flex: 1 0 auto;
+}

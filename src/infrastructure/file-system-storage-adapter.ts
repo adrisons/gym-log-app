@@ -7,6 +7,7 @@ import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
 import type { SessionId, ExerciseId } from '../domain/ids';
 import { StorageError } from '../application/errors';
+import { toPersistableDraft } from '../application/logging/draft';
 import {
   SESSIONS_DIR,
   EXERCISES_FILE,
@@ -32,6 +33,27 @@ export type FileSystemHandleProvider = () => Promise<FileSystemDirectoryHandle>;
 const SESSION_KEY_PREFIX = 'session:';
 
 type OverlayEntry = { kind: 'value'; value: unknown } | { kind: 'deleted' };
+
+/**
+ * ADR-0006's v1->v2 backfill, applied wherever an `Exercise` crosses this
+ * adapter's boundary — not only inside `#migrateExerciseTemplateDefaults`.
+ * This adapter's schema check only runs on a write path (the doc comment
+ * above), so `getExercise`/`listExercises` can otherwise hand back a
+ * pre-migration v1 record whose `defaultVolumeKind`/`trackEffort` are
+ * missing; a caller that then round-trips that record through
+ * `saveExercise` (e.g. `renameExerciseWithCollisionCheck`) would have its
+ * own write's schema-check migration immediately overwritten by that
+ * stale, still-v1-shaped object — permanently, since the stored version
+ * is already 2 by the time that happens. Applying the same defaults on
+ * every read closes that gap at the source.
+ */
+function withTemplateDefaults(exercise: Exercise): Exercise {
+  return {
+    ...exercise,
+    defaultVolumeKind: exercise.defaultVolumeKind ?? 'reps',
+    trackEffort: exercise.trackEffort ?? false,
+  };
+}
 
 /**
  * Durable `StoragePort` implementation backed by the File System Access
@@ -74,6 +96,16 @@ export class FileSystemStorageAdapter implements StoragePort {
   #permissionVerified = false;
   #schemaCheck: Promise<void> | undefined;
   readonly #overlay = new Map<string, OverlayEntry>();
+  /**
+   * Every exercise id ever removed by `mergeExercises` (the loser) or
+   * `deleteExerciseCascade` while running against the `EXERCISES_FILE`
+   * overlay. `#reconcileQueuedExercisesOnAcquire` can't otherwise tell "id
+   * absent from the queued snapshot because shadow mode never touched it"
+   * (keep the real on-disk record) apart from "absent because shadow mode
+   * merged/deleted it away" (must NOT resurrect it from disk) — both look
+   * identical from the queued array alone. This set is the difference.
+   */
+  readonly #tombstonedExerciseIds = new Set<ExerciseId>();
 
   /**
    * `knownHandle` is a testability seam only — production (the
@@ -162,13 +194,122 @@ export class FileSystemStorageAdapter implements StoragePort {
     } catch {
       return undefined;
     }
+    // Validate before committing to this handle at all — a rejected
+    // (schema-too-new) directory must never be cached, or the *next* call
+    // would return it straight from `#tryDirectoryHandle`'s cache without
+    // ever revalidating, silently bypassing the "write nothing" refusal.
+    await this.#reconcileSchemaOnAcquire(handle);
     await this.#db.fileSystemHandle.put({
       key: FILE_SYSTEM_HANDLE_ROW_KEY,
       value: handle,
     });
     this.#root = handle;
+    // Before flushing anything queued while this instance had no handle
+    // at all: a queued *whole-file* write (`exercises.json`) was computed
+    // by code that could not read the real file yet and so assumed it was
+    // empty — flushing it as-is would silently discard every real
+    // pre-existing record the check above just migrated. Reconciling it
+    // against what's actually on disk first keeps both.
+    await this.#reconcileQueuedExercisesOnAcquire(handle);
     await this.#flushOverlay(handle);
     return handle;
+  }
+
+  /**
+   * A queued `EXERCISES_FILE` overlay write (from `saveExercise`/
+   * `mergeExercises`/`deleteExerciseCascade` running with no handle
+   * reachable yet) is a *whole-array* snapshot built from what those
+   * methods could read at the time — which, with no handle, is nothing.
+   * Flushing that snapshot as-is onto a directory that turns out to
+   * already hold real records (this instance's first-ever real
+   * acquisition) would silently drop every record the queued snapshot
+   * didn't know about. Replaces the queued entry with a merge — the real
+   * on-disk record for any id the overlay never touched, the overlay's
+   * own record (already `withTemplateDefaults`-shaped, since it went
+   * through the normal read/write path) for every id it did — so the
+   * flush that follows writes the combined result instead.
+   *
+   * An id absent from the queued array is ambiguous on its own: it could
+   * mean shadow mode never touched it (keep the real record), or that a
+   * queued `mergeExercises`/`deleteExerciseCascade` call removed it (must
+   * NOT resurrect it from disk — `#tombstonedExerciseIds` is exactly the
+   * set of ids that fall in the second case).
+   */
+  async #reconcileQueuedExercisesOnAcquire(
+    handle: FileSystemDirectoryHandle,
+  ): Promise<void> {
+    const queued = this.#overlay.get(EXERCISES_FILE);
+    if (!queued || queued.kind !== 'value') return;
+    const queuedExercises = queued.value as Exercise[];
+    const realExercises =
+      (await this.#readJsonFromHandle<Exercise[]>(handle, EXERCISES_FILE)) ??
+      [];
+    const queuedIds = new Set(queuedExercises.map((e) => e.id));
+    const merged = [
+      ...realExercises.filter(
+        (e) => !queuedIds.has(e.id) && !this.#tombstonedExerciseIds.has(e.id),
+      ),
+      ...queuedExercises,
+    ];
+    this.#overlay.set(EXERCISES_FILE, { kind: 'value', value: merged });
+  }
+
+  /**
+   * Runs exactly once per instance, the moment a real directory handle is
+   * first acquired via a live user gesture — which can happen well after
+   * this same instance already ran `#checkSchema` in shadow mode (no
+   * handle reachable at all, e.g. the mount-time draft save that has no
+   * gesture to work with yet). That shadow-mode check can only guess
+   * "never initialized" (there is nothing to read) and may have queued a
+   * `META_FILE` overlay write claiming `CURRENT_SCHEMA_VERSION` — a guess
+   * that is simply wrong if the directory the user goes on to pick
+   * already holds real v1 data: flushing that guess as-is would mark the
+   * store "already migrated" without ever having backfilled its actual
+   * `exercises.json`, permanently skipping the migration this session
+   * should have run.
+   *
+   * Fixes this by re-deriving the schema action from the real,
+   * newly-reachable files (bypassing the overlay entirely, since it may
+   * hold exactly the stale guess being corrected here) before any queued
+   * write is flushed on top of it, and discarding any shadow-mode
+   * `META_FILE` guess in favor of whatever this real check produces.
+   */
+  async #reconcileSchemaOnAcquire(
+    handle: FileSystemDirectoryHandle,
+  ): Promise<void> {
+    this.#overlay.delete(META_FILE);
+    const realMeta = await this.#readJsonFromHandle<{
+      schemaVersion: number;
+    }>(handle, META_FILE);
+    const stored = realMeta?.schemaVersion ?? 0;
+    const action = decideSchemaAction(stored, CURRENT_SCHEMA_VERSION);
+    if (action === 'refuse') {
+      throw new StorageError(
+        `Stored schema version ${String(stored)} is newer than this app understands (current: ${String(CURRENT_SCHEMA_VERSION)}). Update the app before continuing — nothing has been written.`,
+        undefined,
+        'schema-too-new',
+      );
+    }
+    if (action === 'migrate') {
+      const exercises =
+        (await this.#readJsonFromHandle<Exercise[]>(handle, EXERCISES_FILE)) ??
+        [];
+      if (exercises.length > 0) {
+        await this.#writeJsonToHandle(
+          handle,
+          EXERCISES_FILE,
+          exercises.map(withTemplateDefaults),
+        );
+      }
+    }
+    if (action === 'migrate' || stored === 0) {
+      await this.#writeJsonToHandle(handle, META_FILE, {
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+      });
+    }
+    // Whatever `#ensureSchemaCheckedForWrite` had cached (a shadow-mode
+    // run, or nothing yet) is now superseded by this real check.
+    this.#schemaCheck = Promise.resolve();
   }
 
   async #flushOverlay(root: FileSystemDirectoryHandle): Promise<void> {
@@ -239,6 +380,12 @@ export class FileSystemStorageAdapter implements StoragePort {
         'schema-too-new',
       );
     }
+    if (action === 'migrate') {
+      // v1 -> v2 (ADR-0006): see IndexedDbStorageAdapter's own migration
+      // comment — every stored Exercise gains defaultVolumeKind/trackEffort
+      // with safe defaults.
+      await this.#migrateExerciseTemplateDefaults();
+    }
     if (action === 'migrate' || stored === 0) {
       // See IndexedDbStorageAdapter's #checkSchema for the full rationale
       // — the never-initialized sentinel (stored === 0) needs the same
@@ -248,6 +395,14 @@ export class FileSystemStorageAdapter implements StoragePort {
         schemaVersion: CURRENT_SCHEMA_VERSION,
       });
     }
+  }
+
+  /** ADR-0006's v1->v2 migration: see the call site's comment. */
+  async #migrateExerciseTemplateDefaults(): Promise<void> {
+    const exercises =
+      (await this.#readJson<Exercise[]>(EXERCISES_FILE, true)) ?? [];
+    if (exercises.length === 0) return;
+    await this.#writeJson(EXERCISES_FILE, exercises.map(withTemplateDefaults));
   }
 
   async #readSchemaVersionRaw(forceHandle: boolean): Promise<number> {
@@ -279,6 +434,38 @@ export class FileSystemStorageAdapter implements StoragePort {
     }
   }
 
+  /**
+   * Reads a JSON file directly from an already-resolved handle — no
+   * overlay lookup, no `#resolveHandle` call. Used by `#readJson` once it
+   * has a root, and by `#reconcileSchemaOnAcquire`, which must bypass the
+   * overlay entirely (it may hold exactly the stale guess that function
+   * is correcting).
+   */
+  async #readJsonFromHandle<T>(
+    root: FileSystemDirectoryHandle,
+    path: string,
+  ): Promise<T | undefined> {
+    const fileHandle = await this.#getFileHandle(root, path, false);
+    if (!fileHandle) return undefined;
+    const file = await fileHandle.getFile();
+    const text = await file.text();
+    return JSON.parse(text) as T;
+  }
+
+  /** Writes a JSON file directly to an already-resolved handle — see `#readJsonFromHandle`'s doc comment. */
+  async #writeJsonToHandle(
+    root: FileSystemDirectoryHandle,
+    path: string,
+    value: unknown,
+  ): Promise<void> {
+    await this.#run(async () => {
+      const fileHandle = await root.getFileHandle(path, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(JSON.stringify(value));
+      await writable.close();
+    });
+  }
+
   /** `forceHandle: false` (the default) never triggers a picker — used by every read method (FR-004a). */
   async #readJson<T>(
     path: string,
@@ -292,11 +479,7 @@ export class FileSystemStorageAdapter implements StoragePort {
     }
     const root = await this.#resolveHandle(forceHandle);
     if (!root) return undefined;
-    const fileHandle = await this.#getFileHandle(root, path, false);
-    if (!fileHandle) return undefined;
-    const file = await fileHandle.getFile();
-    const text = await file.text();
-    return JSON.parse(text) as T;
+    return this.#readJsonFromHandle<T>(root, path);
   }
 
   async #writeJson(path: string, value: unknown): Promise<void> {
@@ -305,12 +488,7 @@ export class FileSystemStorageAdapter implements StoragePort {
       this.#overlay.set(path, { kind: 'value', value });
       return;
     }
-    await this.#run(async () => {
-      const fileHandle = await root.getFileHandle(path, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(JSON.stringify(value));
-      await writable.close();
-    });
+    await this.#writeJsonToHandle(root, path, value);
   }
 
   async #deleteFile(path: string): Promise<void> {
@@ -461,11 +639,13 @@ export class FileSystemStorageAdapter implements StoragePort {
 
   async getExercise(id: ExerciseId): Promise<Exercise | undefined> {
     const exercises = (await this.#readJson<Exercise[]>(EXERCISES_FILE)) ?? [];
-    return exercises.find((e) => e.id === id);
+    const exercise = exercises.find((e) => e.id === id);
+    return exercise && withTemplateDefaults(exercise);
   }
 
   async listExercises(): Promise<Exercise[]> {
-    return (await this.#readJson<Exercise[]>(EXERCISES_FILE)) ?? [];
+    const exercises = (await this.#readJson<Exercise[]>(EXERCISES_FILE)) ?? [];
+    return exercises.map(withTemplateDefaults);
   }
 
   async mergeExercises(
@@ -495,6 +675,7 @@ export class FileSystemStorageAdapter implements StoragePort {
           ? { ...e, aliases: [...e.aliases, loser.canonicalName] }
           : e,
       );
+    this.#tombstonedExerciseIds.add(loserId);
     await this.#writeJson(EXERCISES_FILE, nextExercises);
 
     for (const session of await this.listSessions({
@@ -537,6 +718,7 @@ export class FileSystemStorageAdapter implements StoragePort {
         'deleteExerciseCascade: id must resolve to an existing Exercise.',
       );
     }
+    this.#tombstonedExerciseIds.add(id);
     await this.#writeJson(
       EXERCISES_FILE,
       exercises.filter((e) => e.id !== id),
@@ -570,7 +752,7 @@ export class FileSystemStorageAdapter implements StoragePort {
 
   async saveDraft(draft: LoggingDraft): Promise<void> {
     await this.#ensureSchemaCheckedForWrite();
-    await this.#writeJson(DRAFT_FILE, draft);
+    await this.#writeJson(DRAFT_FILE, toPersistableDraft(draft));
   }
 
   async getDraft(): Promise<LoggingDraft | undefined> {

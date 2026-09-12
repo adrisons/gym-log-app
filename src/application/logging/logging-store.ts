@@ -34,7 +34,7 @@ import {
   openLoggingForm,
   searchExercises as searchExercisesUseCase,
   createExercise as createExerciseUseCase,
-  recordLoadTypeDefault as recordLoadTypeDefaultUseCase,
+  updateExerciseTemplate as updateExerciseTemplateUseCase,
   suggestFreeTextLoads as suggestFreeTextLoadsUseCase,
   saveBandLabels as saveBandLabelsUseCase,
   renameExerciseWithCollisionCheck as renameExerciseWithCollisionCheckUseCase,
@@ -44,8 +44,8 @@ import {
 import type {
   CreateExerciseInput,
   RenameExerciseResult,
+  ExerciseTemplate,
 } from '@/application/logging/use-cases';
-import type { Load } from '@/domain/load';
 import {
   addExerciseEntry as addExerciseEntryToDraft,
   addSet as addSetToDraft,
@@ -91,7 +91,7 @@ export interface LoggingSessionState {
   configure: (storage: StoragePort) => void;
   initialize: () => Promise<void>;
   setSessionDateTime: (iso: string) => Promise<void>;
-  addExerciseEntry: (exerciseId: ExerciseId) => Promise<void>;
+  addExerciseEntry: (exerciseId: ExerciseId, blockId?: string) => Promise<void>;
   addSet: (
     blockId: string,
     entryId: string,
@@ -100,9 +100,9 @@ export interface LoggingSessionState {
   prefillNextSet: (blockId: string, entryId: string) => SetPrefill | undefined;
   searchExercises: (query: string) => Exercise[];
   createExercise: (input: CreateExerciseInput) => Promise<Exercise>;
-  recordLoadTypeDefault: (
+  updateExerciseTemplate: (
     exerciseId: ExerciseId,
-    loadType: Load['kind'],
+    template: ExerciseTemplate,
   ) => Promise<void>;
   suggestFreeTextLoads: (exerciseId: ExerciseId) => string[];
   saveBandLabels: (labels: string[]) => Promise<void>;
@@ -202,10 +202,12 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       await storage.saveDraft(updated);
     },
 
-    addExerciseEntry: async (exerciseId) => {
+    addExerciseEntry: async (exerciseId, blockId) => {
       const { storage, draft: current } = get();
       if (!storage || !current) return;
-      const updated = touch(addExerciseEntryToDraft(current, exerciseId));
+      const updated = touch(
+        addExerciseEntryToDraft(current, exerciseId, blockId),
+      );
       set({ draft: updated });
       await storage.saveDraft(updated);
     },
@@ -252,17 +254,41 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       return exercise;
     },
 
-    recordLoadTypeDefault: async (exerciseId, loadType) => {
+    updateExerciseTemplate: async (exerciseId, template) => {
       const { storage } = get();
       if (!storage) return;
-      await recordLoadTypeDefaultUseCase(storage, exerciseId, loadType);
+      const before = get().catalogue.find((e) => e.id === exerciseId);
+      if (!before) return;
+      const optimistic = { ...before, ...template };
       set((state) => ({
         catalogue: state.catalogue.map((exercise) =>
-          exercise.id === exerciseId
-            ? { ...exercise, defaultLoadType: loadType }
-            : exercise,
+          exercise.id === exerciseId ? optimistic : exercise,
         ),
       }));
+      try {
+        await updateExerciseTemplateUseCase(storage, exerciseId, template);
+      } catch (error) {
+        // Roll back only this call's own optimistic entry, by reference —
+        // never the whole captured catalogue: doing that would also erase
+        // any *other* exercise that arrived (e.g. via `createExercise`)
+        // while this write was pending. The `=== optimistic` check is a
+        // per-exercise revision guard: if a newer call already replaced
+        // this same entry with a different optimistic value (or it was
+        // merged/deleted away) since we set it, that identity check fails
+        // and this older, now-irrelevant failure leaves it alone instead
+        // of clobbering whatever superseded it. Re-thrown so a caller that
+        // keeps its own copy of the catalogue (`SessionDetailScreen`) can
+        // also undo its echo of this same optimistic update and keep its
+        // editor open to retry.
+        set((state) => ({
+          catalogue: state.catalogue.map((exercise) =>
+            exercise.id === exerciseId && exercise === optimistic
+              ? before
+              : exercise,
+          ),
+        }));
+        throw error;
+      }
     },
 
     suggestFreeTextLoads: (exerciseId) => {

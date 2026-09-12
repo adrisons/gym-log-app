@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { requireStorage } from '@/application/storage-access';
 import { searchExercises } from '@/application/search/exercise-search';
 import type { Exercise } from '@/application/logging/use-cases';
+import { Icon } from '@/presentation/design/icons';
 import './search.css';
 
 export function ExerciseSearchScreen() {
@@ -40,8 +41,15 @@ export function ExerciseSearchScreen() {
       <ul className="exercise-search-screen__results">
         {results.map((exercise) => (
           <li key={exercise.id}>
-            <Link to={`/exercises/${exercise.id}/progression`}>
-              {exercise.canonicalName}
+            <Link
+              to={`/exercises/${exercise.id}/progression`}
+              className="exercise-search-screen__result"
+            >
+              <Icon name="chart" />
+              <span className="exercise-search-screen__result-name">
+                {exercise.canonicalName}
+              </span>
+              <Icon name="chevron-right" />
             </Link>
           </li>
         ))}

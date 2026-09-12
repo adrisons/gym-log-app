@@ -20,6 +20,7 @@ test('logging a set appears instantly, with no Save control, in a real browser',
     page.getByRole('heading', { name: 'Log a session' }),
   ).toBeVisible();
 
+  await page.getByRole('button', { name: 'Add exercise' }).click();
   await page
     .getByPlaceholder('Search or create an exercise')
     .fill('Back squat');
@@ -27,7 +28,12 @@ test('logging a set appears instantly, with no Save control, in a real browser',
 
   await expect(page.getByRole('heading', { name: 'Back squat' })).toBeVisible();
 
-  await page.getByRole('spinbutton', { name: 'Reps' }).fill('5');
+  await page.getByRole('listbox', { name: 'Reps' }).click();
+  await page.keyboard.press('ArrowDown', { delay: 20 });
+  await page.keyboard.press('ArrowDown', { delay: 20 });
+  await page.keyboard.press('ArrowDown', { delay: 20 });
+  await page.keyboard.press('ArrowDown', { delay: 20 });
+  await page.keyboard.press('ArrowDown', { delay: 20 });
   await page.getByRole('button', { name: 'Add set' }).click();
 
   await expect(page.getByText('5 reps')).toBeVisible();

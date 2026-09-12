@@ -1,10 +1,13 @@
 /**
- * One exercise entry within a block. Reorder is keyboard-operable move-up/
- * move-down buttons, not drag-only (`docs/design.md` §5 — nothing
- * essential revealed by hover/pointer only); moving to a different block
- * is a plain select, for the same reason.
+ * One exercise entry within a block. Its header keeps only the exercise
+ * name in view; reorder/move/delete fold into the shared `OverflowMenu`
+ * (docs/design.md §2 "secondary actions... visually quieter") — still
+ * keyboard-operable buttons/select inside the menu, not hover-only
+ * (docs/design.md §5 — nothing essential revealed by hover/pointer only).
  */
 import type { ReactNode } from 'react';
+import { Icon } from '@/presentation/design/icons';
+import { OverflowMenu } from './overflow-menu';
 import './logging.css';
 
 export interface ExerciseEntryCardProps {
@@ -16,6 +19,8 @@ export interface ExerciseEntryCardProps {
   otherBlocks: { id: string; displayName: string }[];
   onMoveToBlock: (blockId: string) => void;
   onDelete: () => void;
+  /** Opens the exercise's set-entry template editor (ADR-0006). Omit/undefined hides the menu item (e.g. screens that don't support editing it). */
+  onEditTemplate?: (() => void) | undefined;
   children: ReactNode;
 }
 
@@ -28,36 +33,40 @@ export function ExerciseEntryCard({
   otherBlocks,
   onMoveToBlock,
   onDelete,
+  onEditTemplate,
   children,
 }: ExerciseEntryCardProps) {
   return (
     <div className="exercise-entry-card">
       <div className="exercise-entry-card__header">
         <h3>{exerciseName}</h3>
-        <div className="set-row__inputs">
+        <OverflowMenu label={`${exerciseName} actions`}>
           <button
             type="button"
-            className="logging-button"
+            className="logging-button logging-button--icon-label"
             disabled={!canMoveUp}
             aria-disabled={!canMoveUp}
-            aria-label={`Move ${exerciseName} up`}
             onClick={onMoveUp}
           >
-            ↑
+            <Icon name="chevron-up" />
+            Move up
           </button>
           <button
             type="button"
-            className="logging-button"
+            className="logging-button logging-button--icon-label"
             disabled={!canMoveDown}
             aria-disabled={!canMoveDown}
-            aria-label={`Move ${exerciseName} down`}
             onClick={onMoveDown}
           >
-            ↓
+            <Icon name="chevron-down" />
+            Move down
           </button>
           {otherBlocks.length > 0 && (
             <label className="logging-screen__field-label">
-              <span>Move to block</span>
+              <span className="logging-screen__field-label--icon">
+                <Icon name="move-to" />
+                Move to block
+              </span>
               <select
                 className="logging-field-input"
                 value=""
@@ -76,10 +85,25 @@ export function ExerciseEntryCard({
               </select>
             </label>
           )}
-          <button type="button" className="logging-button" onClick={onDelete}>
+          {onEditTemplate && (
+            <button
+              type="button"
+              className="logging-button logging-button--icon-label"
+              onClick={onEditTemplate}
+            >
+              <Icon name="sliders" />
+              Edit tracked fields…
+            </button>
+          )}
+          <button
+            type="button"
+            className="logging-button logging-button--icon-label"
+            onClick={onDelete}
+          >
+            <Icon name="trash" />
             Delete exercise
           </button>
-        </div>
+        </OverflowMenu>
       </div>
       {children}
     </div>

@@ -130,8 +130,10 @@ describe('Logging flow (US2 Independent Test)', () => {
     const blockAId = draft.blocks[0]!.id;
     const blockBId = draft.blocks[1]!.id;
 
-    draft = addExerciseEntry(draft, exercise.id);
-    // addExerciseEntry appends to the last block (B); move it to A instead.
+    // Target B explicitly (its own "add exercise" control would do the
+    // same) — both blocks are named, so the no-blockId default would now
+    // start a third, unnamed block instead of nesting into either (draft.ts).
+    draft = addExerciseEntry(draft, exercise.id, blockBId);
     const entryId = draft.blocks[1]!.exercises[0]!.id;
     draft = moveExerciseAcrossBlocks(draft, blockBId, entryId, blockAId);
     expect(draft.blocks[0]?.exercises).toHaveLength(1);

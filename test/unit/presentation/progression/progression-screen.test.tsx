@@ -52,6 +52,8 @@ describe('ProgressionScreen (FR-013..023)', () => {
       canonicalName: 'Bench Press',
       aliases: [],
       defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
       unilateral: false,
       discipline: 'Strength',
     });
@@ -91,6 +93,8 @@ describe('ProgressionScreen (FR-013..023)', () => {
       canonicalName: 'Band pull-apart',
       aliases: [],
       defaultLoadType: 'band',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
       unilateral: false,
       discipline: 'Strength',
     });

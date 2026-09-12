@@ -12,7 +12,20 @@
  *
  * US2: renders through `BlockCard`/`ExerciseEntryCard` — blocks are now
  * user-visible/manageable (create, rename, reorder, delete-with-undo),
- * replacing US1's flat list.
+ * replacing US1's flat list. Exercise catalogue management (rename/merge/
+ * delete) lives on its own `/exercises` screen so this one stays focused
+ * on the single primary action of recording a set (docs/design.md §2).
+ *
+ * A `loose` block (`DraftBlock.loose`, presentation-only — never part of
+ * the persisted `Block`) renders `bare` — no header, no menu, its
+ * exercises shown directly, even while empty — so an exercise added
+ * without ever tapping "Add block" never looks like it's sitting inside a
+ * block the user didn't ask for. `loose` is distinct from having no name:
+ * an explicitly created block that hasn't been named yet is never `loose`
+ * and always keeps its header (position label, rename, delete — FR-2).
+ * "Add exercise"/"Add block" sit at the bottom of the screen, after
+ * whatever's already there, matching the natural order of adding to
+ * something you can already see.
  */
 import { useEffect, useState } from 'react';
 import { useLoggingSession } from '@/application/logging/logging-store';
@@ -21,13 +34,14 @@ import {
   toSetSummaryViewModel,
 } from '@/application/logging/view-models';
 import type { Exercise } from '@/application/logging/use-cases';
+import { Icon } from '@/presentation/design/icons';
 import { SessionDateTimeField } from './session-date-time-field';
-import { ExerciseSearchField } from './exercise-search-field';
+import { AddExerciseControl } from './add-exercise-control';
 import { SetRow } from './set-row';
 import { BlockCard } from './block-card';
 import { ExerciseEntryCard } from './exercise-entry-card';
+import { ExerciseTemplatePanel } from './exercise-template-panel';
 import { UndoToast } from './undo-toast';
-import { ExerciseCataloguePanel } from './exercise-catalogue-panel';
 import './logging.css';
 
 const UNDO_MESSAGES = {
@@ -48,8 +62,8 @@ export function LoggingScreen() {
   const searchExercises = useLoggingSession((s) => s.searchExercises);
   const createExercise = useLoggingSession((s) => s.createExercise);
   const bandLabels = useLoggingSession((s) => s.bandLabels);
-  const recordLoadTypeDefault = useLoggingSession(
-    (s) => s.recordLoadTypeDefault,
+  const updateExerciseTemplate = useLoggingSession(
+    (s) => s.updateExerciseTemplate,
   );
   const suggestFreeTextLoads = useLoggingSession((s) => s.suggestFreeTextLoads);
   const saveBandLabels = useLoggingSession((s) => s.saveBandLabels);
@@ -63,16 +77,8 @@ export function LoggingScreen() {
   const deleteExerciseEntry = useLoggingSession((s) => s.deleteExerciseEntry);
   const deleteSet = useLoggingSession((s) => s.deleteSet);
   const undo = useLoggingSession((s) => s.undo);
-  const sessions = useLoggingSession((s) => s.sessions);
-  const renameExerciseWithCollisionCheck = useLoggingSession(
-    (s) => s.renameExerciseWithCollisionCheck,
-  );
-  const mergeExercises = useLoggingSession((s) => s.mergeExercises);
-  const deleteExerciseCascade = useLoggingSession(
-    (s) => s.deleteExerciseCascade,
-  );
 
-  const [managingExercise, setManagingExercise] = useState<
+  const [editingTemplateFor, setEditingTemplateFor] = useState<
     Exercise | undefined
   >(undefined);
 
@@ -86,6 +92,15 @@ export function LoggingScreen() {
     return <main className="logging-screen" aria-label="Log a session" />;
   }
 
+  // Position labels ("Block N") and "Move to block" targets are both
+  // computed from the ordinal among non-loose blocks, never the raw array
+  // index — a `loose` container renders with no label at all, so counting
+  // it would misnumber the first *visible* block (e.g. a loose exercise
+  // followed by the user's first "Add block" press would otherwise show
+  // that sole visible block as "Block 2") and would also offer it as a
+  // synthetic, headerless move target.
+  const nonLooseBlocks = draft.blocks.filter((b) => b.loose !== true);
+
   return (
     <main className="logging-screen" aria-label="Log a session">
       <h1>Log a session</h1>
@@ -93,76 +108,86 @@ export function LoggingScreen() {
         value={draft.dateTime}
         onChange={(iso) => void setSessionDateTime(iso)}
       />
-      <ExerciseSearchField
-        search={searchExercises}
-        onSelectExercise={(exercise) => void addExerciseEntry(exercise.id)}
-        onCreateExercise={(name) => {
-          void (async () => {
-            const exercise = await createExercise({ canonicalName: name });
-            await addExerciseEntry(exercise.id);
-          })();
-        }}
-        onManageExercise={setManagingExercise}
-      />
 
-      {managingExercise &&
-        (() => {
-          const hasHistory = sessions.some((session) =>
-            session.blocks.some((block) =>
-              block.exercises.some(
-                (entry) => entry.exerciseId === managingExercise.id,
-              ),
+      {editingTemplateFor && (
+        <ExerciseTemplatePanel
+          key={editingTemplateFor.id}
+          exercise={editingTemplateFor}
+          onSave={(template) => {
+            // Closes immediately either way (every logging interaction
+            // responds immediately — docs/requirements.md §7.1): the store
+            // action already rolls its own optimistic update back on a
+            // storage failure, so this only needs to keep that rejection
+            // from surfacing as an unhandled one.
+            updateExerciseTemplate(editingTemplateFor.id, template).catch(
+              (error: unknown) => {
+                console.error('Failed to save exercise template', error);
+              },
+            );
+            setEditingTemplateFor(undefined);
+          }}
+          onClose={() => setEditingTemplateFor(undefined)}
+        />
+      )}
+
+      {draft.blocks.map((block) => {
+        const blockVm = toBlockViewModel(
+          block,
+          nonLooseBlocks.findIndex((b) => b.id === block.id),
+          catalogue,
+        );
+        const otherBlocks = nonLooseBlocks
+          .filter((b) => b.id !== block.id)
+          .map((b) =>
+            toBlockViewModel(
+              b,
+              nonLooseBlocks.findIndex((x) => x.id === b.id),
+              catalogue,
             ),
-          );
-          return (
-            <ExerciseCataloguePanel
-              exercise={managingExercise}
-              hasHistory={hasHistory}
-              search={searchExercises}
-              onRename={(newName) =>
-                renameExerciseWithCollisionCheck(managingExercise.id, newName)
-              }
-              onMerge={(survivorId, loserId) =>
-                void mergeExercises(survivorId, loserId)
-              }
-              onDeleteConfirm={() => {
-                void deleteExerciseCascade(
-                  managingExercise.id,
-                  hasHistory,
-                  true,
-                );
-                setManagingExercise(undefined);
-              }}
-              onClose={() => setManagingExercise(undefined)}
-            />
-          );
-        })()}
-
-      <button
-        type="button"
-        className="logging-button"
-        onClick={() => void addBlock(undefined, 'straightSets')}
-      >
-        Add block
-      </button>
-
-      {draft.blocks.map((block, blockIndex) => {
-        const blockVm = toBlockViewModel(block, blockIndex, catalogue);
-        const otherBlocks = draft.blocks
-          .map((b, i) => toBlockViewModel(b, i, catalogue))
-          .filter((vm) => vm.id !== block.id)
+          )
           .map((vm) => ({ id: vm.id, displayName: vm.displayName }));
+        const totalSets = block.exercises.reduce(
+          (sum, entry) => sum + entry.sets.length,
+          0,
+        );
+        // No `exercises.length > 0` guard: a `loose` block stays bare even
+        // once emptied by deleting its last exercise — it's still an
+        // implicit container the user never asked to see as a block.
+        const isBare = block.loose === true;
 
         return (
           <BlockCard
             key={block.id}
             displayName={blockVm.displayName}
             hasName={block.name !== undefined}
+            bare={isBare}
+            subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'} logged`}
             onRename={(name) => void renameBlock(block.id, name)}
             onDelete={() => void deleteBlock(block.id)}
+            footer={
+              isBare ? undefined : (
+                <AddExerciseControl
+                  buttonLabel={`Add exercise to ${blockVm.displayName}`}
+                  fieldLabel={`Add exercise to ${blockVm.displayName}`}
+                  search={searchExercises}
+                  onSelectExercise={(exercise) =>
+                    void addExerciseEntry(exercise.id, block.id)
+                  }
+                  onCreateExercise={(name) => {
+                    void (async () => {
+                      const exercise = await createExercise({
+                        canonicalName: name,
+                      });
+                      await addExerciseEntry(exercise.id, block.id);
+                    })();
+                  }}
+                />
+              )
+            }
           >
             {block.exercises.map((entry, entryIndex) => {
               const entryVm = blockVm.entries[entryIndex]!;
+              const exercise = catalogue.find((e) => e.id === entry.exerciseId);
               return (
                 <ExerciseEntryCard
                   key={entry.id}
@@ -188,6 +213,9 @@ export function LoggingScreen() {
                     void moveExerciseAcrossBlocks(block.id, entry.id, toBlockId)
                   }
                   onDelete={() => void deleteExerciseEntry(block.id, entry.id)}
+                  onEditTemplate={
+                    exercise ? () => setEditingTemplateFor(exercise) : undefined
+                  }
                 >
                   <ul className="set-list">
                     {entry.sets.map((set) => {
@@ -198,11 +226,12 @@ export function LoggingScreen() {
                           <span>{vm.volumeLabel}</span>
                           <button
                             type="button"
-                            className="logging-button"
+                            className="logging-button logging-button--icon-label"
                             onClick={() =>
                               void deleteSet(block.id, entry.id, vm.id)
                             }
                           >
+                            <Icon name="trash" />
                             Delete set
                           </button>
                         </li>
@@ -210,19 +239,15 @@ export function LoggingScreen() {
                     })}
                   </ul>
                   <SetRow
-                    key={`${entry.id}-${entry.sets.length}`}
+                    key={`${entry.id}-${entry.sets.length}-${exercise?.defaultLoadType ?? 'none'}-${exercise?.defaultVolumeKind ?? 'reps'}-${exercise?.trackEffort ?? false}`}
                     prefill={prefillNextSet(block.id, entry.id)}
-                    defaultLoadKind={
-                      catalogue.find((e) => e.id === entry.exerciseId)
-                        ?.defaultLoadType ?? 'none'
-                    }
+                    loadKind={exercise?.defaultLoadType ?? 'none'}
+                    volumeKind={exercise?.defaultVolumeKind ?? 'reps'}
+                    trackEffort={exercise?.trackEffort ?? false}
                     bandLabels={bandLabels}
                     freeTextSuggestions={suggestFreeTextLoads(entry.exerciseId)}
                     onConfirm={(input) =>
                       void addSet(block.id, entry.id, input)
-                    }
-                    onLoadTypeChange={(kind) =>
-                      void recordLoadTypeDefault(entry.exerciseId, kind)
                     }
                     onSaveBandLabels={(labels) => void saveBandLabels(labels)}
                   />
@@ -243,6 +268,27 @@ export function LoggingScreen() {
           />
         ))}
       </div>
+
+      <AddExerciseControl
+        buttonLabel="Add exercise"
+        fieldLabel="Exercise"
+        search={searchExercises}
+        onSelectExercise={(exercise) => void addExerciseEntry(exercise.id)}
+        onCreateExercise={(name) => {
+          void (async () => {
+            const exercise = await createExercise({ canonicalName: name });
+            await addExerciseEntry(exercise.id);
+          })();
+        }}
+      />
+      <button
+        type="button"
+        className="logging-button logging-button--icon-label"
+        onClick={() => void addBlock(undefined, 'straightSets')}
+      >
+        <Icon name="plus" />
+        Add block
+      </button>
     </main>
   );
 }

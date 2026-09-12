@@ -21,6 +21,8 @@ describe('InsightsScreen (FR-001..016)', () => {
       canonicalName: 'Squat',
       aliases: [],
       defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
       unilateral: false,
       discipline: 'Strength',
     });
