@@ -40,7 +40,22 @@
   compared" that doesn't force every card into a two-period comparison) —
   all recorded explicitly in the Assumptions section, each reversible via
   a recorded decision per §5.7's own stated philosophy, and none blocking
-  or contradicting `docs/requirements.md` or specs 001-004. Flagged for
-  extra scrutiny in the upcoming `spec-reviewer` pass, particularly User
-  Story 6 (push/pull balance), which is lowest-priority precisely because
-  its classification has no existing vocabulary to anchor to.
+  or contradicting `docs/requirements.md` or specs 001-004.
+- `spec-reviewer` and `schema-guardian` subagent review (2026-09-12) found
+  no schema/domain-model issues and seven spec-internal
+  ambiguities/contradictions, all resolved directly in spec.md:
+  FR-008 (plateau) lacked FR-002's distinct-qualifying-days safeguard
+  despite claiming to reuse the identical §5.4 algorithm — extended to
+  match; FR-010's hardcoded ISO week boundary was reconciled against
+  FR-11's future first-day-of-week setting as a documented provisional
+  default; the spec's "recomputed from scratch every view" framing was
+  reconciled against `docs/requirements.md` §7.1's "recomputed
+  incrementally" NFR (a performance technique, not a data-ownership
+  conflict); FR-004's grouping key gained the same case/accent-insensitive
+  treatment FR-012 already had; FR-012's "matches a keyword list" was
+  tightened to a whole-word match, not a raw substring match; FR-007
+  gained a consolidation rule for multiple same-window ties on one
+  (Exercise, metric) pair; and FR-015 now explicitly folds in
+  `docs/requirements.md` FR-5's "the app says so when [pattern/muscle
+  groups] are missing" obligation for the aggregate-progress card type.
+  Status: Reviewed.

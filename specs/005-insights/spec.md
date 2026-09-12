@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-12
 
-**Status**: Draft
+**Status**: Reviewed
 
 **Input**: User description: "Insights (Phase 5, v1). Covers
 docs/requirements.md FR-9: deterministic, explainable global-conclusion
@@ -65,10 +65,13 @@ from `listSessions`/`listExercises` each time the screen is viewed
 spec needs — e1RM eligibility, the Epley formula, tonnage, and the
 personal-record definition — already exists in `src/application/
 progression/` from spec 004 and is reused, not re-derived. What is new
-here is aggregation *across* exercises (by pattern, by muscle group, or
-across the whole catalogue) and the data-sufficiency gating (§5.7) that
-decides, for each card, whether there is enough evidence to say anything
-at all.
+here is aggregation both *within* one exercise's own history at a finer
+grain than spec 004 needed (spec 004's e1RM is a per-session maximum;
+§5.4's trend needs a per-*day* maximum across however many sessions
+happened that day) and *across* exercises (by pattern, by muscle group,
+or across the whole catalogue), plus the data-sufficiency gating (§5.7)
+that decides, for each card, whether there is enough evidence to say
+anything at all.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -318,16 +321,19 @@ reports a push/pull percentage split matching the logged sets.
 - What happens when the first-three/last-three daily e1RM comparison
   (§5.4) would need to reuse the same day twice because fewer than 6
   distinct days (not just sessions) have an eligible set — e.g. 6
-  sessions land on only 4 distinct calendar days? The card requires at
-  least 6 *distinct qualifying days*, not merely 6 sessions, specifically
-  so the first-three and last-three groups never overlap (see FR-002's
-  refinement of §5.7's literal session-count wording, and Assumptions).
+  sessions land on only 4 distinct calendar days? Both the per-exercise
+  progress card (FR-002) and the detected-plateau card (FR-008) require
+  at least 6 *distinct qualifying days* within their own window, not
+  merely 6 sessions, specifically so the first-three and last-three
+  groups never overlap.
 - What happens to the Recent records card when a session ties (rather
   than beats) an old all-time value, and an even older session already
   held that same tied value outside the 30-day window? Per spec 004's own
   rule, every session tied for the all-time maximum counts as a personal
   record — if the *recent* one falls inside the 30-day window, it is
   shown, regardless of whether an older tied session exists outside it.
+  If more than one session inside the window ties it, FR-007's
+  consolidation rule shows the most recent one.
 
 ## Non-Goals *(mandatory)*
 
@@ -367,8 +373,15 @@ reports a push/pull percentage split matching the logged sets.
 
 - **FR-001**: The system MUST provide an Insights screen that computes
   zero or more cards, of the six types below, entirely from
-  `StoragePort.listSessions`/`listExercises` at view time — no card's
-  result is stored anywhere between views.
+  `StoragePort.listSessions`/`listExercises` — no card's result is
+  persisted to storage, and none is treated as a source of truth in place
+  of the canonical Session/Exercise records it was computed from
+  (`docs/requirements.md` §6). An in-memory-only, non-persisted
+  incremental-recomputation technique (e.g. memoizing a card's result
+  until a session it depends on changes) MAY be used to satisfy
+  `docs/requirements.md` §7.1's "recomputed incrementally" performance
+  goal — that is an implementation technique for `/speckit-plan` to
+  choose, not a change to this requirement's data-ownership contract.
 - **FR-002**: For each Exercise with at least one e1RM-eligible working
   set (per spec 004's `isE1rmEligible`) within a trailing 90-day window,
   the system MUST compute a per-exercise percentage change per
@@ -387,12 +400,17 @@ reports a push/pull percentage split matching the logged sets.
   date range it covers, and the number of supporting sessions, and MUST
   link to that exercise's spec-004 progression screen.
 - **FR-004**: For each distinct `movementPattern` value and each distinct
-  entry of `muscleGroups` present across the Exercise catalogue, the
-  system MUST compute an aggregate percentage change per
+  entry of `muscleGroups` present across the Exercise catalogue —
+  compared case/accent-insensitively, so e.g. "Legs" and "legs" group
+  together, matching FR-012's own treatment of the same kind of free-text
+  field — the system MUST compute an aggregate percentage change per
   `docs/requirements.md` §5.5: the mean of FR-002's per-exercise
   percentage changes for every Exercise in that group that independently
   clears FR-003's threshold, weighted by each such exercise's count of
-  sessions with an e1RM-eligible set within the 90-day window.
+  sessions with an e1RM-eligible set within the 90-day window. An
+  Exercise with more than one `muscleGroups` entry contributes to each of
+  those groups' aggregates independently, in addition to its single
+  `movementPattern` group.
 - **FR-005**: An aggregate progress card for a pattern or muscle group
   MUST be shown only when at least 2 distinct exercises in that group
   clear FR-003's threshold (§5.7); it MUST state the pattern/group name,
@@ -408,34 +426,46 @@ reports a push/pull percentage split matching the logged sets.
   metric) pair FR-006 finds within the 30-day window, stating the
   exercise's name, the metric, its value, and the date achieved, and MUST
   link to that exercise's spec-004 progression screen with the record
-  session identifiable.
+  session identifiable. When more than one session within the 30-day
+  window ties the same (Exercise, metric) pair's all-time-best value, the
+  entry MUST show the most recent such date and link to that session,
+  consolidating rather than producing a separate entry per tied session.
 - **FR-008**: For each e1RM-eligible Exercise, the system MUST compute the
   same §5.4 trend as FR-002, but over a fixed trailing 8-week window
-  instead of 90 days, requiring at least 6 sessions with that exercise
-  within those 8 weeks (per §5.7's "Plateau" row — no separate day-span
-  or distinct-day minimum beyond what FR-002's overlap-avoidance already
-  implies for this shorter window).
+  instead of 90 days. Per §5.7's "Plateau" row, this MUST require at
+  least 6 sessions with that exercise within those 8 weeks, and — for the
+  same overlap-avoidance reason FR-002 states — at least 6 *distinct
+  qualifying calendar days* within those 8 weeks (no separate ≥21-day
+  span requirement; §5.7's Plateau row states none, unlike its Exercise
+  trend row).
 - **FR-009**: A detected-plateau card for an Exercise MUST be shown only
   when FR-008's computation yields an absolute percentage change under 2%
   (§5.7); it MUST state the exercise's name, the near-zero change, the
   8-week period, and the supporting session count, and MUST link to that
   exercise's progression screen.
 - **FR-010**: The system MUST compute a consistency figure: the count of
-  distinct ISO calendar weeks, within the trailing 12 weeks (or the
-  person's full training history if shorter), that contain at least one
-  logged Session.
+  distinct calendar weeks, within the trailing 12 weeks (or the person's
+  full training history if shorter), that contain at least one logged
+  Session. Week boundaries default to the ISO convention (Monday-start)
+  for this spec; `docs/requirements.md` FR-11 (Settings) later gives the
+  user a "first day of the week" preference that FR-11's own spec should
+  make this computation follow once it exists — this default is provisional
+  pending that setting, not a permanent override of it (see Assumptions).
 - **FR-011**: A consistency card MUST be shown only when the person's
   total training history spans at least 4 weeks (§5.7); it MUST state how
   many of the covered weeks included a session, out of how many weeks
   were covered.
 - **FR-012**: The system MUST classify each working Set logged within the
   trailing 90 days as "push," "pull," or unclassified, based on whether
-  its Exercise entry's referenced Exercise's `movementPattern` value
-  case/accent-insensitively matches a fixed "push" keyword list, a fixed
-  "pull" keyword list, or neither (see Assumptions for the lists) — a Set
-  whose Exercise has no `movementPattern`, or one matching neither list,
-  MUST be excluded from both categories and from the qualifying count
-  below.
+  its Exercise entry's referenced Exercise's `movementPattern` value has,
+  case/accent-insensitively, any whitespace-delimited word that exactly
+  equals an entry in a fixed "push" keyword list, a fixed "pull" keyword
+  list, or neither (see Assumptions for the lists) — a whole-word match,
+  not a raw substring match, so e.g. "press" matches a pattern of
+  "close-grip bench press" but a hypothetical pattern like "compression"
+  would not. A Set whose Exercise has no `movementPattern`, or one
+  matching neither list, MUST be excluded from both categories and from
+  the qualifying count below.
 - **FR-013**: A push/pull balance card MUST be shown only when at least
   20 classified (push or pull) working sets exist within the 90-day
   window (§5.7); it MUST state the percentage split between push and
@@ -451,7 +481,14 @@ reports a push/pull percentage split matching the logged sets.
   (e.g. how many more sessions or how much more history would be needed)
   rather than omitting the section with no explanation — distinct from an
   individual Exercise or group simply not (yet) qualifying while others
-  of the same card type do.
+  of the same card type do. For the aggregate progress card type
+  (FR-004/FR-005) specifically, when the reason no aggregate qualifies is
+  that too few of the person's exercises carry a `movementPattern` or
+  `muscleGroups` value at all (rather than simply not clearing FR-003's
+  trend threshold), the explanation MUST say so — folding
+  `docs/requirements.md` FR-5's "the app says so when they are missing"
+  obligation into this card type's own missing-data messaging, rather
+  than a separate, disconnected requirement.
 - **FR-016**: None of this spec's thresholds (§5.7) or window lengths
   (Assumptions) are exposed as a user-facing setting — changing any of
   them requires its own recorded decision, consistent with
@@ -497,6 +534,21 @@ derived concepts:
 
 ## Assumptions
 
+- **Consistency's week boundary vs. FR-11's future setting**: FR-010 uses
+  the ISO (Monday-start) week convention as a fixed default, since
+  `docs/requirements.md` FR-11's user-configurable "first day of the
+  week" setting is a later phase (`docs/agent-brief.md` Phase 7) that
+  does not exist yet. This is a provisional default this card should
+  switch to reading from FR-11's setting once that phase ships, not a
+  permanent, deliberate override of it — noted here so a future spec
+  touching FR-11 knows to revisit this computation.
+- **§7.1's "recomputed incrementally" performance goal**: this spec's
+  "no card is persisted" contract (FR-001, constitution Principle I) is
+  about *data ownership* — canonical Session/Exercise records are the
+  only source of truth — not about forbidding an in-memory, non-persisted
+  memoization strategy that satisfies §7.1's incremental-recomputation
+  performance goal. Exactly how incremental recomputation is implemented
+  (e.g. keyed by which sessions changed) is left to `/speckit-plan`.
 - **Window lengths** (not specified numerically in `docs/requirements.md`
   beyond the Plateau card's own explicit "8 weeks"): per-exercise
   progress and aggregate progress use a trailing 90-day window; recent
@@ -519,8 +571,9 @@ derived concepts:
   pull" classify as pull. Patterns like "squat," "hinge," "lunge," or
   "carry" are deliberately classified as neither. The exact list is an
   implementation detail for `/speckit-plan`; this spec fixes only its
-  behavior (case/accent-insensitive keyword match, unmatched/absent
-  pattern excluded from both categories) per FR-012/Edge Cases. Because
+  behavior (case/accent-insensitive, whole-word keyword match — not a raw
+  substring match — with an unmatched/absent pattern excluded from both
+  categories) per FR-012/Edge Cases. Because
   `movementPattern` is free text with no seed catalogue yet (`ADR-0005`),
   this card will show "not enough data" for many real installs until a
   person's own naming happens to match — an accepted, honestly-degraded
