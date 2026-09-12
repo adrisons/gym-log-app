@@ -106,8 +106,6 @@ export function ExerciseSearchField({
           onFocus={() => setOpen(true)}
           onClick={() => setOpen(true)}
           placeholder={placeholder}
-          aria-expanded={open}
-          aria-controls={resultsId}
           autoFocus={autoFocus}
         />
       </label>

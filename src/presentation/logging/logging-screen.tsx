@@ -92,6 +92,15 @@ export function LoggingScreen() {
     return <main className="logging-screen" aria-label="Log a session" />;
   }
 
+  // Position labels ("Block N") and "Move to block" targets are both
+  // computed from the ordinal among non-loose blocks, never the raw array
+  // index — a `loose` container renders with no label at all, so counting
+  // it would misnumber the first *visible* block (e.g. a loose exercise
+  // followed by the user's first "Add block" press would otherwise show
+  // that sole visible block as "Block 2") and would also offer it as a
+  // synthetic, headerless move target.
+  const nonLooseBlocks = draft.blocks.filter((b) => b.loose !== true);
+
   return (
     <main className="logging-screen" aria-label="Log a session">
       <h1>Log a session</h1>
@@ -105,18 +114,37 @@ export function LoggingScreen() {
           key={editingTemplateFor.id}
           exercise={editingTemplateFor}
           onSave={(template) => {
-            void updateExerciseTemplate(editingTemplateFor.id, template);
+            // Closes immediately either way (every logging interaction
+            // responds immediately — docs/requirements.md §7.1): the store
+            // action already rolls its own optimistic update back on a
+            // storage failure, so this only needs to keep that rejection
+            // from surfacing as an unhandled one.
+            updateExerciseTemplate(editingTemplateFor.id, template).catch(
+              (error: unknown) => {
+                console.error('Failed to save exercise template', error);
+              },
+            );
             setEditingTemplateFor(undefined);
           }}
           onClose={() => setEditingTemplateFor(undefined)}
         />
       )}
 
-      {draft.blocks.map((block, blockIndex) => {
-        const blockVm = toBlockViewModel(block, blockIndex, catalogue);
-        const otherBlocks = draft.blocks
-          .map((b, i) => toBlockViewModel(b, i, catalogue))
-          .filter((vm) => vm.id !== block.id)
+      {draft.blocks.map((block) => {
+        const blockVm = toBlockViewModel(
+          block,
+          nonLooseBlocks.findIndex((b) => b.id === block.id),
+          catalogue,
+        );
+        const otherBlocks = nonLooseBlocks
+          .filter((b) => b.id !== block.id)
+          .map((b) =>
+            toBlockViewModel(
+              b,
+              nonLooseBlocks.findIndex((x) => x.id === b.id),
+              catalogue,
+            ),
+          )
           .map((vm) => ({ id: vm.id, displayName: vm.displayName }));
         const totalSets = block.exercises.reduce(
           (sum, entry) => sum + entry.sets.length,

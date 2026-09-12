@@ -255,14 +255,25 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     },
 
     updateExerciseTemplate: async (exerciseId, template) => {
-      const { storage } = get();
+      const { storage, catalogue: previousCatalogue } = get();
       if (!storage) return;
       set((state) => ({
         catalogue: state.catalogue.map((exercise) =>
           exercise.id === exerciseId ? { ...exercise, ...template } : exercise,
         ),
       }));
-      await updateExerciseTemplateUseCase(storage, exerciseId, template);
+      try {
+        await updateExerciseTemplateUseCase(storage, exerciseId, template);
+      } catch (error) {
+        // Roll the optimistic update back: durable storage never got the
+        // new template, so leaving it applied here would show set-entry
+        // controls for a template that silently reverts on the next
+        // reload. Re-thrown so a caller that keeps its own copy of the
+        // catalogue (`SessionDetailScreen`) can also undo its echo of this
+        // same optimistic update and keep its editor open to retry.
+        set({ catalogue: previousCatalogue });
+        throw error;
+      }
     },
 
     suggestFreeTextLoads: (exerciseId) => {

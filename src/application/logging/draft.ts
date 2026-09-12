@@ -95,6 +95,28 @@ export function draftToSession(draft: LoggingDraft, id: SessionId): Session {
 }
 
 /**
+ * Drops presentation-only fields before a draft is written to storage.
+ * `DraftBlock.loose` is a rendering hint (docs/requirements.md §6: an
+ * undocumented field reaching the actual persisted bytes is an implicit
+ * schema change, the same reasoning `draftToSession` already applies when
+ * promoting a draft to a `Session`). Both real adapters call this at their
+ * write boundary so `loose` never reaches disk/IndexedDB; a block that was
+ * loose simply shows its header again after a reload, matching what a
+ * freshly-migrated v1 record (which never had the field) already renders.
+ */
+export function toPersistableDraft(draft: LoggingDraft): LoggingDraft {
+  return {
+    ...draft,
+    blocks: draft.blocks.map((block) => ({
+      id: block.id,
+      ...(block.name !== undefined ? { name: block.name } : {}),
+      type: block.type,
+      exercises: block.exercises,
+    })),
+  };
+}
+
+/**
  * Adds an exercise entry to the draft (FR-002). With no `blockId` (the
  * "loose exercise" path a user reaches without ever tapping "Add block"):
  * appends to the trailing block only if it's itself `loose` (an implicit

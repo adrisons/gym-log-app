@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createDraft,
   draftToSession,
+  toPersistableDraft,
   addExerciseEntry,
   prefillNextSet,
   addSet,
@@ -101,6 +102,46 @@ describe('LoggingDraft (data-model.md "LoggingDraft")', () => {
     const draft = createDraft('2026-09-11T18:00:00.000Z');
     const session = draftToSession(draft, 'session-2' as SessionId);
     expect(session.blocks).toEqual([]);
+  });
+
+  it('toPersistableDraft strips the presentation-only `loose` flag so it never reaches disk/IndexedDB (undocumented-schema-field regression)', () => {
+    const draft: LoggingDraft = {
+      id: 'draft-1',
+      dateTime: '2026-09-11T18:00:00.000Z',
+      lastEditedAt: '2026-09-11T18:00:00.000Z',
+      notes: '',
+      blocks: [
+        {
+          id: 'block-1',
+          loose: true,
+          type: 'straightSets',
+          exercises: [],
+        },
+        {
+          id: 'block-2',
+          name: 'Named block',
+          type: 'straightSets',
+          exercises: [],
+        },
+      ],
+    };
+
+    const persistable = toPersistableDraft(draft);
+
+    expect(persistable.blocks[0]).not.toHaveProperty('loose');
+    expect(persistable.blocks[1]).not.toHaveProperty('loose');
+    // Every other field survives unchanged.
+    expect(persistable.blocks[0]).toEqual({
+      id: 'block-1',
+      type: 'straightSets',
+      exercises: [],
+    });
+    expect(persistable.blocks[1]).toEqual({
+      id: 'block-2',
+      name: 'Named block',
+      type: 'straightSets',
+      exercises: [],
+    });
   });
 });
 

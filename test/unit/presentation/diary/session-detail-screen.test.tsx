@@ -439,6 +439,58 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('numbers the first explicit block "Block 1" even after a loose exercise already exists (loose-block-numbering regression)', async () => {
+    const storage = new InMemoryStorage();
+    const sessionId = 's1' as SessionId;
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <Routes>
+          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Add exercise' }),
+      ).toBeInTheDocument();
+    });
+
+    // Adding an exercise with no explicit block first creates a `loose`
+    // container at index 0 — it renders bare, with no "Block N" label.
+    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.type(
+      screen.getByPlaceholderText(/search or create an exercise/i),
+      'Lat pulldown',
+    );
+    await userEvent.click(screen.getByText('Create "Lat pulldown"'));
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Lat pulldown' }),
+      ).toBeInTheDocument();
+    });
+
+    // The first explicitly created block must still be numbered "Block 1"
+    // — the loose container ahead of it in the array has no label and
+    // must not be counted.
+    await userEvent.click(screen.getByRole('button', { name: 'Add block' }));
+    await waitFor(() => {
+      expect(screen.getByText('Block 1')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Block 2')).not.toBeInTheDocument();
+  });
+
   it('a loose block stays chrome-less even after its last exercise is deleted (empty-loose-block regression)', async () => {
     const storage = new InMemoryStorage();
     const exerciseId = 'ex-1' as ExerciseId;
@@ -590,6 +642,87 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       const updated = catalogue.find((e) => e.id === exerciseId);
       expect(updated?.trackEffort).toBe(true);
     });
+  });
+
+  it('keeps the template editor open and the old template applied when the storage write fails (failed-template-save regression)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const sessionId = 's1' as SessionId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [
+          createBlock({
+            type: 'straightSets',
+            name: 'Push day',
+            exercises: [{ exerciseId, notes: '', sets: [] }],
+          }),
+        ],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <Routes>
+          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Squat' }),
+      ).toBeInTheDocument();
+    });
+
+    storage.saveExercise = vi.fn().mockRejectedValue(new Error('disk full'));
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Squat actions' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /edit tracked fields/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /track effort/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    // A rejected write must never close the editor or apply the
+    // never-persisted template — the prior (optimistic-then-close)
+    // behavior left this screen recording new sets under a template that
+    // silently reverted on the next reload, with no way to retry.
+    await waitFor(() => {
+      expect(consoleError).toHaveBeenCalled();
+    });
+    expect(
+      screen.getByRole('dialog', { name: /edit squat's tracked fields/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: /track effort/i }),
+    ).toBeChecked();
+
+    consoleError.mockRestore();
   });
 
   it('creating an exercise re-syncs the logging store, not just this screen (stale-catalogue regression)', async () => {

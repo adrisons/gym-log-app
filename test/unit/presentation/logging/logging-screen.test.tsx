@@ -100,6 +100,40 @@ describe('LoggingScreen (FR-001)', () => {
     ).toBeInTheDocument();
   });
 
+  it('numbers the first explicit block "Block 1" even after a loose exercise already exists (loose-block-numbering regression)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    render(<LoggingScreen />);
+
+    // Add a loose exercise first — it renders bare, with no "Block N"
+    // label of its own, but it still occupies index 0 in `draft.blocks`.
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Add exercise' }),
+      ).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.type(
+      screen.getByPlaceholderText(/search or create an exercise/i),
+      'Lat pulldown',
+    );
+    await userEvent.click(screen.getByText('Create "Lat pulldown"'));
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Lat pulldown' }),
+      ).toBeInTheDocument();
+    });
+
+    // The first explicitly created block must still be numbered "Block 1"
+    // — the loose container ahead of it in the array has no label and
+    // must not be counted.
+    await userEvent.click(screen.getByRole('button', { name: 'Add block' }));
+    await waitFor(() => {
+      expect(screen.getByText('Block 1')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Block 2')).not.toBeInTheDocument();
+  });
+
   it('a loose block stays chrome-less even after its last exercise is deleted (empty-loose-block regression)', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);

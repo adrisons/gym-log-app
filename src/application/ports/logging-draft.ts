@@ -49,7 +49,7 @@ export interface DraftBlock {
    * persisted domain `Block` (`domain/block.ts`) — a purely cosmetic
    * rendering choice isn't a schema change (`docs/requirements.md` §6).
    */
-  loose?: boolean;
+  loose?: boolean; // stripped before either real adapter writes a draft (`application/logging/draft.ts`'s `toPersistableDraft`) — never reaches disk/IndexedDB, so it needs no ADR/migration of its own
   type: 'straightSets' | 'superset' | 'circuit';
   exercises: DraftExerciseEntry[];
 }

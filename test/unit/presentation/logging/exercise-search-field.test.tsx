@@ -30,6 +30,28 @@ describe('ExerciseSearchField (FR-002, FR-015, FR-016)', () => {
     expect(screen.queryByText('Back squat')).not.toBeInTheDocument();
   });
 
+  it('never exposes combobox disclosure attributes on the plain textbox (invalid-aria regression)', async () => {
+    const search = vi.fn(() => [squat]);
+    render(
+      <ExerciseSearchField
+        search={search}
+        onSelectExercise={() => {}}
+        onCreateExercise={() => {}}
+      />,
+    );
+
+    const input = screen.getByRole('textbox');
+    await userEvent.click(input);
+
+    // This is deliberately a plain textbox, not an ARIA combobox — it
+    // implements neither aria-activedescendant-driven option focus nor
+    // arrow-key navigation, so `aria-expanded`/`aria-controls` (properties
+    // the `textbox` role does not support at all) would announce a
+    // half-implemented widget state to assistive tech.
+    expect(input).not.toHaveAttribute('aria-expanded');
+    expect(input).not.toHaveAttribute('aria-controls');
+  });
+
   it('shows results from the search function once focused, as the query changes', async () => {
     const search = vi.fn((query: string) => (query ? [squat] : []));
     render(

@@ -104,3 +104,41 @@ describe('useLoggingSession undo stack (FR-004, FR-023)', () => {
     expect(useLoggingSession.getState().undoStack).toHaveLength(1);
   });
 });
+
+describe('useLoggingSession.updateExerciseTemplate (docs/requirements.md §7.1)', () => {
+  it('rolls the optimistic catalogue update back when the storage write fails (failed-template-save regression)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const original = {
+      id: exerciseId,
+      canonicalName: 'Back squat',
+      aliases: [],
+      defaultLoadType: 'weight' as const,
+      defaultVolumeKind: 'reps' as const,
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength' as const,
+    };
+    await storage.saveExercise(original);
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+
+    const failure = new Error('disk full');
+    storage.saveExercise = vi.fn().mockRejectedValue(failure);
+
+    await expect(
+      useLoggingSession.getState().updateExerciseTemplate(exerciseId, {
+        defaultLoadType: 'weight',
+        defaultVolumeKind: 'reps',
+        trackEffort: true,
+      }),
+    ).rejects.toThrow(failure);
+
+    // Storage never got the new template — the in-memory catalogue must
+    // match it exactly, not the optimistic (now-abandoned) update.
+    const catalogueEntry = useLoggingSession
+      .getState()
+      .catalogue.find((e) => e.id === exerciseId);
+    expect(catalogueEntry?.trackEffort).toBe(false);
+  });
+});

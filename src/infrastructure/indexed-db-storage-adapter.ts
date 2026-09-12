@@ -7,6 +7,7 @@ import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
 import type { SessionId, ExerciseId } from '../domain/ids';
 import { StorageError } from '../application/errors';
+import { toPersistableDraft } from '../application/logging/draft';
 import {
   GymLogDatabase,
   DRAFT_ROW_KEY,
@@ -247,7 +248,10 @@ export class IndexedDbStorageAdapter implements StoragePort {
   async saveDraft(draft: LoggingDraft): Promise<void> {
     await this.#ensureSchemaChecked();
     await this.#run(() =>
-      this.#db.draft.put({ key: DRAFT_ROW_KEY, value: draft }),
+      this.#db.draft.put({
+        key: DRAFT_ROW_KEY,
+        value: toPersistableDraft(draft),
+      }),
     );
   }
 

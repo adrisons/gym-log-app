@@ -212,6 +212,14 @@ export function SessionDetailScreen() {
     return <main className="session-detail-screen" aria-label="Session" />;
   }
 
+  // "Block N" position labels are computed from the ordinal among
+  // non-loose blocks, never the raw array index — a `loose` container
+  // renders with no label at all, so counting it would misnumber the
+  // first *visible* block (e.g. a loose exercise followed by the user's
+  // first "Add block" press would otherwise show that sole visible block
+  // as "Block 2").
+  const nonLooseBlocks = editable.blocks.filter((b) => b.loose !== true);
+
   return (
     <main className="session-detail-screen" aria-label="Session detail">
       <div className="session-detail-screen__header">
@@ -231,25 +239,38 @@ export function SessionDetailScreen() {
           key={editingTemplateFor.id}
           exercise={editingTemplateFor}
           onSave={(template) => {
-            setCatalogue((current) =>
-              current.map((exercise) =>
-                exercise.id === editingTemplateFor.id
-                  ? { ...exercise, ...template }
-                  : exercise,
-              ),
-            );
-            void updateExerciseTemplateInSession(
-              editingTemplateFor.id,
-              template,
-            );
-            setEditingTemplateFor(undefined);
+            // Unlike LoggingScreen, this screen keeps its own separate
+            // `catalogue` copy alongside the logging store's — awaits the
+            // storage-backed action first and only echoes the template
+            // into that local copy (and closes) on success, so a storage
+            // failure never leaves this screen showing/recording against
+            // an unsaved template with no retry path (the panel just stays
+            // open instead).
+            updateExerciseTemplateInSession(editingTemplateFor.id, template)
+              .then(() => {
+                setCatalogue((current) =>
+                  current.map((exercise) =>
+                    exercise.id === editingTemplateFor.id
+                      ? { ...exercise, ...template }
+                      : exercise,
+                  ),
+                );
+                setEditingTemplateFor(undefined);
+              })
+              .catch((error: unknown) => {
+                console.error('Failed to save exercise template', error);
+              });
           }}
           onClose={() => setEditingTemplateFor(undefined)}
         />
       )}
 
-      {editable.blocks.map((block, blockIndex) => {
-        const blockVm = toBlockViewModel(block, blockIndex, catalogue);
+      {editable.blocks.map((block) => {
+        const blockVm = toBlockViewModel(
+          block,
+          nonLooseBlocks.findIndex((b) => b.id === block.id),
+          catalogue,
+        );
         const totalSets = block.exercises.reduce(
           (sum, entry) => sum + entry.sets.length,
           0,
