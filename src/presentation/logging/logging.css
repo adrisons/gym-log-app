@@ -6,7 +6,7 @@
    visually-related controls, not independent design surfaces. */
 
 .logging-screen {
-  min-height: 100vh;
+  min-height: 100%;
   background: var(--color-canvas);
   color: var(--color-foreground);
   padding: var(--space-4);
@@ -97,6 +97,28 @@
   border-color: var(--color-accent);
   text-align: center;
   font-weight: 600;
+}
+
+/* A button whose label is preceded by an icon (docs/design.md §1.2 — the
+   icon is decorative, the visible word next to it still carries the
+   meaning). Icon inherits `currentColor`, so it always matches whichever
+   text color the button variant already has — no extra token needed. */
+.logging-button--icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.logging-button--icon-label svg {
+  flex: none;
+}
+
+/* A field label preceded by an icon (e.g. ExerciseEntryCard's "Move to
+   block" select) — same icon+word pairing as the button variant above. */
+.logging-screen__field-label--icon {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .logging-button--primary:hover {
@@ -253,9 +275,11 @@
 }
 
 .overflow-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 44px;
   min-width: 44px;
-  text-align: center;
   padding: var(--space-2);
 }
 

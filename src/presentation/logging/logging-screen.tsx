@@ -30,6 +30,7 @@ import {
   toSetSummaryViewModel,
 } from '@/application/logging/view-models';
 import type { Exercise } from '@/application/logging/use-cases';
+import { Icon } from '@/presentation/design/icons';
 import { SessionDateTimeField } from './session-date-time-field';
 import { AddExerciseControl } from './add-exercise-control';
 import { SetRow } from './set-row';
@@ -130,7 +131,7 @@ export function LoggingScreen() {
             footer={
               isBare ? undefined : (
                 <AddExerciseControl
-                  buttonLabel={`+ Add exercise to ${blockVm.displayName}`}
+                  buttonLabel={`Add exercise to ${blockVm.displayName}`}
                   fieldLabel={`Add exercise to ${blockVm.displayName}`}
                   search={searchExercises}
                   onSelectExercise={(exercise) =>
@@ -189,11 +190,12 @@ export function LoggingScreen() {
                           <span>{vm.volumeLabel}</span>
                           <button
                             type="button"
-                            className="logging-button"
+                            className="logging-button logging-button--icon-label"
                             onClick={() =>
                               void deleteSet(block.id, entry.id, vm.id)
                             }
                           >
+                            <Icon name="trash" />
                             Delete set
                           </button>
                         </li>
@@ -232,7 +234,7 @@ export function LoggingScreen() {
       </div>
 
       <AddExerciseControl
-        buttonLabel="+ Add exercise"
+        buttonLabel="Add exercise"
         fieldLabel="Exercise"
         search={searchExercises}
         onSelectExercise={(exercise) => void addExerciseEntry(exercise.id)}
@@ -245,10 +247,11 @@ export function LoggingScreen() {
       />
       <button
         type="button"
-        className="logging-button"
+        className="logging-button logging-button--icon-label"
         onClick={() => void addBlock(undefined, 'straightSets')}
       >
-        + Add block
+        <Icon name="plus" />
+        Add block
       </button>
     </main>
   );

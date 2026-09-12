@@ -7,7 +7,6 @@
  * state of its own, only catalogue reads and management writes.
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { requireStorage } from '@/application/storage-access';
 import { allStoredDataRange } from '@/application/date-range';
 import { searchExercises } from '@/application/search/exercise-search';
@@ -17,6 +16,7 @@ import {
   deleteExerciseCascade,
 } from '@/application/logging/use-cases';
 import type { Exercise, Session } from '@/application/logging/use-cases';
+import { Icon } from '@/presentation/design/icons';
 import { ExerciseCataloguePanel } from '../logging/exercise-catalogue-panel';
 import './catalogue.css';
 
@@ -63,7 +63,6 @@ export function ExerciseCatalogueScreen() {
   return (
     <main className="catalogue-screen" aria-label="Manage exercises">
       <h1>Exercises</h1>
-      <Link to="/">Back to logging</Link>
 
       <label className="logging-screen__field-label">
         <span>Exercise name</span>
@@ -82,10 +81,11 @@ export function ExerciseCatalogueScreen() {
             <span>{exercise.canonicalName}</span>
             <button
               type="button"
-              className="logging-button"
+              className="logging-button logging-button--icon-label"
               aria-label={`Manage ${exercise.canonicalName}`}
               onClick={() => setManaging(exercise)}
             >
+              <Icon name="sliders" />
               Manage
             </button>
           </li>

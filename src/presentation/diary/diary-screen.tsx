@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Icon } from '@/presentation/design/icons';
 import { requireStorage } from '@/application/storage-access';
 import { allStoredDataRange } from '@/application/date-range';
 import { buildDiarySessionSummary } from '@/application/diary/diary-summary';
@@ -64,11 +65,11 @@ export function DiaryScreen() {
   return (
     <main className="diary-screen" aria-label="Diary">
       <h1>Diary</h1>
-      <Link to="/search">Search exercises</Link>
-      <Link to="/insights">Insights</Link>
-      <Link to="/exercises">Manage exercises</Link>
       <label className="diary-screen__jump">
-        <span>Jump to date</span>
+        <span className="diary-screen__jump-label">
+          <Icon name="calendar" />
+          Jump to date
+        </span>
         <input
           type="date"
           value={jumpDate}
@@ -90,10 +91,20 @@ export function DiaryScreen() {
                   to={`/diary/${session.sessionId}`}
                   className="diary-screen__session-link"
                 >
-                  <span>{new Date(session.dateTime).toLocaleDateString()}</span>
-                  <span>{session.mainExerciseNames.join(', ')}</span>
-                  <span>{session.setCount} sets</span>
-                  {session.kindOfWork && <span>{session.kindOfWork}</span>}
+                  <Icon name="dumbbell" />
+                  <span className="diary-screen__session-link-body">
+                    <span className="diary-screen__session-link-date">
+                      {new Date(session.dateTime).toLocaleDateString()}
+                    </span>
+                    <span className="diary-screen__session-link-detail">
+                      {session.mainExerciseNames.join(', ')}
+                    </span>
+                    <span className="diary-screen__session-link-detail">
+                      {session.setCount} sets
+                      {session.kindOfWork && ` · ${session.kindOfWork}`}
+                    </span>
+                  </span>
+                  <Icon name="chevron-right" />
                 </Link>
               </li>
             ))}

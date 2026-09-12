@@ -6,6 +6,7 @@
  * (docs/design.md §5 — nothing essential revealed by hover/pointer only).
  */
 import type { ReactNode } from 'react';
+import { Icon } from '@/presentation/design/icons';
 import { OverflowMenu } from './overflow-menu';
 import './logging.css';
 
@@ -43,26 +44,31 @@ export function ExerciseEntryCard({
           <button
             type="button"
             role="menuitem"
-            className="logging-button"
+            className="logging-button logging-button--icon-label"
             disabled={!canMoveUp}
             aria-disabled={!canMoveUp}
             onClick={onMoveUp}
           >
+            <Icon name="chevron-up" />
             Move up
           </button>
           <button
             type="button"
             role="menuitem"
-            className="logging-button"
+            className="logging-button logging-button--icon-label"
             disabled={!canMoveDown}
             aria-disabled={!canMoveDown}
             onClick={onMoveDown}
           >
+            <Icon name="chevron-down" />
             Move down
           </button>
           {otherBlocks.length > 0 && (
             <label className="logging-screen__field-label">
-              <span>Move to block</span>
+              <span className="logging-screen__field-label--icon">
+                <Icon name="move-to" />
+                Move to block
+              </span>
               <select
                 className="logging-field-input"
                 value=""
@@ -85,18 +91,20 @@ export function ExerciseEntryCard({
             <button
               type="button"
               role="menuitem"
-              className="logging-button"
+              className="logging-button logging-button--icon-label"
               onClick={onEditTemplate}
             >
+              <Icon name="sliders" />
               Edit tracked fields…
             </button>
           )}
           <button
             type="button"
             role="menuitem"
-            className="logging-button"
+            className="logging-button logging-button--icon-label"
             onClick={onDelete}
           >
+            <Icon name="trash" />
             Delete exercise
           </button>
         </OverflowMenu>

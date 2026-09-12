@@ -4,6 +4,7 @@
  * preference) until the pending set has a volume or a non-`none` load.
  * Never labelled "Save" (FR-003 — no visible Save control anywhere).
  */
+import { Icon } from '@/presentation/design/icons';
 import './logging.css';
 
 export interface SetConfirmControlProps {
@@ -19,11 +20,12 @@ export function SetConfirmControl({
     <div>
       <button
         type="button"
-        className="logging-button logging-button--primary"
+        className="logging-button logging-button--primary logging-button--icon-label"
         disabled={!canConfirm}
         aria-disabled={!canConfirm}
         onClick={onConfirm}
       >
+        <Icon name="check" />
         Add set
       </button>
       {!canConfirm && (

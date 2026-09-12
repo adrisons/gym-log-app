@@ -32,6 +32,7 @@ import type {
   Session,
   SessionId,
 } from '@/application/logging/use-cases';
+import { Icon } from '@/presentation/design/icons';
 import { BlockCard } from '../logging/block-card';
 import { ExerciseEntryCard } from '../logging/exercise-entry-card';
 import { SetRow } from '../logging/set-row';
@@ -117,7 +118,7 @@ export function SessionDetailScreen() {
           aria-label="Close"
           onClick={() => navigate('/diary')}
         >
-          ×
+          <Icon name="close" />
         </button>
       </div>
 
@@ -178,7 +179,7 @@ export function SessionDetailScreen() {
             footer={
               isBare ? undefined : (
                 <AddExerciseControl
-                  buttonLabel={`+ Add exercise to ${blockVm.displayName}`}
+                  buttonLabel={`Add exercise to ${blockVm.displayName}`}
                   fieldLabel={`Add exercise to ${blockVm.displayName}`}
                   search={(query) => searchExercises(query, catalogue)}
                   onSelectExercise={(exercise) =>
@@ -243,7 +244,7 @@ export function SessionDetailScreen() {
                             <span>{vm.volumeLabel}</span>
                             <button
                               type="button"
-                              className="logging-button"
+                              className="logging-button logging-button--icon-label"
                               onClick={() =>
                                 persist({
                                   ...editable,
@@ -267,6 +268,7 @@ export function SessionDetailScreen() {
                                 })
                               }
                             >
+                              <Icon name="trash" />
                               Delete set
                             </button>
                           </li>
@@ -326,7 +328,7 @@ export function SessionDetailScreen() {
       })}
 
       <AddExerciseControl
-        buttonLabel="+ Add exercise"
+        buttonLabel="Add exercise"
         fieldLabel="Exercise"
         search={(query) => searchExercises(query, catalogue)}
         onSelectExercise={(exercise) => {
@@ -366,7 +368,7 @@ export function SessionDetailScreen() {
       />
       <button
         type="button"
-        className="logging-button"
+        className="logging-button logging-button--icon-label"
         onClick={() =>
           persist({
             ...editable,
@@ -377,7 +379,8 @@ export function SessionDetailScreen() {
           })
         }
       >
-        + Add block
+        <Icon name="plus" />
+        Add block
       </button>
     </main>
   );

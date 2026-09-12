@@ -43,6 +43,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { registerSW } from 'virtual:pwa-register';
+import { AppShell } from './app-shell';
 import { LoggingScreen } from './logging/logging-screen';
 import { DiaryScreen } from './diary/diary-screen';
 import { SessionDetailScreen } from './diary/session-detail-screen';
@@ -95,16 +96,18 @@ function mount(): void {
     <StrictMode>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
-          <Route path="/" element={<LoggingScreen />} />
-          <Route path="/diary" element={<DiaryScreen />} />
-          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
-          <Route path="/search" element={<ExerciseSearchScreen />} />
-          <Route
-            path="/exercises/:exerciseId/progression"
-            element={<ProgressionScreen />}
-          />
-          <Route path="/insights" element={<InsightsScreen />} />
-          <Route path="/exercises" element={<ExerciseCatalogueScreen />} />
+          <Route element={<AppShell />}>
+            <Route path="/" element={<LoggingScreen />} />
+            <Route path="/diary" element={<DiaryScreen />} />
+            <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+            <Route path="/search" element={<ExerciseSearchScreen />} />
+            <Route
+              path="/exercises/:exerciseId/progression"
+              element={<ProgressionScreen />}
+            />
+            <Route path="/insights" element={<InsightsScreen />} />
+            <Route path="/exercises" element={<ExerciseCatalogueScreen />} />
+          </Route>
         </Routes>
       </BrowserRouter>
     </StrictMode>,

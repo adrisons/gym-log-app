@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { LoadTypePicker } from './load-type-picker';
 import type { Exercise, Load, Volume } from '@/application/logging/use-cases';
+import { Icon } from '@/presentation/design/icons';
 import './logging.css';
 
 const VOLUME_KIND_LABELS: Record<Volume['kind'], string> = {
@@ -91,7 +92,7 @@ export function ExerciseTemplatePanel({
 
       <button
         type="button"
-        className="logging-button logging-button--primary"
+        className="logging-button logging-button--primary logging-button--icon-label"
         onClick={() =>
           onSave({
             defaultLoadType: loadType,
@@ -100,9 +101,15 @@ export function ExerciseTemplatePanel({
           })
         }
       >
+        <Icon name="check" />
         Save changes
       </button>
-      <button type="button" className="logging-button" onClick={onClose}>
+      <button
+        type="button"
+        className="logging-button logging-button--icon-label"
+        onClick={onClose}
+      >
+        <Icon name="close" />
         Cancel
       </button>
     </div>

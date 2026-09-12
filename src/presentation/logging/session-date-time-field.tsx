@@ -3,6 +3,7 @@
  * native `<input type="datetime-local">` on design tokens — always
  * editable (no disabled state applies, `contracts/logging-screen-components.md`).
  */
+import { Icon } from '@/presentation/design/icons';
 import './logging.css';
 
 function isoToLocalInputValue(iso: string): string {
@@ -27,7 +28,10 @@ export function SessionDateTimeField({
 }: SessionDateTimeFieldProps) {
   return (
     <label className="logging-screen__field-label">
-      <span>Session date &amp; time</span>
+      <span className="logging-screen__field-label--icon">
+        <Icon name="calendar" />
+        Session date &amp; time
+      </span>
       <input
         type="datetime-local"
         className="logging-field-input"

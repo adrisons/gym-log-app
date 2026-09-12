@@ -21,6 +21,7 @@
  */
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { Icon } from '@/presentation/design/icons';
 import { OverflowMenu } from './overflow-menu';
 import './logging.css';
 
@@ -78,7 +79,11 @@ export function BlockCard({
                 autoFocus
               />
             </label>
-            <button type="submit" className="logging-button">
+            <button
+              type="submit"
+              className="logging-button logging-button--icon-label"
+            >
+              <Icon name="check" />
               Save name
             </button>
           </form>
@@ -93,16 +98,18 @@ export function BlockCard({
             <div className="block-card__actions--inline">
               <button
                 type="button"
-                className="logging-button"
+                className="logging-button logging-button--icon-label"
                 onClick={() => setEditing(true)}
               >
+                <Icon name="pencil" />
                 Rename
               </button>
               <button
                 type="button"
-                className="logging-button"
+                className="logging-button logging-button--icon-label"
                 onClick={onDelete}
               >
+                <Icon name="trash" />
                 Delete block
               </button>
             </div>
@@ -111,17 +118,19 @@ export function BlockCard({
                 <button
                   type="button"
                   role="menuitem"
-                  className="logging-button"
+                  className="logging-button logging-button--icon-label"
                   onClick={() => setEditing(true)}
                 >
+                  <Icon name="pencil" />
                   Rename
                 </button>
                 <button
                   type="button"
                   role="menuitem"
-                  className="logging-button"
+                  className="logging-button logging-button--icon-label"
                   onClick={onDelete}
                 >
+                  <Icon name="trash" />
                   Delete block
                 </button>
               </OverflowMenu>

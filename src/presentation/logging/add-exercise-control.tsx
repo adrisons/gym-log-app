@@ -7,6 +7,7 @@
  */
 import { useState } from 'react';
 import type { Exercise } from '@/application/logging/use-cases';
+import { Icon } from '@/presentation/design/icons';
 import { ExerciseSearchField } from './exercise-search-field';
 import './logging.css';
 
@@ -31,9 +32,10 @@ export function AddExerciseControl({
     return (
       <button
         type="button"
-        className="logging-button"
+        className="logging-button logging-button--icon-label"
         onClick={() => setOpen(true)}
       >
+        <Icon name="plus" />
         {buttonLabel}
       </button>
     );

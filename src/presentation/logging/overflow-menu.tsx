@@ -10,6 +10,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { Icon } from '@/presentation/design/icons';
 import './logging.css';
 
 export interface OverflowMenuProps {
@@ -56,7 +57,7 @@ export function OverflowMenu({
         aria-label={label}
         onClick={() => setOpen((current) => !current)}
       >
-        ⋮
+        <Icon name="more-vertical" />
       </button>
       {open && (
         <div role="menu" aria-label={label} className="overflow-menu__list">

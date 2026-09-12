@@ -26,12 +26,10 @@ describe('LoggingScreen (FR-001)', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: '+ Add exercise' }),
+        screen.getByRole('button', { name: 'Add exercise' }),
       ).toBeInTheDocument();
     });
-    await userEvent.click(
-      screen.getByRole('button', { name: '+ Add exercise' }),
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
 
     await userEvent.type(
       screen.getByPlaceholderText(/search or create an exercise/i),
