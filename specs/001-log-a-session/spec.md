@@ -369,9 +369,11 @@ result — independently verifiable without blocks, load types, or effort.
   kg/lb default lives in Settings (FR-11), out of scope here.
 - **Effort as RIR.** Only the 1–5 integer effort level exists; no RIR input
   mode, no RIR↔level conversion (ADR-0003).
-- **History, search, progression, insights** (FR-6 to FR-9), **body
-  composition** (FR-10), **settings/export/import** (FR-11, FR-12), **session
-  templates** (FR-13). None are part of this slice.
+- **History, search, progression, insights** (FR-6 to FR-9),
+  **settings/export/import** (FR-11, FR-12), **session templates** (FR-13).
+  None are part of this slice. (Body composition, formerly planned as
+  FR-10, was removed from scope entirely — `docs/requirements.md` Decision
+  D10.)
 - **Non-Strength disciplines.** Every exercise here is implicitly Strength
   (`docs/requirements.md` §1.4, D8); no discipline picker, no non-Strength
   behavior.

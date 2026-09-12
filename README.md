@@ -30,8 +30,11 @@ loads (Phase 4); and an Insights screen — six deterministic global-
 conclusion cards (per-exercise progress, aggregate progress by movement
 pattern/muscle group, recent records, detected plateau, consistency,
 push/pull balance), each traceable to its own data and never shown below
-its data-sufficiency threshold (Phase 5). See `specs/` for each
-phase's spec, plan and tasks. Phase 6 (Body composition) is next.
+its data-sufficiency threshold (Phase 5). Body composition tracking was
+considered for v1 and removed from scope entirely — this app covers
+exercises and training metrics only (`docs/requirements.md` Decision D10).
+See `specs/` for each phase's spec, plan and tasks. Phase 6 (Settings, data,
+closing) is next.
 
 ## Development
 

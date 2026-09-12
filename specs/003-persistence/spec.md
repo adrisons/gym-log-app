@@ -4,7 +4,14 @@
 
 **Created**: 2026-09-11
 
-**Status**: Implemented — merged to `main` via PR #10
+**Status**: Implemented — merged to `main` via PR #10. **Partially retired:**
+the `BodyMeasurement` persistence support built here (both adapters'
+`saveBodyMeasurement`/`listBodyMeasurements`, the IndexedDB `bodyMeasurements`
+table, the File System adapter's `body-measurements.json`) was removed —
+body composition tracking is out of scope for this application, in any
+version (`docs/requirements.md` Decision D10). The rest of this spec
+(Session/Exercise persistence, the two adapters, migrate/refuse behavior) is
+unaffected and remains as built.
 
 **Input**: User description: "Persistence: real durable storage adapters
 behind the existing StoragePort (ADR-0002) — IndexedDbStorageAdapter

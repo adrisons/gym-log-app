@@ -50,6 +50,9 @@ refused or turned into a recorded decision before it's built.
 - Not a cloud service: no multi-device sync today. If sync is ever built, it
   is its own recorded decision, explicit in the UI, and off by default.
 - Not a wearable companion: no heart-rate monitors or sensors in v1.
+- Not a body-composition tracker: no weight, body-fat, or other body
+  measurements at all, in any version. Scope is exercises and training
+  metrics only. See Decision D10.
 
 Social and coaching ideas — peer comparison, coach groups, coach-assigned
 workouts — are not designed into anything above and are not scoped for any
@@ -91,7 +94,6 @@ what they do.
 | S3 | Check what I lifted last time | Right before loading the bar | See the exercise's last record without leaving the logging screen |
 | S4 | Review one exercise's progression | At home, unhurried | Search by name and see list + chart on one screen |
 | S5 | Understand whether I'm improving | Monthly review | Insights showing the claim, the data behind it, and the period |
-| S6 | Track body composition | After weighing in | Record weight/fat/muscle in ≤ 15 s and see the trend |
 | S7 | Take my data with me | New phone, distrust, curiosity | Export everything to an open file and import it back |
 | S8 | Skim what I've trained lately | Casual check, not reviewing one exercise | See recent sessions with their date and what kind of work each one was, without opening each one |
 
@@ -301,14 +303,12 @@ Cards with global conclusions across the whole set of exercises.
 - Card types in v1: per-exercise progress, per-pattern/group progress, recent
   records, detected plateau, consistency, push/pull balance.
 
-### FR-10 — Body composition `[v1]`
+### FR-10 — *(removed)*
 
-- One screen to record: weight, fat %, muscle %, date, notes.
-- Every field except weight and date is optional.
-- Charts for weight, fat and muscle with a range selector, including a 7-day
-  moving average for weight.
-- Derive and show fat mass and lean mass in kg when a percentage is present.
-- No targets, no judgements, no alarm colours on these figures.
+Body composition tracking was scoped for v1 and then removed: this
+application covers exercises and training metrics only, never body
+measurements. See Decision D10. The ID is retained, unassigned, so existing
+cross-references elsewhere in the codebase are not renumbered.
 
 ### FR-11 — Settings `[v1]`
 
@@ -482,7 +482,8 @@ before code.
 | D7 | Whether FR-13 (templates) is v1 or v1.1 | **Closed:** v1.1, to keep the logging critical path clean. |
 | D8 | Which exercise disciplines beyond Strength (§1.4) are in scope, and when | **Closed:** MVP and v1 ship Strength only; swimming (distance + time, no load) is the first documented candidate for a second discipline, deferred to v1.1 or later pending its own recorded decision — it must not be designed into the schema now, only kept representable (§1.4). |
 | D9 | Whether the app ships a seed exercise catalogue | **Closed:** yes — a seed set of common strength exercises is present from first launch so there is no empty state on the logging critical path; seed entries are ordinary editable catalogue entries and the list is app-bundle data, not persisted schema. → ADR-0005 |
-| D10 | What happens to a Set's history when an exercise's set-entry template changes | **Closed:** nothing — the template (default load type, default volume kind, whether effort is tracked) only decides what a *new* set defaults to; every already-recorded Set keeps exactly what it was given, no reconciliation or deprecation. Schema v2. → ADR-0006 |
+| D10 | Whether the app tracks body composition (weight, body fat, etc.) | **Closed:** no — removed from scope entirely, in any version. This application is exercises and training metrics only; it never records body measurements. FR-10 (previously "Body composition") is retired; its ID is left unassigned rather than renumbering the FRs after it. |
+| D11 | What happens to a Set's history when an exercise's set-entry template changes | **Closed:** nothing — the template (default load type, default volume kind, whether effort is tracked) only decides what a *new* set defaults to; every already-recorded Set keeps exactly what it was given, no reconciliation or deprecation. Schema v2. → ADR-0006 |
 
 ---
 
@@ -493,20 +494,21 @@ before code.
   FR-8). Concretely: FR-1 (log a session), FR-2 (blocks), FR-3 (sets and
   load), FR-4 (effort), FR-5 (exercise catalogue), FR-6 (diary/history),
   FR-7 (exercise search), FR-8 (exercise progression, Strength only). This
-  is deliberately smaller than v1 below — it excludes insights, body
-  composition, and settings/export, all of which are useful but not
-  required to prove the core loop works. FR-1 to FR-5 are already specified
+  is deliberately smaller than v1 below — it excludes insights and
+  settings/export, both of which are useful but not required to prove the
+  core loop works. FR-1 to FR-5 are already specified
   in `specs/001-log-a-session/spec.md`; FR-6 to FR-8 are the next spec to
   write (see the tracking issue for this decision).
-- **v1** — MVP + FR-9 (insights), FR-10 (body composition), FR-11
-  (settings), FR-12 (export/import). A complete, useful application on its
-  own, still Strength-only (§1.4).
+- **v1** — MVP + FR-9 (insights), FR-11 (settings), FR-12 (export/import). A
+  complete, useful application on its own, still Strength-only (§1.4). Body
+  composition (formerly planned as FR-10) is not part of this or any
+  version — see Decision D10.
 - **v1.1** — FR-13 templates; extra progression metrics; a quick-log widget
   or shortcut; possibly the first non-Strength discipline (§1.4, §8), pending
   its own scoping decision.
-- **Later, only with a recorded decision** — multi-device sync, additional body
-  measurements (girths, photos), import from other apps, report export,
-  further exercise disciplines beyond the first one added under v1.1.
+- **Later, only with a recorded decision** — multi-device sync, import from
+  other apps, report export, further exercise disciplines beyond the first
+  one added under v1.1.
 
 ---
 

@@ -3,7 +3,6 @@ import { InMemoryStorage } from '../support';
 import type { LoggingDraft } from '../../src/application/ports/storage-port';
 import type { Session } from '../../src/domain/session';
 import type { Exercise } from '../../src/domain/exercise';
-import type { BodyMeasurement } from '../../src/domain/body-measurement';
 import type { SessionId, ExerciseId } from '../../src/domain/ids';
 import { StorageError } from '../../src/application/errors';
 import { createSet } from '../../src/domain/set';
@@ -135,22 +134,6 @@ describe('InMemoryStorage (StoragePort fake)', () => {
       await storage.saveExercise(exercise);
       expect(await storage.getExercise(exercise.id)).toEqual(exercise);
       expect(await storage.listExercises()).toEqual([exercise]);
-    });
-  });
-
-  describe('Body measurements', () => {
-    it('round-trips a BodyMeasurement through saveBodyMeasurement/listBodyMeasurements', async () => {
-      const measurement: BodyMeasurement = {
-        date: '2026-09-10',
-        bodyWeightKg: 78.4,
-        notes: '',
-      };
-      await storage.saveBodyMeasurement(measurement);
-      const listed = await storage.listBodyMeasurements({
-        from: '2026-09-01',
-        to: '2026-09-30',
-      });
-      expect(listed).toEqual([measurement]);
     });
   });
 

@@ -43,7 +43,6 @@ import type {
 import type { LoggingDraft } from '../../src/application/ports/storage-port';
 import type { Session } from '../../src/domain/session';
 import type { Exercise } from '../../src/domain/exercise';
-import type { BodyMeasurement } from '../../src/domain/body-measurement';
 import type { SessionId, ExerciseId } from '../../src/domain/ids';
 import { createSet } from '../../src/domain/set';
 import { createLoad } from '../../src/domain/load';
@@ -191,28 +190,6 @@ const sessionScenarios: Scenario[] = [
       assert(
         listed.some((e) => deepEqual(e, exercise)),
         'listExercises includes the exercise after restart',
-      );
-    },
-  },
-  {
-    name: 'US1-3: a saved BodyMeasurement survives a restart',
-    async run(makeAdapter) {
-      const writer = await makeAdapter();
-      const measurement: BodyMeasurement = {
-        date: '2026-09-10',
-        bodyWeightKg: 78.4,
-        notes: '',
-      };
-      await writer.saveBodyMeasurement(measurement);
-
-      const reader = await makeAdapter();
-      const listed = await reader.listBodyMeasurements({
-        from: '2026-09-01',
-        to: '2026-09-30',
-      });
-      assert(
-        listed.some((m) => deepEqual(m, measurement)),
-        'listBodyMeasurements includes the measurement after restart',
       );
     },
   },

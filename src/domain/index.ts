@@ -29,9 +29,6 @@ export { createBlock } from './block';
 export type { Session } from './session';
 export { createSession } from './session';
 
-export type { BodyMeasurement } from './body-measurement';
-export { createBodyMeasurement } from './body-measurement';
-
 export type { Exercise, ExerciseHasHistory } from './exercise';
 export {
   renameExercise,
@@ -44,7 +41,6 @@ export {
   InvalidSetError,
   InvalidLoadError,
   InvalidVolumeError,
-  InvalidBodyMeasurementError,
   ExerciseMergeError,
   ExerciseDeleteConfirmationRequiredError,
 } from './errors';

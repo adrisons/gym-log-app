@@ -56,7 +56,7 @@ are placeholder types in Phase 0 (`type SessionId = string`,
 replaces them with the real `docs/requirements.md` §3 entities and MAY add,
 rename, or drop methods.
 
-`exportAll` / `importAll` (FR-12, Phase 7) are **not** in the Phase 0
+`exportAll` / `importAll` (FR-12, Phase 6) are **not** in the Phase 0
 interface — added when that phase is specified, to avoid a stale placeholder.
 
 ## Verification (Phase 0)
