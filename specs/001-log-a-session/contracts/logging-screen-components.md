@@ -19,7 +19,7 @@ type, never a raw `Load`/`Volume` union (`docs/architecture.md`'s
 |---|---|---|
 | `LoggingScreen` (root) | FR-001, FR-024 | Calls `openLoggingForm` on mount. No loading spinner while it resolves (constitution Principle II, `docs/design.md` §4.4) — the draft, once loaded, is what renders; there is nothing meaningfully "loading" from the user's perspective since the in-memory fake/real adapter both resolve fast enough to not need a spinner state here (contrast with e.g. an eventual large import, which does get one, per §4.4). |
 | `SessionDateTimeField` | FR-001 | `<input type="datetime-local">` composed with tokens. Disabled state not applicable (always editable). |
-| `BlockList` / `BlockCard` | FR-006, FR-007, FR-004, FR-023 | Unnamed block renders its position label (FR-007) — computed by `view-models.ts`, never hardcoded per-component. Delete action shows the 5-second undo (shared `UndoToast`, below). |
+| `BlockList` / `BlockCard` | FR-006, FR-007, FR-004, FR-023, FR-2 (`docs/requirements.md`) | Unnamed block renders its position label (FR-007) — computed by `view-models.ts`, never hardcoded per-component. Delete action shows the 5-second undo (shared `UndoToast`, below), offered through the same secondary-menu affordance as `ExerciseEntryCard`'s and each set's delete action (`docs/design.md` §2). Collapse/expand is local UI state, not persisted, and never affects what the block's own undo restores. |
 | `ExerciseEntryCard` | FR-002, FR-004 | Reorder handles need a keyboard-operable equivalent (`docs/design.md` §5 — "nothing essential revealed by hover/pointer only"), not just drag. |
 | `ExerciseSearchField` | FR-002, FR-015, FR-016 | Debounced input calling `searchExercises`; shows most-used/most-recent first with no query (FR-002); "create new exercise" affordance always visible as the last result, never hidden behind a separate mode. |
 | `LoadTypePicker` | FR-009 | One control choosing among Weight / Band / Bodyweight / Free text / None; remembers the exercise's default (FR-009). _(Amended by ADR-0006: per-set override is retired — this control edits the exercise's template directly, from the exercise's own menu, not per set; see `docs/requirements.md` FR-3.)_ |
@@ -28,8 +28,9 @@ type, never a raw `Load`/`Volume` union (`docs/architecture.md`'s
 | `BodyweightLoadInput` | FR-014, FR-026 | Signed added/assisted numeric field, −300..+300 clamp (matches domain `createLoad`'s own bound — this component clamps in the UI *and* the domain constructor still rejects out-of-range as defense in depth, per FR-014's own text). |
 | `FreeTextLoadInput` | FR-012 | 40-char cap enforced in the input itself (not just on submit — a visible counter or hard stop, so the user isn't surprised at confirm time); autocomplete sourced from `suggestFreeTextLoads`. |
 | `VolumeInput` (reps / duration / distance) | FR-008, FR-026 | Reps: integer-only keypad. Volume must be > 0 — same clamp-and-disabled-reason pattern as load. |
-| `EffortPicker` | FR-013 | One-tap 1–5 control; every level always shows its word label next to the number (ADR-0003) — never a bare numeral in any state, including rest. |
-| `SetConfirmControl` | FR-003, FR-019, FR-025 | Disabled-with-reason (not merely a silent no-op — spec.md's clarification allows either, this plan picks disabled-with-reason since `docs/testing.md`'s state convention already requires a stated reason for every disabled control, and "confirm" being visibly inert only when nothing is enterable is more legible than a tap that does nothing) until the pending set has a volume or a non-`none` load (FR-019). No visible "Save" anywhere (FR-003) — this control's label is about confirming/adding the set, never "Save". |
+| `EffortPicker` | FR-013 | Scrollable 1–5 wheel (unchanged mechanism); each level's word label (ADR-0003) is shown alongside a graduated success/warning/danger tint (`docs/design.md` §1.2 refinement note) — the tint is decoration on top of the word, never a replacement for it. |
+| ~~`SetConfirmControl`~~ | FR-003, FR-019, FR-025 | **Superseded by ADR-0007** — retired. A set commits automatically on the edit that makes it valid; nothing is rendered while it's invalid beyond the existing status text (FR-019). Replaced by: |
+| `RepeatLastSetControl` | FR-008, FR-025 (ADR-0007) | Renders only for a row that is pre-filled from the previous set and still untouched by the user; a tap records that identical set (FR-008's "single tap"). Disappears the instant the user edits any field — from then on the auto-commit path (below) applies instead. Debounced identically to any other commit (FR-025). |
 | `UndoToast` | FR-004, FR-023 | Shared by block/entry/set deletion. 5-second visible countdown or equivalent (reduced-motion-safe per `docs/design.md` §4.3 — the countdown's *information*, not just its animation, must survive reduced motion, e.g. a numeral alongside any shrinking bar). |
 | `ExerciseCataloguePanel` (rename/merge/delete) | FR-017, FR-018, FR-020, FR-022 | Merge confirmation explicitly states "not undoable" in its copy (FR-017/SC-005) — this is the one destructive action on this screen's periphery with no `UndoToast`. Delete-with-history confirmation offers merge as the alternative in the same dialog (FR-018), not a separate flow. |
 
@@ -43,8 +44,8 @@ type, never a raw `Load`/`Volume` union (`docs/architecture.md`'s
   colour-only state, but a component review checks this explicitly before
   merge, per `docs/design.md` §8's review checklist).
 - Hit targets sized for one-handed, sweaty-hands use, especially
-  `SetConfirmControl`, the quick-increment buttons, and `UndoToast`'s undo
-  action.
+  `RepeatLastSetControl` and `UndoToast`'s undo action (the quick-increment
+  buttons were themselves retired by ADR-0006, above).
 
 ## Verification
 
