@@ -11,10 +11,16 @@ import { expect, test } from '@playwright/test';
 // the follow-up persistence spec once a real on-device adapter exists
 // (quickstart.md scenario 3's revised wording carries the same note).
 
-test('logging a set appears instantly, with no Save control, in a real browser', async ({
+test('logging a set appears instantly, with no confirm control, in a real browser', async ({
   page,
 }) => {
   await page.goto('/');
+
+  // `/` redirects to `/diary` (the app's home — FR-1's design-refinement
+  // pass); the logging form is reached from its floating action, not a
+  // persistent nav tab.
+  await expect(page.getByRole('heading', { name: 'Diary' })).toBeVisible();
+  await page.getByRole('link', { name: 'Log session' }).click();
 
   await expect(
     page.getByRole('heading', { name: 'Log a session' }),
@@ -28,14 +34,18 @@ test('logging a set appears instantly, with no Save control, in a real browser',
 
   await expect(page.getByRole('heading', { name: 'Back squat' })).toBeVisible();
 
+  // ADR-0007: no confirm button — selecting a rep count on the wheel
+  // commits the set the instant it settles.
   await page.getByRole('listbox', { name: 'Reps' }).click();
   await page.keyboard.press('ArrowDown', { delay: 20 });
   await page.keyboard.press('ArrowDown', { delay: 20 });
   await page.keyboard.press('ArrowDown', { delay: 20 });
   await page.keyboard.press('ArrowDown', { delay: 20 });
   await page.keyboard.press('ArrowDown', { delay: 20 });
-  await page.getByRole('button', { name: 'Add set' }).click();
 
   await expect(page.getByText('5 reps')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /add set|confirm/i }),
+  ).toHaveCount(0);
   await expect(page.getByText('Save', { exact: false })).toHaveCount(0);
 });

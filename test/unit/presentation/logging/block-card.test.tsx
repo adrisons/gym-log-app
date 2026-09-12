@@ -75,6 +75,32 @@ describe('BlockCard (FR-006, FR-007)', () => {
     expect(screen.getByText('2 exercises · 5 sets logged')).toBeInTheDocument();
   });
 
+  it('collapsing hides children and expanding shows them again (FR-2)', async () => {
+    render(
+      <BlockCard
+        displayName="Block 1"
+        hasName={false}
+        onRename={() => {}}
+        onDelete={() => {}}
+      >
+        <p>content</p>
+      </BlockCard>,
+    );
+
+    expect(screen.getByText('content')).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /collapse block 1/i }),
+    );
+    expect(screen.queryByText('content')).not.toBeInTheDocument();
+    expect(screen.getByText('Block 1')).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /expand block 1/i }),
+    );
+    expect(screen.getByText('content')).toBeInTheDocument();
+  });
+
   it('bare mode renders only children/footer, no header chrome', () => {
     render(
       <BlockCard
