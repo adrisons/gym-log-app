@@ -30,6 +30,14 @@
  * itself, and `configure()`'s call before the router renders, are
  * unchanged (constitution Principle II: no added latency/step on the
  * logging critical path).
+ *
+ * `BrowserRouter`'s `basename` is `import.meta.env.BASE_URL` — Vite sets
+ * this to whatever `vite.config.ts`'s `base` resolves to (`/` normally,
+ * `/gym-log-app/` under the GitHub Pages build). Without it, `Routes`
+ * matches against the raw pathname the browser reports, which on Pages'
+ * subpath deployment is `/gym-log-app/...`, not `/...` — none of the
+ * routes below would ever match and the whole app would render nothing
+ * (a blank page, `.github/workflows/deploy.yml`'s deployed build).
  */
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -84,7 +92,7 @@ function mount(): void {
   useStorageAccess.getState().configure(storage);
   createRoot(root).render(
     <StrictMode>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           <Route path="/" element={<LoggingScreen />} />
           <Route path="/diary" element={<DiaryScreen />} />
