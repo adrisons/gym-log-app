@@ -65,6 +65,7 @@ export function DiaryScreen() {
     <main className="diary-screen" aria-label="Diary">
       <h1>Diary</h1>
       <Link to="/search">Search exercises</Link>
+      <Link to="/insights">Insights</Link>
       <label className="diary-screen__jump">
         <span>Jump to date</span>
         <input

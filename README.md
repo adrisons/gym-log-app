@@ -18,16 +18,20 @@ taps, and see your progression and trend-based insights over time.
 
 ## Status
 
-Phases 0–4 complete, closing the MVP loop (`docs/agent-brief.md` §3):
-stack chosen and layer boundaries mechanically enforced (Phase 0); the
-domain model, value objects and every computation rule tested without
-touching disk (Phase 1); durable storage on both real adapters —
-IndexedDB and File System Access, chosen automatically per device (Phase
-2); the logging screen — blocks, sets, load, effort, undo, catalogue
-management (Phase 3); and a diary/history screen, exercise search, and a
-per-exercise progression screen with e1RM/tonnage charts and honest
-degradation for non-numeric loads (Phase 4). See `specs/` for each
-phase's spec, plan and tasks. Phase 5 (Insights) is next.
+Phases 0–5 complete (`docs/agent-brief.md` §3): stack chosen and layer
+boundaries mechanically enforced (Phase 0); the domain model, value
+objects and every computation rule tested without touching disk (Phase
+1); durable storage on both real adapters — IndexedDB and File System
+Access, chosen automatically per device (Phase 2); the logging screen —
+blocks, sets, load, effort, undo, catalogue management (Phase 3); a
+diary/history screen, exercise search, and a per-exercise progression
+screen with e1RM/tonnage charts and honest degradation for non-numeric
+loads (Phase 4); and an Insights screen — six deterministic global-
+conclusion cards (per-exercise progress, aggregate progress by movement
+pattern/muscle group, recent records, detected plateau, consistency,
+push/pull balance), each traceable to its own data and never shown below
+its data-sufficiency threshold (Phase 5). See `specs/` for each
+phase's spec, plan and tasks. Phase 6 (Body composition) is next.
 
 ## Development
 
