@@ -14,6 +14,11 @@
   gap: var(--space-5);
 }
 
+.diary-screen {
+  position: relative;
+  padding-bottom: calc(var(--space-6) * 2);
+}
+
 .diary-screen__empty {
   color: var(--color-foreground-muted);
 }
@@ -58,6 +63,15 @@
   border-color: var(--color-border-strong);
 }
 
+/* Bulk-select (`docs/requirements.md` FR-6, ADR-0007's sibling behavior
+   note): a selected row reads the same way the accent already reads
+   everywhere else — border + a tinted background, never colour alone
+   (the check badge below is the second, non-colour signal). */
+.diary-screen__session-link--selected {
+  border-color: var(--color-accent);
+  background: var(--color-surface-raised);
+}
+
 .diary-screen__session-link > svg:first-child {
   flex: none;
   color: var(--color-foreground-muted);
@@ -98,4 +112,146 @@
   justify-content: center;
   flex-shrink: 0;
   min-width: 44px;
+}
+
+.diary-screen__session-icon {
+  position: relative;
+  flex: none;
+}
+
+.diary-screen__session-icon-check {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-surface);
+}
+
+/* FAB (`docs/requirements.md` FR-1, `docs/design.md` §6's refinement
+   note): the logging form's one entry point from the diary, floating so
+   it stays reachable while the list scrolls and never occupies a
+   permanent nav slot. Hidden while bulk-select is active — the floating
+   bar below takes its place. */
+.diary-screen__fab {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--space-6) + 56px);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-foreground);
+  border: none;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  min-height: 44px;
+  text-decoration: none;
+  box-shadow: 0 4px 12px var(--color-border-strong);
+  cursor: pointer;
+  transition: background var(--duration-short) var(--easing-standard);
+}
+
+.diary-screen__fab:hover,
+.diary-screen__fab:focus-visible {
+  background: var(--color-accent);
+  opacity: 0.9;
+}
+
+.diary-screen__fab svg {
+  flex: none;
+}
+
+.diary-screen__bulk-bar {
+  position: fixed;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-foreground);
+  color: var(--color-canvas);
+  box-shadow: 0 4px 12px var(--color-border-strong);
+}
+
+.diary-screen__bulk-bar-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.diary-screen__bulk-button {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  min-height: 44px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.diary-screen__bulk-button--cancel {
+  background: transparent;
+  color: inherit;
+  border-color: currentColor;
+}
+
+.diary-screen__bulk-button--delete {
+  background: var(--color-danger);
+  color: var(--color-accent-foreground);
+}
+
+/* SessionSavedToast — docs/design.md §1.1's one bounded exception. */
+.diary-screen__saved-toast {
+  position: fixed;
+  left: 50%;
+  top: var(--space-4);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 12px var(--color-border-strong);
+  font-weight: 600;
+  animation: diary-screen__saved-toast-in var(--duration-medium)
+    var(--easing-decelerate);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diary-screen__saved-toast {
+    animation: none;
+  }
+}
+
+.diary-screen__saved-toast-emoji {
+  font-size: 1.25rem;
+}
+
+@keyframes diary-screen__saved-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
