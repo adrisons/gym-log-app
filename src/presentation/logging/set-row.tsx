@@ -14,7 +14,7 @@
  * (FR-008) without a manual state-sync effect.
  */
 import { useState } from 'react';
-import { LoadTypePicker } from './load-type-picker';
+import { LoadTypePicker, LOAD_TYPE_LABELS } from './load-type-picker';
 import { WeightLoadInput } from './weight-load-input';
 import { BandLoadInput } from './band-load-input';
 import { BodyweightLoadInput } from './bodyweight-load-input';
@@ -86,6 +86,7 @@ export function SetRow({
   const [effort, setEffort] = useState<1 | 2 | 3 | 4 | 5 | undefined>(
     undefined,
   );
+  const [loadTypeOpen, setLoadTypeOpen] = useState(false);
 
   const load: { kind: Load['kind']; present: boolean } = (() => {
     switch (loadKind) {
@@ -148,7 +149,23 @@ export function SetRow({
 
   return (
     <div className="set-row">
-      <LoadTypePicker selected={loadKind} onSelect={handleLoadTypeChange} />
+      {loadTypeOpen ? (
+        <LoadTypePicker
+          selected={loadKind}
+          onSelect={(kind) => {
+            handleLoadTypeChange(kind);
+            setLoadTypeOpen(false);
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          className="logging-button"
+          onClick={() => setLoadTypeOpen(true)}
+        >
+          Change load type ({LOAD_TYPE_LABELS[loadKind]})
+        </button>
+      )}
       {loadKind === 'weight' && (
         <WeightLoadInput valueKg={weightKg} onChange={setWeightKg} />
       )}

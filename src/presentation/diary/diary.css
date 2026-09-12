@@ -51,3 +51,18 @@
 .diary-screen__session-link:focus-visible {
   border-color: var(--color-border-strong);
 }
+
+.session-detail-screen__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.session-detail-screen__close {
+  flex-shrink: 0;
+  min-width: 44px;
+  text-align: center;
+  font-size: 1.25rem;
+  line-height: 1;
+}

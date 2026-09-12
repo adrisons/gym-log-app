@@ -122,6 +122,40 @@ body {
   font-family: var(--font-ui);
 }
 
+/* Heading identity (docs/design.md §1.2: "Section headings and primary
+   titles use the heavier weight, uppercase, in the approved identity" —
+   hierarchy expressed through weight/size, not through repeating the same
+   treatment at every level). Every screen lays headings out with flex +
+   gap already, so margins are zeroed here rather than left to the
+   browser default. h3 (an exercise/block's own name — user-entered
+   content, not a structural heading) intentionally keeps its natural
+   case. */
+h1,
+h2 {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--color-foreground);
+}
+
+h1 {
+  font-size: 1.75rem;
+}
+
+h2 {
+  font-size: 1.125rem;
+}
+
+h3 {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-foreground);
+}
+
 /* An explicit light choice always wins over the OS preference. */
 :root[data-theme='light'] {
   --color-canvas: #f3f4f6;

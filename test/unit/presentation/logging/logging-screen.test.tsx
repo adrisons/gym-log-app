@@ -42,10 +42,8 @@ describe('LoggingScreen (FR-001)', () => {
       ).toBeInTheDocument();
     });
 
-    await userEvent.type(
-      screen.getByRole('spinbutton', { name: /^reps/i }),
-      '5',
-    );
+    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
+    await userEvent.keyboard('{ArrowDown}'.repeat(5));
     await userEvent.click(screen.getByRole('button', { name: /add set/i }));
 
     await waitFor(async () => {

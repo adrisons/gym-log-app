@@ -91,7 +91,7 @@ export interface LoggingSessionState {
   configure: (storage: StoragePort) => void;
   initialize: () => Promise<void>;
   setSessionDateTime: (iso: string) => Promise<void>;
-  addExerciseEntry: (exerciseId: ExerciseId) => Promise<void>;
+  addExerciseEntry: (exerciseId: ExerciseId, blockId?: string) => Promise<void>;
   addSet: (
     blockId: string,
     entryId: string,
@@ -202,10 +202,12 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       await storage.saveDraft(updated);
     },
 
-    addExerciseEntry: async (exerciseId) => {
+    addExerciseEntry: async (exerciseId, blockId) => {
       const { storage, draft: current } = get();
       if (!storage || !current) return;
-      const updated = touch(addExerciseEntryToDraft(current, exerciseId));
+      const updated = touch(
+        addExerciseEntryToDraft(current, exerciseId, blockId),
+      );
       set({ draft: updated });
       await storage.saveDraft(updated);
     },

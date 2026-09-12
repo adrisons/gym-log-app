@@ -14,6 +14,13 @@ const OPTIONS: { kind: Load['kind']; label: string }[] = [
   { kind: 'none', label: 'None' },
 ];
 
+/** Shared with `SetRow`'s collapsed "change load type" control, so the
+ * label shown there always matches this picker's own wording. */
+export const LOAD_TYPE_LABELS: Record<Load['kind'], string> =
+  Object.fromEntries(
+    OPTIONS.map((option) => [option.kind, option.label]),
+  ) as Record<Load['kind'], string>;
+
 export interface LoadTypePickerProps {
   selected: Load['kind'];
   onSelect: (kind: Load['kind']) => void;

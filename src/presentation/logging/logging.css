@@ -60,12 +60,16 @@
   gap: var(--space-1);
 }
 
+/* Buttons sit on --color-surface-raised (never --color-surface, which is
+   reserved for inputs/the active input row — docs/design.md §3.1's role
+   table) so a control reads as "tappable" versus "editable" by surface
+   alone, on top of the radius split below. */
 .logging-button {
   font-family: var(--font-ui);
   font-size: 1rem;
   color: var(--color-foreground);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
   min-height: 44px;
@@ -75,12 +79,11 @@
 }
 
 .logging-button:hover {
-  background: var(--color-surface-raised);
-  border-color: var(--color-border-strong);
+  background: var(--color-border);
 }
 
 .logging-button:active {
-  background: var(--color-border);
+  background: var(--color-border-strong);
 }
 
 .logging-button:focus-visible {
@@ -103,7 +106,7 @@
 
 .logging-button:disabled {
   color: var(--color-foreground-subtle);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   border-color: var(--color-border);
   cursor: not-allowed;
   opacity: 0.7;
@@ -217,4 +220,98 @@
   justify-content: space-between;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+/* Overflow ("⋮") menu — shared by BlockCard and ExerciseEntryCard headers. */
+.overflow-menu {
+  position: relative;
+}
+
+.overflow-menu__trigger {
+  min-height: 44px;
+  min-width: 44px;
+  text-align: center;
+  padding: var(--space-2);
+}
+
+.overflow-menu__list {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  min-width: 180px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+
+/* WheelPicker — reps/effort. Three rows tall (44px each, the app's own
+   hit-target minimum) so the current value sits centered between its
+   neighbours; CSS scroll-snap does the settling, the component only
+   reads the resting scroll position. */
+.wheel-picker {
+  height: 132px;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.wheel-picker:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.wheel-picker__spacer {
+  height: 44px;
+}
+
+.wheel-picker__item {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: center;
+  color: var(--color-foreground-subtle);
+  font-family: var(--font-ui);
+}
+
+.wheel-picker__item--selected {
+  color: var(--color-foreground);
+  font-weight: 700;
+}
+
+.wheel-picker--numeric .wheel-picker__item {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.125rem;
+}
+
+/* BlockCard header actions: full buttons on a wide-enough layout, folded
+   into the shared overflow menu once space is tight (docs/design.md §6 —
+   content re-prioritizes rather than shrinking past a readable size). The
+   breakpoint matches the narrow/one-handed width this app designs for
+   first. */
+.block-card__actions--inline {
+  display: none;
+}
+
+.block-card__actions--menu {
+  display: block;
+}
+
+@media (min-width: 480px) {
+  .block-card__actions--inline {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .block-card__actions--menu {
+    display: none;
+  }
 }

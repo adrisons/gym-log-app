@@ -11,6 +11,12 @@ const baseProps = {
   onSaveBandLabels: () => {},
 };
 
+async function expandLoadTypePicker() {
+  await userEvent.click(
+    screen.getByRole('button', { name: /change load type/i }),
+  );
+}
+
 describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
   it('confirm is disabled with a stated reason until a load or volume is entered (FR-019)', () => {
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
@@ -33,10 +39,8 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
       />,
     );
 
-    await userEvent.type(
-      screen.getByRole('spinbutton', { name: /^reps/i }),
-      '8',
-    );
+    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
+    await userEvent.keyboard('{ArrowDown}'.repeat(8));
     await userEvent.click(screen.getByRole('button', { name: /add set/i }));
 
     expect(onConfirm).toHaveBeenCalledWith({
@@ -78,35 +82,29 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
     expect(screen.getByRole('spinbutton', { name: /weight/i })).toHaveValue(
       100,
     );
-    expect(screen.getByRole('spinbutton', { name: /^reps/i })).toHaveValue(5);
+    expect(screen.getByRole('option', { name: '5' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     expect(screen.getByRole('button', { name: /add set/i })).toBeEnabled();
   });
 
-  it('tapping the weight quick-increment at 0 keeps it at 0 and is disabled with a reason (FR-010)', async () => {
+  it('the weight field has no dedicated quick-increment buttons (numeric keypad only)', () => {
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
 
-    const decrement = screen.getByRole('button', {
-      name: /decrease weight \(already at the 0 kg minimum\)/i,
-    });
-    expect(decrement).toBeDisabled();
-  });
-
-  it('quick-increment raises the weight value (FR-010)', async () => {
-    render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
-
-    await userEvent.click(
-      screen.getByRole('button', { name: /increase weight by 2.5 kg/i }),
-    );
-
-    expect(screen.getByRole('spinbutton', { name: /weight/i })).toHaveValue(
-      2.5,
-    );
+    expect(
+      screen.queryByRole('button', { name: /increase weight/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /decrease weight/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('switching to Band and picking a label produces a Band load (US3)', async () => {
     const onConfirm = vi.fn();
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={onConfirm} />);
 
+    await expandLoadTypePicker();
     await userEvent.click(screen.getByRole('radio', { name: 'Band' }));
     await userEvent.click(screen.getByRole('radio', { name: 'Red' }));
     await userEvent.click(screen.getByRole('button', { name: /add set/i }));
@@ -121,6 +119,7 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
     const onConfirm = vi.fn();
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={onConfirm} />);
 
+    await expandLoadTypePicker();
     await userEvent.click(screen.getByRole('radio', { name: 'Bodyweight' }));
     await userEvent.click(screen.getByRole('button', { name: /add set/i }));
 
@@ -138,7 +137,8 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
       screen.getByRole('spinbutton', { name: /weight/i }),
       '20',
     );
-    await userEvent.click(screen.getByRole('radio', { name: /3 —/ }));
+    await userEvent.click(screen.getByRole('listbox', { name: /^effort$/i }));
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}');
     await userEvent.click(screen.getByRole('button', { name: /add set/i }));
 
     expect(onConfirm).toHaveBeenCalledWith(
@@ -157,6 +157,7 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface)', () => {
       />,
     );
 
+    await expandLoadTypePicker();
     await userEvent.click(screen.getByRole('radio', { name: 'Free text' }));
 
     expect(onLoadTypeChange).toHaveBeenCalledWith('freeText');

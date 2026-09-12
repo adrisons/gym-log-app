@@ -93,16 +93,23 @@ export function draftToSession(draft: LoggingDraft, id: SessionId): Session {
 }
 
 /**
- * Adds an exercise entry to the draft (FR-002). Appends to the last
- * existing block, or creates a default unnamed `straightSets` block first
- * if the draft has none yet — this is what lets User Story 1 read as "a
- * single running list of sets" (spec.md User Story 2 context) without any
- * block-management UI existing yet; User Story 2 layers real block
- * creation/naming on top of the same structure.
+ * Adds an exercise entry to the draft (FR-002). With no `blockId`: appends
+ * to the last existing block, or creates a default unnamed `straightSets`
+ * block first if the draft has none yet — this is what lets User Story 1
+ * read as "a single running list of sets" (spec.md User Story 2 context)
+ * without any block-management UI existing yet; User Story 2 layers real
+ * block creation/naming on top of the same structure. This is also the
+ * "loose exercise" path a user reaches without ever tapping "Add block".
+ *
+ * With an explicit `blockId` (a block's own "Add exercise" control, used
+ * to group exercises on purpose): appends to that specific block instead
+ * of always the last one. An id that doesn't resolve is a no-op, matching
+ * `findEntry`'s defensive-lookup convention elsewhere in this module.
  */
 export function addExerciseEntry(
   draft: LoggingDraft,
   exerciseId: ExerciseId,
+  blockId?: string,
 ): LoggingDraft {
   const entry: DraftExerciseEntry = {
     id: newId(),
@@ -110,6 +117,19 @@ export function addExerciseEntry(
     notes: '',
     sets: [],
   };
+
+  if (blockId !== undefined) {
+    const targetExists = draft.blocks.some((block) => block.id === blockId);
+    if (!targetExists) return draft;
+    return {
+      ...draft,
+      blocks: draft.blocks.map((block) =>
+        block.id === blockId
+          ? { ...block, exercises: [...block.exercises, entry] }
+          : block,
+      ),
+    };
+  }
 
   if (draft.blocks.length === 0) {
     const block: DraftBlock = {

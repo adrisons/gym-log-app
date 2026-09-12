@@ -12,22 +12,25 @@
  *
  * US2: renders through `BlockCard`/`ExerciseEntryCard` — blocks are now
  * user-visible/manageable (create, rename, reorder, delete-with-undo),
- * replacing US1's flat list.
+ * replacing US1's flat list. Exercise catalogue management (rename/merge/
+ * delete) lives on its own `/exercises` screen so this one stays focused
+ * on the single primary action of recording a set (docs/design.md §2).
+ * The top search field always adds a "loose" exercise (no block target,
+ * FR-002's existing single-running-list default); each block's own
+ * footer search field groups an exercise into that specific block.
  */
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useLoggingSession } from '@/application/logging/logging-store';
 import {
   toBlockViewModel,
   toSetSummaryViewModel,
 } from '@/application/logging/view-models';
-import type { Exercise } from '@/application/logging/use-cases';
 import { SessionDateTimeField } from './session-date-time-field';
 import { ExerciseSearchField } from './exercise-search-field';
 import { SetRow } from './set-row';
 import { BlockCard } from './block-card';
 import { ExerciseEntryCard } from './exercise-entry-card';
 import { UndoToast } from './undo-toast';
-import { ExerciseCataloguePanel } from './exercise-catalogue-panel';
 import './logging.css';
 
 const UNDO_MESSAGES = {
@@ -63,18 +66,6 @@ export function LoggingScreen() {
   const deleteExerciseEntry = useLoggingSession((s) => s.deleteExerciseEntry);
   const deleteSet = useLoggingSession((s) => s.deleteSet);
   const undo = useLoggingSession((s) => s.undo);
-  const sessions = useLoggingSession((s) => s.sessions);
-  const renameExerciseWithCollisionCheck = useLoggingSession(
-    (s) => s.renameExerciseWithCollisionCheck,
-  );
-  const mergeExercises = useLoggingSession((s) => s.mergeExercises);
-  const deleteExerciseCascade = useLoggingSession(
-    (s) => s.deleteExerciseCascade,
-  );
-
-  const [managingExercise, setManagingExercise] = useState<
-    Exercise | undefined
-  >(undefined);
 
   useEffect(() => {
     void initialize();
@@ -102,41 +93,7 @@ export function LoggingScreen() {
             await addExerciseEntry(exercise.id);
           })();
         }}
-        onManageExercise={setManagingExercise}
       />
-
-      {managingExercise &&
-        (() => {
-          const hasHistory = sessions.some((session) =>
-            session.blocks.some((block) =>
-              block.exercises.some(
-                (entry) => entry.exerciseId === managingExercise.id,
-              ),
-            ),
-          );
-          return (
-            <ExerciseCataloguePanel
-              exercise={managingExercise}
-              hasHistory={hasHistory}
-              search={searchExercises}
-              onRename={(newName) =>
-                renameExerciseWithCollisionCheck(managingExercise.id, newName)
-              }
-              onMerge={(survivorId, loserId) =>
-                void mergeExercises(survivorId, loserId)
-              }
-              onDeleteConfirm={() => {
-                void deleteExerciseCascade(
-                  managingExercise.id,
-                  hasHistory,
-                  true,
-                );
-                setManagingExercise(undefined);
-              }}
-              onClose={() => setManagingExercise(undefined)}
-            />
-          );
-        })()}
 
       <button
         type="button"
@@ -160,6 +117,24 @@ export function LoggingScreen() {
             hasName={block.name !== undefined}
             onRename={(name) => void renameBlock(block.id, name)}
             onDelete={() => void deleteBlock(block.id)}
+            footer={
+              <ExerciseSearchField
+                label="Add exercise to this block"
+                placeholder="Search or create an exercise"
+                search={searchExercises}
+                onSelectExercise={(exercise) =>
+                  void addExerciseEntry(exercise.id, block.id)
+                }
+                onCreateExercise={(name) => {
+                  void (async () => {
+                    const exercise = await createExercise({
+                      canonicalName: name,
+                    });
+                    await addExerciseEntry(exercise.id, block.id);
+                  })();
+                }}
+              />
+            }
           >
             {block.exercises.map((entry, entryIndex) => {
               const entryVm = blockVm.entries[entryIndex]!;

@@ -1,10 +1,12 @@
 /**
- * One exercise entry within a block. Reorder is keyboard-operable move-up/
- * move-down buttons, not drag-only (`docs/design.md` §5 — nothing
- * essential revealed by hover/pointer only); moving to a different block
- * is a plain select, for the same reason.
+ * One exercise entry within a block. Its header keeps only the exercise
+ * name in view; reorder/move/delete fold into the shared `OverflowMenu`
+ * (docs/design.md §2 "secondary actions... visually quieter") — still
+ * keyboard-operable buttons/select inside the menu, not hover-only
+ * (docs/design.md §5 — nothing essential revealed by hover/pointer only).
  */
 import type { ReactNode } from 'react';
+import { OverflowMenu } from './overflow-menu';
 import './logging.css';
 
 export interface ExerciseEntryCardProps {
@@ -34,26 +36,26 @@ export function ExerciseEntryCard({
     <div className="exercise-entry-card">
       <div className="exercise-entry-card__header">
         <h3>{exerciseName}</h3>
-        <div className="set-row__inputs">
+        <OverflowMenu label={`${exerciseName} actions`}>
           <button
             type="button"
+            role="menuitem"
             className="logging-button"
             disabled={!canMoveUp}
             aria-disabled={!canMoveUp}
-            aria-label={`Move ${exerciseName} up`}
             onClick={onMoveUp}
           >
-            ↑
+            Move up
           </button>
           <button
             type="button"
+            role="menuitem"
             className="logging-button"
             disabled={!canMoveDown}
             aria-disabled={!canMoveDown}
-            aria-label={`Move ${exerciseName} down`}
             onClick={onMoveDown}
           >
-            ↓
+            Move down
           </button>
           {otherBlocks.length > 0 && (
             <label className="logging-screen__field-label">
@@ -76,10 +78,15 @@ export function ExerciseEntryCard({
               </select>
             </label>
           )}
-          <button type="button" className="logging-button" onClick={onDelete}>
+          <button
+            type="button"
+            role="menuitem"
+            className="logging-button"
+            onClick={onDelete}
+          >
             Delete exercise
           </button>
-        </div>
+        </OverflowMenu>
       </div>
       {children}
     </div>

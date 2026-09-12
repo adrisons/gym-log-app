@@ -72,14 +72,17 @@ export function SessionDetailScreen() {
 
   return (
     <main className="session-detail-screen" aria-label="Session detail">
-      <h1>Session — {new Date(editable.dateTime).toLocaleString()}</h1>
-      <button
-        type="button"
-        className="logging-button"
-        onClick={() => navigate('/diary')}
-      >
-        Back to diary
-      </button>
+      <div className="session-detail-screen__header">
+        <h1>Session — {new Date(editable.dateTime).toLocaleString()}</h1>
+        <button
+          type="button"
+          className="logging-button session-detail-screen__close"
+          aria-label="Close"
+          onClick={() => navigate('/diary')}
+        >
+          ×
+        </button>
+      </div>
 
       <button
         type="button"
@@ -120,47 +123,48 @@ export function SessionDetailScreen() {
                 blocks: editable.blocks.filter((b) => b.id !== block.id),
               })
             }
-          >
-            <label className="logging-screen__field-label">
-              <span>Add exercise</span>
-              <select
-                className="logging-field-input"
-                value=""
-                onChange={(event) => {
-                  const exerciseId = event.target.value;
-                  if (!exerciseId) return;
-                  persist({
-                    ...editable,
-                    blocks: editable.blocks.map((b) =>
-                      b.id === block.id
-                        ? {
-                            ...b,
-                            exercises: [
-                              ...b.exercises,
-                              {
-                                id: newEditableItemId(),
-                                exerciseId: exerciseId as Exercise['id'],
-                                notes: '',
-                                sets: [],
-                              },
-                            ],
-                          }
-                        : b,
-                    ),
-                  });
-                }}
-              >
-                <option value="" disabled>
-                  Search…
-                </option>
-                {searchExercises('', catalogue).map((exercise) => (
-                  <option key={exercise.id} value={exercise.id}>
-                    {exercise.canonicalName}
+            footer={
+              <label className="logging-screen__field-label">
+                <span>Add exercise</span>
+                <select
+                  className="logging-field-input"
+                  value=""
+                  onChange={(event) => {
+                    const exerciseId = event.target.value;
+                    if (!exerciseId) return;
+                    persist({
+                      ...editable,
+                      blocks: editable.blocks.map((b) =>
+                        b.id === block.id
+                          ? {
+                              ...b,
+                              exercises: [
+                                ...b.exercises,
+                                {
+                                  id: newEditableItemId(),
+                                  exerciseId: exerciseId as Exercise['id'],
+                                  notes: '',
+                                  sets: [],
+                                },
+                              ],
+                            }
+                          : b,
+                      ),
+                    });
+                  }}
+                >
+                  <option value="" disabled>
+                    Search…
                   </option>
-                ))}
-              </select>
-            </label>
-
+                  {searchExercises('', catalogue).map((exercise) => (
+                    <option key={exercise.id} value={exercise.id}>
+                      {exercise.canonicalName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            }
+          >
             {block.exercises.map((entry, entryIndex) => {
               const entryVm = blockVm.entries[entryIndex]!;
               return (

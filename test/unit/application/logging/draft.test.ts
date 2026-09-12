@@ -127,6 +127,33 @@ describe('addExerciseEntry (FR-002; keeps US1 a flat single running list)', () =
     expect(withSecond.blocks).toHaveLength(1);
     expect(withSecond.blocks[0]?.exercises).toHaveLength(2);
   });
+
+  it('with an explicit blockId, appends to that block instead of the last one', () => {
+    let draft = addBlock(
+      createDraft('2026-09-11T18:00:00.000Z'),
+      'Legs',
+      'straightSets',
+    );
+    draft = addBlock(draft, undefined, 'straightSets');
+    const firstBlockId = draft.blocks[0]!.id;
+
+    const updated = addExerciseEntry(draft, 'ex-1' as ExerciseId, firstBlockId);
+
+    expect(updated.blocks[0]?.exercises).toHaveLength(1);
+    expect(updated.blocks[1]?.exercises).toHaveLength(0);
+  });
+
+  it('is a no-op when the given blockId does not resolve', () => {
+    const draft = addBlock(
+      createDraft('2026-09-11T18:00:00.000Z'),
+      undefined,
+      'straightSets',
+    );
+
+    const updated = addExerciseEntry(draft, 'ex-1' as ExerciseId, 'missing');
+
+    expect(updated).toBe(draft);
+  });
 });
 
 describe('prefillNextSet (FR-008)', () => {

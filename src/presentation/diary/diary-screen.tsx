@@ -66,6 +66,7 @@ export function DiaryScreen() {
       <h1>Diary</h1>
       <Link to="/search">Search exercises</Link>
       <Link to="/insights">Insights</Link>
+      <Link to="/exercises">Manage exercises</Link>
       <label className="diary-screen__jump">
         <span>Jump to date</span>
         <input
