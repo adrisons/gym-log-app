@@ -11,20 +11,21 @@ import { expect, test } from '@playwright/test';
 //
 // Spec 004 wraps the composition root in a react-router-dom router
 // (diary/search/progression screens) — this test's own assertions confirm
-// "/" still renders the logging screen exactly as before (plan.md
-// Constitution Check, Principle II: no regression to the logging critical
-// path), and a second test confirms the new "/diary" route is reachable.
+// "/" resolves and the service worker registers.
 //
 // Spec 005 adds "/insights" alongside the others — same pattern.
+//
+// Design-refinement pass (docs/requirements.md FR-1): "/" now redirects to
+// "/diary" — the diary is the app's home, and the logging form moved to
+// "/log", reached from a floating action there rather than a nav tab. This
+// test checks for the Diary heading at "/" accordingly.
 
-test('the app boots to the logging screen and the service worker registers', async ({
+test('the app boots to the diary screen and the service worker registers', async ({
   page,
 }) => {
   await page.goto('/');
 
-  await expect(
-    page.getByRole('heading', { name: 'Log a session' }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Diary' })).toBeVisible();
 
   const serviceWorkerReady = await page.evaluate(async () => {
     if (!('serviceWorker' in navigator)) {
