@@ -127,7 +127,11 @@ Session templates, kept off the logging critical path (D7).
 
 D8 is closed for swimming (ADR-0006): the `discipline` field becomes a real
 enum, a distance/duration-based progression metric and its own insight card
-type are added, with a schema version bump (1 → 2) and a tested migration
-(existing exercises default to `Strength`) per `docs/requirements.md` §6.
-Not yet specced. Ordering relative to Phase 7 is not fixed by ADR-0006 —
-either can go first; decide when this phase is picked up.
+type are added, with a schema version bump — to whatever version the
+schema is at when this phase starts, plus one, not assumed to be a fixed
+1 → 2; `specs/006-settings-data` claims Phase 6 leaves it at 1, but that is
+for `schema-guardian` to confirm, not this document to assume — and a
+tested migration (existing exercises default to `Strength`) per
+`docs/requirements.md` §6. Not yet specced. Ordering relative to Phase 7 is
+not fixed by ADR-0006 — either can go first; decide when this phase is
+picked up.

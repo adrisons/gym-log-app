@@ -67,8 +67,17 @@ first candidate: swimming, e.g. tracking the best time achieved for a fixed
 distance like 100 m freestyle) can be added later without a rework of the
 canonical data. Concretely: a Set's `Volume` already distinguishes reps,
 duration and distance, and its `Load` already has a `None` variant for work
-where load doesn't apply — a swim length is representable today as a Set
-with `Volume: Distance` and `Load: None`. The Exercise catalogue's new
+where load doesn't apply. `Volume` is an exclusive choice among reps,
+duration and distance, not a combination, so a fixed-distance swim result
+(both the distance and the time it took) is not a single Set's `Volume` —
+it is the *catalogue entry* that fixes the distance (e.g. "100 m
+freestyle", the same way "back squat" and "front squat" are already
+distinct entries rather than one entry with a variant field, per FR-5), and
+the Set logged against it needs only `Volume: Duration` and `Load: None`.
+No new value-object shape is needed for that split, but it is a real split
+a future discipline's own spec has to state, not something today's model
+already does automatically (see ADR-0006 for where this was first written
+imprecisely as "distance", corrected there). The Exercise catalogue's new
 `discipline` field (§3.1) is itself a schema change — a persisted fact
 about a canonical entity, not a derived value — so per §6 it ships with a
 version bump, an ADR, and a (trivial, default-to-Strength) migration when

@@ -8,10 +8,25 @@
 D8 (`docs/requirements.md` §8) left open which exercise disciplines beyond
 Strength (§1.4) are in scope, and when. The domain model was deliberately
 generalized from the start so a second discipline would be additive: a
-Set's `Volume` already distinguishes reps, duration and distance, and its
-`Load` already has a `None` variant for work where load doesn't apply —
-swimming (distance + time, no load) was named in §1.4 as the first
-documented candidate precisely because it fits that shape with no rework.
+Set's `Load` already has a `None` variant for work where load doesn't
+apply, and `Volume` already distinguishes reps, duration and distance —
+though `Volume` is an exclusive choice among the three (`src/domain/
+volume.ts`), not a combination, so a single Set cannot itself hold both a
+distance and the time it took. Swimming (distance + time, no load) was
+named in §1.4 as the first documented candidate not because a Set can
+already record both values at once, but because the fixed distance is
+naturally the *exercise*, not the *set*: a catalogue entry named e.g. "100 m
+freestyle" already carries the distance (the same way "back squat" and
+"front squat" are already distinct catalogue entries rather than a shared
+entry with a variant field, per FR-5), and the Set logged against it needs
+only `Volume: Duration` (the time achieved) and `Load: None`. On that
+reading, no new value-object shape is needed for the swim result itself;
+what §1.4's "no rework" claim glossed over is this catalogue-vs-set split,
+which this ADR's own feature spec (not yet written) still has to state
+explicitly and confirm covers what a swimmer actually wants to record
+(a single fixed-distance personal best, pacing across a session with
+varying distances, interval sets, etc. — scope for that spec, not this
+ADR).
 
 The project owner was asked to choose a scope for closing D8, with four
 options: swimming only; swimming and running together; a lighter
@@ -42,8 +57,11 @@ its own scoping pass rather than being assumed in under this decision.
 
 This is a persisted-format change (the `discipline` field on `Exercise`
 stops being the fixed literal `'Strength'`), so per `docs/requirements.md`
-§6 it ships with a schema version bump (1 → 2), its own migration
-(existing exercises default to `Strength`), and a dedicated feature spec
+§6 it ships with a schema version bump (to whatever version the schema is
+at when this phase is picked up, plus one — `specs/006-settings-data`'s own
+claim is that Phase 6 leaves it at 1, but that is confirmed by
+`schema-guardian`, not assumed here), its own migration (existing exercises
+default to `Strength`), and a dedicated feature spec
 (via `/speckit-specify`, per `docs/agent-brief.md` §3 and the constitution's
 Development Workflow) before any implementation code — this ADR records
 the scope decision, it does not itself specify the feature.
@@ -53,8 +71,10 @@ the scope decision, it does not itself specify the feature.
 **Positive**
 
 - Proves the extensibility §1.4 designed for, with the one discipline the
-  requirements already anticipated and partially designed around —
-  no new value-object shapes needed for `Volume`/`Load`.
+  requirements already anticipated and partially designed around — no new
+  value-object shapes needed for `Volume`/`Load` themselves, once the swim
+  result is modeled as a fixed-distance catalogue entry plus a
+  `Volume: Duration` Set (Context).
 - Smaller, single-discipline change is easier to review (`spec-reviewer`,
   `schema-guardian`) and to migrate correctly than shipping two disciplines
   in the same schema bump.
