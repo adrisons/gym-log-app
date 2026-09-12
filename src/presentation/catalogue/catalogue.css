@@ -21,6 +21,8 @@
   gap: var(--space-2);
 }
 
+/* Square, per docs/design.md §1.2 — a structural row, not the directly
+   tapped control (its "Manage" button carries the radius instead). */
 .catalogue-screen__row {
   display: flex;
   align-items: center;
@@ -28,6 +30,5 @@
   gap: var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
   background: var(--color-surface);
 }

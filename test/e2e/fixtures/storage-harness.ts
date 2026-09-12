@@ -149,6 +149,17 @@ export interface MigrationTestResult {
    * this function's own doc comment for why File System needs an extra
    * write to reach this, unlike IndexedDB. */
   storedSchemaVersion: number;
+  /**
+   * Whether the raw on-disk `exercises.json` itself (read directly, not
+   * through the port's own normalizing `getExercise`/`listExercises` —
+   * see file-system-storage-adapter.ts's `withTemplateDefaults`) actually
+   * has the backfilled fields. `getExercise` would report a correctly
+   * shaped record either way, since it normalizes whatever it reads
+   * regardless of what actually made it to disk — this is the one field
+   * that can tell a real physical migration apart from that read-time
+   * safety net alone. `undefined` where a scenario doesn't check it.
+   */
+  rawFileMigrated?: boolean;
 }
 
 /**
@@ -198,16 +209,21 @@ async function runMigrationTestIndexedDb(): Promise<MigrationTestResult> {
   };
 }
 
-async function runMigrationTestFileSystem(): Promise<MigrationTestResult> {
-  const legacyExercise = {
-    id: 'legacy-1',
-    canonicalName: 'Legacy squat',
-    aliases: [],
-    defaultLoadType: 'weight',
-    unilateral: false,
-    discipline: 'Strength',
-  };
+const LEGACY_EXERCISE = {
+  id: 'legacy-1',
+  canonicalName: 'Legacy squat',
+  aliases: [],
+  defaultLoadType: 'weight',
+  unilateral: false,
+  discipline: 'Strength',
+};
 
+/** Seeds a real, genuinely pre-migration v1 directory: `exercises.json` with one legacy-shaped record, `_meta.json` at schemaVersion 1. */
+async function seedLegacyDirectory(): Promise<{
+  opfsRoot: FileSystemDirectoryHandle;
+  dirName: string;
+  storeDir: FileSystemDirectoryHandle;
+}> {
   const opfsRoot = await navigator.storage.getDirectory();
   const dirName = uniqueName('migration-fs');
   const storeDir = await opfsRoot.getDirectoryHandle(dirName, {
@@ -218,7 +234,7 @@ async function runMigrationTestFileSystem(): Promise<MigrationTestResult> {
     create: true,
   });
   const exercisesWritable = await exercisesHandle.createWritable();
-  await exercisesWritable.write(JSON.stringify([legacyExercise]));
+  await exercisesWritable.write(JSON.stringify([LEGACY_EXERCISE]));
   await exercisesWritable.close();
 
   const metaHandle = await storeDir.getFileHandle('_meta.json', {
@@ -227,6 +243,12 @@ async function runMigrationTestFileSystem(): Promise<MigrationTestResult> {
   const metaWritable = await metaHandle.createWritable();
   await metaWritable.write(JSON.stringify({ schemaVersion: 1 }));
   await metaWritable.close();
+
+  return { opfsRoot, dirName, storeDir };
+}
+
+async function runMigrationTestFileSystem(): Promise<MigrationTestResult> {
+  const { opfsRoot, dirName, storeDir } = await seedLegacyDirectory();
 
   const db = new GymLogDatabase(uniqueName('migration-fs-handles'));
   const adapter = new FileSystemStorageAdapter(
@@ -256,10 +278,84 @@ async function runMigrationTestFileSystem(): Promise<MigrationTestResult> {
   };
 }
 
+/**
+ * Reproduces the exact sequence a Copilot review comment flagged: this
+ * adapter's schema check can run in "shadow mode" (no directory handle
+ * reachable at all — e.g. the mount-time draft save, which has no user
+ * gesture to acquire one with yet) and, finding nothing to read, guesses
+ * "never initialized" and queues a `_meta.json` write claiming
+ * `CURRENT_SCHEMA_VERSION` in the in-memory overlay. If the directory the
+ * user goes on to pick already holds real v1 data, flushing that guess
+ * as-is would mark the store "migrated" without ever having backfilled
+ * the real `exercises.json` — permanently, since the stored version is
+ * already current by the time anything looks again.
+ *
+ * `getHandle` here fails until `gestureAvailable` flips true, simulating
+ * a real device where the first write has no gesture and a later one
+ * does; `#reconcileSchemaOnAcquire` (file-system-storage-adapter.ts) is
+ * what makes the second write's real handle acquisition re-derive the
+ * schema action from the real files instead of trusting that queued
+ * guess.
+ */
+async function runMigrationTestFileSystemFreshAcquire(): Promise<MigrationTestResult> {
+  const { opfsRoot, dirName, storeDir } = await seedLegacyDirectory();
+
+  let gestureAvailable = false;
+  const getHandle = async (): Promise<FileSystemDirectoryHandle> => {
+    if (!gestureAvailable) {
+      throw new DOMException('No active user gesture.', 'NotAllowedError');
+    }
+    return storeDir;
+  };
+
+  const db = new GymLogDatabase(uniqueName('migration-fs-fresh-handles'));
+  const adapter = new FileSystemStorageAdapter(getHandle, db);
+
+  // The mount-time write: no gesture yet, degrades to the in-memory
+  // overlay (this is what used to queue the wrong `_meta.json` guess).
+  await adapter.saveBandLabels([]);
+
+  // A later write, now with a real gesture — first real handle
+  // acquisition against a directory that already holds v1 data.
+  gestureAvailable = true;
+  await adapter.saveBandLabels(['after-gesture']);
+
+  const migrated = await adapter.getExercise('legacy-1' as ExerciseId);
+  const storedSchemaVersion = await adapter.getSchemaVersion();
+
+  // Read the raw file directly — bypassing the port's own read-time
+  // normalization entirely — to prove the *disk* was actually migrated,
+  // not just whatever `getExercise` reports back.
+  const rawExercisesFile = await storeDir.getFileHandle('exercises.json');
+  const rawExercises = JSON.parse(
+    await (await rawExercisesFile.getFile()).text(),
+  ) as { defaultVolumeKind?: string; trackEffort?: boolean }[];
+  const rawFileMigrated =
+    rawExercises[0]?.defaultVolumeKind === 'reps' &&
+    rawExercises[0]?.trackEffort === false;
+
+  db.close();
+  await opfsRoot
+    .removeEntry(dirName, { recursive: true })
+    .catch(() => undefined);
+
+  return {
+    canonicalNamePreserved: migrated?.canonicalName === 'Legacy squat',
+    defaultLoadTypePreserved: migrated?.defaultLoadType === 'weight',
+    defaultVolumeKind: migrated?.defaultVolumeKind,
+    trackEffort: migrated?.trackEffort,
+    storedSchemaVersion,
+    rawFileMigrated,
+  };
+}
+
 window.__runMigrationTest = (adapterKind) =>
   adapterKind === 'indexed-db'
     ? runMigrationTestIndexedDb()
     : runMigrationTestFileSystem();
+
+window.__runMigrationTestFreshAcquire = () =>
+  runMigrationTestFileSystemFreshAcquire();
 
 declare global {
   interface Window {
@@ -275,5 +371,6 @@ declare global {
     __runMigrationTest: (
       adapterKind: AdapterKind,
     ) => Promise<MigrationTestResult>;
+    __runMigrationTestFreshAcquire: () => Promise<MigrationTestResult>;
   }
 }

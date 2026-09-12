@@ -59,15 +59,35 @@ export function WheelPicker<T>({
     });
   };
 
+  // A user-driven scroll (touch drag, momentum, wheel) fires many `scroll`
+  // events in quick succession, each committing its nearest option via
+  // `onChange` — which changes `selectedIndex` and would otherwise re-run
+  // the sync effect below mid-gesture, snapping `scrollTop` back to that
+  // exact index and fighting the still-moving native scroll/momentum.
+  // `isUserScrollingRef` suppresses that sync until scrolling has been
+  // quiet for a moment, letting CSS scroll-snap alone settle the final
+  // position; the sync effect still runs normally for a value change that
+  // didn't originate from this element's own scroll (e.g. the parent
+  // resetting it).
+  const isUserScrollingRef = useRef(false);
+  const scrollIdleTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
   // Keep the wheel's scroll position in sync when `value` changes from
   // outside (e.g. the parent resets it), without fighting the user's own
   // in-progress scroll.
   useEffect(() => {
+    if (isUserScrollingRef.current) return;
     scrollToIndex(selectedIndex, false);
     // Only re-sync when the resolved index actually changes.
   }, [selectedIndex]);
 
   const commitFromScroll = () => {
+    isUserScrollingRef.current = true;
+    clearTimeout(scrollIdleTimeoutRef.current);
+    scrollIdleTimeoutRef.current = setTimeout(() => {
+      isUserScrollingRef.current = false;
+    }, 150);
+
     const container = containerRef.current;
     if (!container) return;
     const index = Math.min(

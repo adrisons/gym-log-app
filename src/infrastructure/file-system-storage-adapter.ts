@@ -188,8 +188,71 @@ export class FileSystemStorageAdapter implements StoragePort {
       value: handle,
     });
     this.#root = handle;
+    // Before flushing anything queued while this instance had no handle
+    // at all — see `#reconcileSchemaOnAcquire`'s own doc comment for why
+    // a schema check run in that shadow mode cannot be trusted once a
+    // real, possibly pre-existing directory is actually reachable.
+    await this.#reconcileSchemaOnAcquire(handle);
     await this.#flushOverlay(handle);
     return handle;
+  }
+
+  /**
+   * Runs exactly once per instance, the moment a real directory handle is
+   * first acquired via a live user gesture — which can happen well after
+   * this same instance already ran `#checkSchema` in shadow mode (no
+   * handle reachable at all, e.g. the mount-time draft save that has no
+   * gesture to work with yet). That shadow-mode check can only guess
+   * "never initialized" (there is nothing to read) and may have queued a
+   * `META_FILE` overlay write claiming `CURRENT_SCHEMA_VERSION` — a guess
+   * that is simply wrong if the directory the user goes on to pick
+   * already holds real v1 data: flushing that guess as-is would mark the
+   * store "already migrated" without ever having backfilled its actual
+   * `exercises.json`, permanently skipping the migration this session
+   * should have run.
+   *
+   * Fixes this by re-deriving the schema action from the real,
+   * newly-reachable files (bypassing the overlay entirely, since it may
+   * hold exactly the stale guess being corrected here) before any queued
+   * write is flushed on top of it, and discarding any shadow-mode
+   * `META_FILE` guess in favor of whatever this real check produces.
+   */
+  async #reconcileSchemaOnAcquire(
+    handle: FileSystemDirectoryHandle,
+  ): Promise<void> {
+    this.#overlay.delete(META_FILE);
+    const realMeta = await this.#readJsonFromHandle<{
+      schemaVersion: number;
+    }>(handle, META_FILE);
+    const stored = realMeta?.schemaVersion ?? 0;
+    const action = decideSchemaAction(stored, CURRENT_SCHEMA_VERSION);
+    if (action === 'refuse') {
+      throw new StorageError(
+        `Stored schema version ${String(stored)} is newer than this app understands (current: ${String(CURRENT_SCHEMA_VERSION)}). Update the app before continuing — nothing has been written.`,
+        undefined,
+        'schema-too-new',
+      );
+    }
+    if (action === 'migrate') {
+      const exercises =
+        (await this.#readJsonFromHandle<Exercise[]>(handle, EXERCISES_FILE)) ??
+        [];
+      if (exercises.length > 0) {
+        await this.#writeJsonToHandle(
+          handle,
+          EXERCISES_FILE,
+          exercises.map(withTemplateDefaults),
+        );
+      }
+    }
+    if (action === 'migrate' || stored === 0) {
+      await this.#writeJsonToHandle(handle, META_FILE, {
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+      });
+    }
+    // Whatever `#ensureSchemaCheckedForWrite` had cached (a shadow-mode
+    // run, or nothing yet) is now superseded by this real check.
+    this.#schemaCheck = Promise.resolve();
   }
 
   async #flushOverlay(root: FileSystemDirectoryHandle): Promise<void> {
@@ -314,6 +377,38 @@ export class FileSystemStorageAdapter implements StoragePort {
     }
   }
 
+  /**
+   * Reads a JSON file directly from an already-resolved handle — no
+   * overlay lookup, no `#resolveHandle` call. Used by `#readJson` once it
+   * has a root, and by `#reconcileSchemaOnAcquire`, which must bypass the
+   * overlay entirely (it may hold exactly the stale guess that function
+   * is correcting).
+   */
+  async #readJsonFromHandle<T>(
+    root: FileSystemDirectoryHandle,
+    path: string,
+  ): Promise<T | undefined> {
+    const fileHandle = await this.#getFileHandle(root, path, false);
+    if (!fileHandle) return undefined;
+    const file = await fileHandle.getFile();
+    const text = await file.text();
+    return JSON.parse(text) as T;
+  }
+
+  /** Writes a JSON file directly to an already-resolved handle — see `#readJsonFromHandle`'s doc comment. */
+  async #writeJsonToHandle(
+    root: FileSystemDirectoryHandle,
+    path: string,
+    value: unknown,
+  ): Promise<void> {
+    await this.#run(async () => {
+      const fileHandle = await root.getFileHandle(path, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(JSON.stringify(value));
+      await writable.close();
+    });
+  }
+
   /** `forceHandle: false` (the default) never triggers a picker — used by every read method (FR-004a). */
   async #readJson<T>(
     path: string,
@@ -327,11 +422,7 @@ export class FileSystemStorageAdapter implements StoragePort {
     }
     const root = await this.#resolveHandle(forceHandle);
     if (!root) return undefined;
-    const fileHandle = await this.#getFileHandle(root, path, false);
-    if (!fileHandle) return undefined;
-    const file = await fileHandle.getFile();
-    const text = await file.text();
-    return JSON.parse(text) as T;
+    return this.#readJsonFromHandle<T>(root, path);
   }
 
   async #writeJson(path: string, value: unknown): Promise<void> {
@@ -340,12 +431,7 @@ export class FileSystemStorageAdapter implements StoragePort {
       this.#overlay.set(path, { kind: 'value', value });
       return;
     }
-    await this.#run(async () => {
-      const fileHandle = await root.getFileHandle(path, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(JSON.stringify(value));
-      await writable.close();
-    });
+    await this.#writeJsonToHandle(root, path, value);
   }
 
   async #deleteFile(path: string): Promise<void> {

@@ -6,7 +6,7 @@
  * reconciled or flagged (ADR-0006's whole point — nothing here can lose
  * or invalidate history).
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LoadTypePicker } from './load-type-picker';
 import type { Exercise, Load, Volume } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
@@ -42,12 +42,24 @@ export function ExerciseTemplatePanel({
     exercise.defaultVolumeKind,
   );
   const [trackEffort, setTrackEffort] = useState(exercise.trackEffort);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // This dialog is inserted wherever it sits in the tree (near the top of
+  // the screen, not next to the menu item that opened it) without moving
+  // focus on its own — without this, opening it leaves focus on that now
+  // possibly-unmounted menu item and forward Tab navigation never reaches
+  // the dialog at all.
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
 
   return (
     <div
+      ref={dialogRef}
       className="block-card"
       role="dialog"
       aria-label={`Edit ${exercise.canonicalName}'s tracked fields`}
+      tabIndex={-1}
     >
       <p role="status">
         This changes what a new {exercise.canonicalName} set shows by default.

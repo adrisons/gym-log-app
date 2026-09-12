@@ -33,6 +33,7 @@ export function OverflowMenu({
 }: OverflowMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -53,10 +54,17 @@ export function OverflowMenu({
       ref={containerRef}
       className={`overflow-menu${className ? ` ${className}` : ''}`}
       onKeyDown={(event) => {
-        if (event.key === 'Escape') setOpen(false);
+        // Escape removes whichever child had focus (the popover itself
+        // unmounts), which would otherwise drop keyboard focus to
+        // <body> — return it to the trigger instead.
+        if (event.key === 'Escape') {
+          setOpen(false);
+          triggerRef.current?.focus();
+        }
       }}
     >
       <button
+        ref={triggerRef}
         type="button"
         className="logging-button overflow-menu__trigger"
         aria-expanded={open}

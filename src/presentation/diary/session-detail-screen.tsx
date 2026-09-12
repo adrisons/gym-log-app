@@ -71,17 +71,29 @@ export function SessionDetailScreen() {
     })();
   }, [sessionId]);
 
-  const persist = (next: EditableSession) => {
-    setEditable(next);
-    if (!original) return;
-    void requireStorage().saveSession(editableToSession(next, original));
+  // Takes an updater, not a next value: every call site (including the
+  // async onCreateExercise handlers below) can run after an `await`, by
+  // which point a *different* edit may already have landed — updating
+  // from a `next` object built off the render-time `editable` closure
+  // would silently overwrite that intervening edit. `setEditable`'s
+  // functional form always receives the true latest state, updater
+  // functions compose safely, and `saveSession` fires from the exact
+  // `next` this same call computed, never a second, possibly-stale read.
+  const persist = (update: (current: EditableSession) => EditableSession) => {
+    setEditable((current) => {
+      if (!current) return current;
+      const next = update(current);
+      if (original) {
+        void requireStorage().saveSession(editableToSession(next, original));
+      }
+      return next;
+    });
   };
 
   const addExerciseToBlock = (blockId: string, exerciseId: Exercise['id']) => {
-    if (!editable) return;
-    persist({
-      ...editable,
-      blocks: editable.blocks.map((b) =>
+    persist((current) => ({
+      ...current,
+      blocks: current.blocks.map((b) =>
         b.id === blockId
           ? {
               ...b,
@@ -97,28 +109,40 @@ export function SessionDetailScreen() {
             }
           : b,
       ),
-    });
+    }));
   };
 
   // Attaches to the trailing unnamed block, or creates a fresh one WITH
-  // the exercise already in it and persists once — building the block and
-  // its first entry in two separate `persist` calls would have the second
-  // (`addExerciseToBlock`) close over the pre-first-persist `editable`
-  // (React state updates aren't synchronous), so it could never find the
-  // block it just asked to create and would silently drop it.
+  // the exercise already in it — computed entirely inside the updater
+  // (see `persist`'s own doc comment) so both the "which block is
+  // trailing" decision and the append happen against the true latest
+  // state, never a stale render-time snapshot.
   const addExerciseAtTopLevel = (exerciseId: Exercise['id']) => {
-    if (!editable) return;
-    const lastBlock = editable.blocks.at(-1);
-    if (lastBlock && lastBlock.name === undefined) {
-      addExerciseToBlock(lastBlock.id, exerciseId);
-      return;
-    }
-    const block = {
-      id: newEditableItemId(),
-      type: 'straightSets' as const,
-      exercises: [{ id: newEditableItemId(), exerciseId, notes: '', sets: [] }],
-    };
-    persist({ ...editable, blocks: [...editable.blocks, block] });
+    persist((current) => {
+      const lastBlock = current.blocks.at(-1);
+      const newEntry = {
+        id: newEditableItemId(),
+        exerciseId,
+        notes: '',
+        sets: [],
+      };
+      if (lastBlock && lastBlock.name === undefined) {
+        return {
+          ...current,
+          blocks: current.blocks.map((b) =>
+            b.id === lastBlock.id
+              ? { ...b, exercises: [...b.exercises, newEntry] }
+              : b,
+          ),
+        };
+      }
+      const block = {
+        id: newEditableItemId(),
+        type: 'straightSets' as const,
+        exercises: [newEntry],
+      };
+      return { ...current, blocks: [...current.blocks, block] };
+    });
   };
 
   if (!sessionId) {
@@ -145,6 +169,7 @@ export function SessionDetailScreen() {
 
       {editingTemplateFor && (
         <ExerciseTemplatePanel
+          key={editingTemplateFor.id}
           exercise={editingTemplateFor}
           onSave={(template) => {
             void updateExerciseTemplate(
@@ -182,20 +207,20 @@ export function SessionDetailScreen() {
             bare={isBare}
             subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'} logged`}
             onRename={(name) =>
-              persist({
+              persist((editable) => ({
                 ...editable,
                 blocks: editable.blocks.map((b) =>
                   b.id === block.id
                     ? { ...b, ...(name !== undefined ? { name } : {}) }
                     : b,
                 ),
-              })
+              }))
             }
             onDelete={() =>
-              persist({
+              persist((editable) => ({
                 ...editable,
                 blocks: editable.blocks.filter((b) => b.id !== block.id),
-              })
+              }))
             }
             footer={
               isBare ? undefined : (
@@ -241,7 +266,7 @@ export function SessionDetailScreen() {
                         : undefined
                     }
                     onDelete={() =>
-                      persist({
+                      persist((editable) => ({
                         ...editable,
                         blocks: editable.blocks.map((b) =>
                           b.id === block.id
@@ -253,7 +278,7 @@ export function SessionDetailScreen() {
                               }
                             : b,
                         ),
-                      })
+                      }))
                     }
                   >
                     <ul className="set-list">
@@ -267,7 +292,7 @@ export function SessionDetailScreen() {
                               type="button"
                               className="logging-button logging-button--icon-label"
                               onClick={() =>
-                                persist({
+                                persist((editable) => ({
                                   ...editable,
                                   blocks: editable.blocks.map((b) =>
                                     b.id === block.id
@@ -286,7 +311,7 @@ export function SessionDetailScreen() {
                                         }
                                       : b,
                                   ),
-                                })
+                                }))
                               }
                             >
                               <Icon name="trash" />
@@ -305,7 +330,7 @@ export function SessionDetailScreen() {
                       bandLabels={bandLabels}
                       freeTextSuggestions={[]}
                       onConfirm={(input) =>
-                        persist({
+                        persist((editable) => ({
                           ...editable,
                           blocks: editable.blocks.map((b) =>
                             b.id === block.id
@@ -336,7 +361,7 @@ export function SessionDetailScreen() {
                                 }
                               : b,
                           ),
-                        })
+                        }))
                       }
                       onSaveBandLabels={(labels) => setBandLabels(labels)}
                     />
@@ -367,13 +392,13 @@ export function SessionDetailScreen() {
         type="button"
         className="logging-button logging-button--icon-label"
         onClick={() =>
-          persist({
+          persist((editable) => ({
             ...editable,
             blocks: [
               ...editable.blocks,
               { id: newEditableItemId(), type: 'straightSets', exercises: [] },
             ],
-          })
+          }))
         }
       >
         <Icon name="plus" />

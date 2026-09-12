@@ -37,6 +37,8 @@ export interface ExerciseSearchFieldProps {
   onCreateExercise: (name: string) => void;
   label?: string;
   placeholder?: string;
+  /** Focuses the input as soon as it mounts — for a caller (`AddExerciseControl`) that only mounts this field once the user has just asked for it, so the field opening should hand keyboard focus straight to it rather than leaving focus on the now-unmounted trigger button. */
+  autoFocus?: boolean;
 }
 
 export function ExerciseSearchField({
@@ -45,6 +47,7 @@ export function ExerciseSearchField({
   onCreateExercise,
   label = 'Exercise',
   placeholder = 'Search or create an exercise',
+  autoFocus = false,
 }: ExerciseSearchFieldProps) {
   const resultsId = useId();
   const [query, setQuery] = useState('');
@@ -83,6 +86,7 @@ export function ExerciseSearchField({
           placeholder={placeholder}
           aria-expanded={open}
           aria-controls={resultsId}
+          autoFocus={autoFocus}
         />
       </label>
       {open && (results.length > 0 || showCreate) && (

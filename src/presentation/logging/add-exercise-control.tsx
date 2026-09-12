@@ -5,7 +5,7 @@
  * sitting in view before the user has asked for it (docs/design.md §2).
  * Collapses back to a button after a selection/creation, or on blur.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Exercise } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
 import { ExerciseSearchField } from './exercise-search-field';
@@ -27,10 +27,26 @@ export function AddExerciseControl({
   onCreateExercise,
 }: AddExerciseControlProps) {
   const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
+
+  // The trigger button unmounts while expanded, so closing (select,
+  // create, or blur) would otherwise leave keyboard focus nowhere — hand
+  // it back once the button exists again. Skipped on first mount:
+  // `wasOpenRef` only turns true once this component has actually been
+  // open, so a page that renders this collapsed and untouched never
+  // steals focus on its own.
+  useEffect(() => {
+    if (wasOpenRef.current && !open) {
+      buttonRef.current?.focus();
+    }
+    wasOpenRef.current = open;
+  }, [open]);
 
   if (!open) {
     return (
       <button
+        ref={buttonRef}
         type="button"
         className="logging-button logging-button--icon-label"
         onClick={() => setOpen(true)}
@@ -52,6 +68,7 @@ export function AddExerciseControl({
       <ExerciseSearchField
         label={fieldLabel}
         search={search}
+        autoFocus
         onSelectExercise={(exercise) => {
           onSelectExercise(exercise);
           setOpen(false);

@@ -98,6 +98,7 @@ export function LoggingScreen() {
 
       {editingTemplateFor && (
         <ExerciseTemplatePanel
+          key={editingTemplateFor.id}
           exercise={editingTemplateFor}
           onSave={(template) => {
             void updateExerciseTemplate(editingTemplateFor.id, template);
