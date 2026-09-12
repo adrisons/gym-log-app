@@ -537,7 +537,7 @@ derived concepts:
 - **Consistency's week boundary vs. FR-11's future setting**: FR-010 uses
   the ISO (Monday-start) week convention as a fixed default, since
   `docs/requirements.md` FR-11's user-configurable "first day of the
-  week" setting is a later phase (`docs/agent-brief.md` Phase 7) that
+  week" setting is a later phase (`docs/agent-brief.md` Phase 6) that
   does not exist yet. This is a provisional default this card should
   switch to reading from FR-11's setting once that phase ships, not a
   permanent, deliberate override of it — noted here so a future spec

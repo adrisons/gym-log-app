@@ -4,7 +4,13 @@
 
 **Created**: 2026-09-11
 
-**Status**: Implemented — merged to `main` via PR #8
+**Status**: Implemented — merged to `main` via PR #8. **Partially retired:**
+the `BodyMeasurement` entity and its `StoragePort` methods
+(`saveBodyMeasurement`/`listBodyMeasurements`) specified and built here were
+removed entirely — body composition tracking is out of scope for this
+application, in any version (`docs/requirements.md` Decision D10). The rest
+of this spec (Session/Block/ExerciseEntry/Set/Exercise, Load/Volume/Effort,
+the storage port's other methods) is unaffected and remains as built.
 
 **Input**: User description: "Domain model and ports (Phase 1). Entities,
 value objects, domain rules (docs/requirements.md §3.3), and the finalized

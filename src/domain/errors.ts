@@ -37,13 +37,6 @@ export class InvalidVolumeError extends DomainError {
 }
 
 /**
- * A `Body measurement` was constructed with no body weight value (FR-021).
- */
-export class InvalidBodyMeasurementError extends DomainError {
-  override readonly name = 'InvalidBodyMeasurementError';
-}
-
-/**
  * `mergeExerciseIdentities` was called with the same identifier as
  * survivor and loser, or with an identifier that does not resolve to an
  * existing `Exercise` (FR-019).

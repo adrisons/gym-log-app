@@ -251,8 +251,9 @@ marked as personal records.
   in-memory derived data, rebuilt from canonical records each time they are
   needed (`docs/requirements.md` §6); this spec does not add a new storage
   adapter concern or a schema version bump.
-- **Body composition (FR-10), settings (FR-11), export/import (FR-12)** —
-  unrelated later phases.
+- **Settings (FR-11), export/import (FR-12)** — unrelated later phases.
+  (Body composition, formerly planned as FR-10, was removed from scope —
+  `docs/requirements.md` Decision D10.)
 - **Cross-tab or cross-device synchronization of the diary/search/
   progression views** — consistent with spec 003's Non-Goals and
   `docs/requirements.md` §1.2's single-device assumption.

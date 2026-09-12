@@ -56,10 +56,6 @@ interface follows these:
 - **Errors state the fact, then the fix**, and never blame the user: "That
   set wasn't saved. Your other sets are safe," followed by what to try next.
   No technical codes in the sentence.
-- **Neutral on body data**, always: no targets implied, no color coding a
-  number as good or bad, no streaks framed as a threat to protect (per
-  `docs/requirements.md` FR-10: "no targets, no judgements, no alarm
-  colours").
 - **Empty and below-threshold states name what's missing and stop** — "Log
   this exercise 3 more times to see its trend," never a blank space that
   looks broken.
@@ -76,9 +72,8 @@ interface follows these:
   icon is always also stated in a word (`docs/requirements.md` §7.4).
 - **Color**: one chromatic accent used for primary actions and current
   selection. Everything else is neutral. Status colors (success, warning,
-  danger) are reserved for status and never reused decoratively. Body
-  composition figures (FR-10) use neutral presentation only — no
-  chromatic "good/bad" coding.
+  danger) are reserved for status and never reused decoratively — no
+  chromatic "good/bad" coding of a training number.
 - **Imagery**: none. No illustrations, no mascots, no stock photography —
   the interface is entirely typographic and numeric. Nothing competes with
   the number the user is trying to read at a glance.
@@ -141,9 +136,9 @@ implementation exists:
 | Focus ring | Focus indication only, never decorative |
 | Danger / warning / success | Status only, always paired with an icon or word |
 
-No token exists for "encouragement" or "alarm" on body-composition figures
-— those figures are always presented with the same neutral roles as any
-other number (`docs/requirements.md` FR-10).
+No token exists for "encouragement" or "alarm" — every number in this app is
+presented with the same neutral roles, per the "never editorializing"
+principle in §1.1.
 
 ### 3.2 Light and dark
 

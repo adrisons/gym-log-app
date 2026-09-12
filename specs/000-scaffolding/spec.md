@@ -314,7 +314,7 @@ confirm it passes.
   constitution already exist and are authoritative; Phase 0 adds three new
   docs and does not rewrite these.
 - **Full accessibility, performance, and offline audits.** Those are done
-  against `docs/requirements.md` §7 in later phases (§7.4 audit in Phase 7).
+  against `docs/requirements.md` §7 in later phases (§7.4 audit in Phase 6).
   Phase 0 only establishes that design tokens and light/dark theming exist.
 
 ## Requirements *(mandatory)*
