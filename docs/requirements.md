@@ -67,8 +67,17 @@ first candidate: swimming, e.g. tracking the best time achieved for a fixed
 distance like 100 m freestyle) can be added later without a rework of the
 canonical data. Concretely: a Set's `Volume` already distinguishes reps,
 duration and distance, and its `Load` already has a `None` variant for work
-where load doesn't apply — a swim length is representable today as a Set
-with `Volume: Distance` and `Load: None`. The Exercise catalogue's new
+where load doesn't apply. `Volume` is an exclusive choice among reps,
+duration and distance, not a combination, so a fixed-distance swim result
+(both the distance and the time it took) is not a single Set's `Volume` —
+it is the *catalogue entry* that fixes the distance (e.g. "100 m
+freestyle", the same way "back squat" and "front squat" are already
+distinct entries rather than one entry with a variant field, per FR-5), and
+the Set logged against it needs only `Volume: Duration` and `Load: None`.
+No new value-object shape is needed for that split, but it is a real split
+a future discipline's own spec has to state, not something today's model
+already does automatically (see ADR-0006 for where this was first written
+imprecisely as "distance", corrected there). The Exercise catalogue's new
 `discipline` field (§3.1) is itself a schema change — a persisted fact
 about a canonical entity, not a derived value — so per §6 it ships with a
 version bump, an ADR, and a (trivial, default-to-Strength) migration when
@@ -77,8 +86,10 @@ it. What v1 does NOT ship is any
 strength-specific computation (e1RM, tonnage, §5.2–5.3) applied to a
 non-strength discipline, any UI for a non-strength discipline, or a second
 discipline's own progression metric (e.g. "fastest time" as a tracked
-trend). Which disciplines beyond strength are in scope, and when, is D8
-(§8) — open.
+trend), until D8 (§8) is implemented. D8 is now closed: swimming is the
+first discipline added beyond Strength, targeted at v1.1 → ADR-0006. Which
+disciplines beyond swimming (running included) are in scope, and when,
+remains open and needs its own future decision.
 
 ---
 
@@ -458,7 +469,7 @@ before code.
 | D5 | e1RM formula | **Closed:** Epley, for simplicity and explainability; its weakness at high reps is why the rule caps use at 12 reps (§5.2). → ADR-0004 |
 | D6 | Multiple sessions per day, and session lifecycle | **Closed** for FR-1 to FR-5: multiple sessions per day are allowed and each is fully independent. A session has no open/closed state — its date-time is fixed at creation (when the logging form opens, user-editable) and there is no auto-resume; an unsubmitted form is kept as a single UI draft, not a Session. → `specs/001-log-a-session/spec.md` Clarifications |
 | D7 | Whether FR-13 (templates) is v1 or v1.1 | **Closed:** v1.1, to keep the logging critical path clean. |
-| D8 | Which exercise disciplines beyond Strength (§1.4) are in scope, and when | **Closed:** MVP and v1 ship Strength only; swimming (distance + time, no load) is the first documented candidate for a second discipline, deferred to v1.1 or later pending its own recorded decision — it must not be designed into the schema now, only kept representable (§1.4). |
+| D8 | Which exercise disciplines beyond Strength (§1.4) are in scope, and when | **Closed:** MVP and v1 ship Strength only. Swimming (distance + time, no load) is the first discipline added beyond Strength, targeted at v1.1 → ADR-0006. Running, and any discipline beyond swimming, remains open and needs its own future decision — swimming's shipped implementation does not pre-approve it. |
 | D9 | Whether the app ships a seed exercise catalogue | **Closed:** yes — a seed set of common strength exercises is present from first launch so there is no empty state on the logging critical path; seed entries are ordinary editable catalogue entries and the list is app-bundle data, not persisted schema. → ADR-0005 |
 | D10 | Whether the app tracks body composition (weight, body fat, etc.) | **Closed:** no — removed from scope entirely, in any version. This application is exercises and training metrics only; it never records body measurements. FR-10 (previously "Body composition") is retired; its ID is left unassigned rather than renumbering the FRs after it. |
 
@@ -481,8 +492,10 @@ before code.
   composition (formerly planned as FR-10) is not part of this or any
   version — see Decision D10.
 - **v1.1** — FR-13 templates; extra progression metrics; a quick-log widget
-  or shortcut; possibly the first non-Strength discipline (§1.4, §8), pending
-  its own scoping decision.
+  or shortcut; swimming as the first non-Strength discipline (§1.4, D8 →
+  ADR-0006) — its own feature spec, computation rule and schema migration,
+  not yet written. Running, or any discipline beyond swimming, is still an
+  open question (§8) pending its own future decision.
 - **Later, only with a recorded decision** — multi-device sync, import from
   other apps, report export, further exercise disciplines beyond the first
   one added under v1.1.
