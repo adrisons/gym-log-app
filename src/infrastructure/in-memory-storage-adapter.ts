@@ -5,7 +5,6 @@ import type {
 } from '../application/ports/storage-port';
 import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
-import type { BodyMeasurement } from '../domain/body-measurement';
 import type { SessionId, ExerciseId } from '../domain/ids';
 import { StorageError } from '../application/errors';
 
@@ -37,7 +36,6 @@ import { StorageError } from '../application/errors';
 export class InMemoryStorageAdapter implements StoragePort {
   #sessions = new Map<SessionId, Session>();
   #exercises = new Map<ExerciseId, Exercise>();
-  #bodyMeasurements: BodyMeasurement[] = [];
   #draft: LoggingDraft | undefined;
   #bandLabels: string[] = [];
   #schemaVersion = 0;
@@ -149,19 +147,6 @@ export class InMemoryStorageAdapter implements StoragePort {
     }
   }
 
-  async saveBodyMeasurement(measurement: BodyMeasurement): Promise<void> {
-    this.#bodyMeasurements.push(measurement);
-  }
-
-  async listBodyMeasurements(range: DateRange): Promise<BodyMeasurement[]> {
-    const from = Date.parse(range.from);
-    const to = Date.parse(range.to);
-    return this.#bodyMeasurements.filter((m) => {
-      const date = Date.parse(m.date);
-      return date >= from && date <= to;
-    });
-  }
-
   async saveDraft(draft: LoggingDraft): Promise<void> {
     this.#draft = draft;
   }
@@ -194,7 +179,6 @@ export class InMemoryStorageAdapter implements StoragePort {
   reset(): void {
     this.#sessions.clear();
     this.#exercises.clear();
-    this.#bodyMeasurements = [];
     this.#draft = undefined;
     this.#bandLabels = [];
     this.#schemaVersion = 0;

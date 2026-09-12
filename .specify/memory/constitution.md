@@ -34,15 +34,15 @@ Deferred TODOs: none.
 ## Core Principles
 
 ### I. Data Ownership and Recoverability (NON-NEGOTIABLE)
-The user's training and body-composition data belongs to the user and lives on
-their device. No mandatory account, no v1 backend, no user content sent to
-third parties. Everything MUST be exportable in an open, self-describing,
-versioned format. Search indexes, progression aggregates, insight caches and
-chart data are derived from canonical records (Session, Exercise catalogue,
-Body measurement); they MUST be deletable and rebuildable from the canonical
-records with no loss. A schema version travels with the data: an older
-version auto-migrates and records the migration; a newer version is refused
-with nothing written, never read partially.
+The user's training data belongs to the user and lives on their device. No
+mandatory account, no v1 backend, no user content sent to third parties.
+Everything MUST be exportable in an open, self-describing, versioned format.
+Search indexes, progression aggregates, insight caches and chart data are
+derived from canonical records (Session, Exercise catalogue); they MUST be
+deletable and rebuildable from the canonical records with no loss. A schema
+version travels with the data: an older version auto-migrates and records
+the migration; a newer version is refused with nothing written, never read
+partially.
 Rationale: this is the app's reason to exist over a cloud alternative — data
 custody and recomputability are the trust contract with the user, not
 implementation details to compromise under deadline pressure.
@@ -164,9 +164,10 @@ expected behavior, `/speckit-clarify`, followed by `/speckit-plan` and
 `/speckit-tasks`; `/speckit-implement` executes only after that chain exists
 for the feature in question. Features are delivered in the phase order
 recorded in `docs/requirements.md` §9 — MVP closes the log→evidence loop
-(FR-1 to FR-8, Strength only); v1 adds insights, body composition, settings
-and export/import; v1.1 adds templates and possibly the first non-Strength
-discipline — and every spec states which phase it targets.
+(FR-1 to FR-8, Strength only); v1 adds insights, settings and export/import
+(body composition is not part of any version — see Decision D10); v1.1 adds
+templates and possibly the first non-Strength discipline — and every spec
+states which phase it targets.
 
 Definition of done for every change: typecheck, tests, and lint pass locally
 and in CI; every new behaviour has at least one test and every fix has a

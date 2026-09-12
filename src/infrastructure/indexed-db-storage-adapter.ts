@@ -5,7 +5,6 @@ import type {
 } from '../application/ports/storage-port';
 import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
-import type { BodyMeasurement } from '../domain/body-measurement';
 import type { SessionId, ExerciseId } from '../domain/ids';
 import { StorageError } from '../application/errors';
 import {
@@ -13,7 +12,6 @@ import {
   DRAFT_ROW_KEY,
   BAND_LABELS_ROW_KEY,
   SCHEMA_VERSION_ROW_KEY,
-  type BodyMeasurementRow,
 } from './indexed-db/schema';
 import { CURRENT_SCHEMA_VERSION, decideSchemaAction } from './schema-version';
 import {
@@ -225,26 +223,6 @@ export class IndexedDbStorageAdapter implements StoragePort {
     );
   }
 
-  // Body measurements
-
-  async saveBodyMeasurement(measurement: BodyMeasurement): Promise<void> {
-    await this.#ensureSchemaChecked();
-    await this.#run(() => this.#db.bodyMeasurements.add({ ...measurement }));
-  }
-
-  async listBodyMeasurements(range: DateRange): Promise<BodyMeasurement[]> {
-    await this.#ensureSchemaChecked();
-    const from = Date.parse(range.from);
-    const to = Date.parse(range.to);
-    const rows = await this.#db.bodyMeasurements.toArray();
-    return rows
-      .filter((m) => {
-        const date = Date.parse(m.date);
-        return date >= from && date <= to;
-      })
-      .map((row) => withoutSurrogateId(row));
-  }
-
   // The logging draft
 
   async saveDraft(draft: LoggingDraft): Promise<void> {
@@ -309,19 +287,4 @@ export class IndexedDbStorageAdapter implements StoragePort {
       );
     }
   }
-}
-
-/** Strips Dexie's storage-local surrogate `id` before a `BodyMeasurementRow` crosses the `StoragePort` boundary. */
-function withoutSurrogateId(row: BodyMeasurementRow): BodyMeasurement {
-  return {
-    date: row.date,
-    bodyWeightKg: row.bodyWeightKg,
-    ...(row.fatPercentage !== undefined && {
-      fatPercentage: row.fatPercentage,
-    }),
-    ...(row.musclePercentageOrMassKg !== undefined && {
-      musclePercentageOrMassKg: row.musclePercentageOrMassKg,
-    }),
-    notes: row.notes,
-  };
 }

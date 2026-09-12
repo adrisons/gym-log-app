@@ -109,17 +109,16 @@ sufficiency thresholds (§5.7). Every card type ships tests covering the case
 with data, the case just below the threshold, and the case with no data.
 Incremental recomputation, off the interaction path.
 
-### Phase 6 — Body composition (FR-10) — v1
+Body composition tracking (formerly planned as a Phase 6 / FR-10) was
+removed from scope entirely — see `docs/requirements.md` Decision D10. This
+app covers exercises and training metrics only.
 
-Logging, derived kg values, charts with moving average. Neutral tone: no
-targets, no alarms.
-
-### Phase 7 — Settings, data, closing (FR-11, FR-12) — v1
+### Phase 6 — Settings, data, closing (FR-11, FR-12) — v1
 
 Export and import with preview and rejection of newer schema versions. Full
 accessibility audit against `docs/requirements.md` §7.4. Performance measured
 against §7.1, before and after any optimisation.
 
-### Phase 8 — Templates (FR-13) — v1.1
+### Phase 7 — Templates (FR-13) — v1.1
 
 Session templates, kept off the logging critical path (D7).

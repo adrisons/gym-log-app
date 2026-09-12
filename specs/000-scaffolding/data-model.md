@@ -23,7 +23,7 @@ Shape (illustrative — exact method set is refined in Phase 1 against the
 | `deleteSession(id)` | remove a session | |
 | `saveExercise(exercise)` / `getExercise(id)` / `listExercises()` | catalogue reads/writes | catalogue itself is Phase 1 |
 | `getSchemaVersion()` / `setSchemaVersion(v)` | the version that travels with the data (`docs/requirements.md` §6) | migrate/refuse logic is Phase 2 |
-| `exportAll()` / `importAll(payload)` | the interchange format (FR-12) | Phase 7; interface placeholder only |
+| `exportAll()` / `importAll(payload)` | the interchange format (FR-12) | Phase 6; interface placeholder only |
 
 Rules the interface must respect (from the constitution and ADR-0002):
 

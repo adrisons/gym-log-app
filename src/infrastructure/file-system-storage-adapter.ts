@@ -5,13 +5,11 @@ import type {
 } from '../application/ports/storage-port';
 import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
-import type { BodyMeasurement } from '../domain/body-measurement';
 import type { SessionId, ExerciseId } from '../domain/ids';
 import { StorageError } from '../application/errors';
 import {
   SESSIONS_DIR,
   EXERCISES_FILE,
-  BODY_MEASUREMENTS_FILE,
   DRAFT_FILE,
   BAND_LABELS_FILE,
   META_FILE,
@@ -566,28 +564,6 @@ export class FileSystemStorageAdapter implements StoragePort {
     if (draft && draftReferencesExercise(draft, id)) {
       await this.#writeJson(DRAFT_FILE, pruneDraftExerciseId(draft, id));
     }
-  }
-
-  // Body measurements
-
-  async saveBodyMeasurement(measurement: BodyMeasurement): Promise<void> {
-    await this.#ensureSchemaCheckedForWrite();
-    const measurements =
-      (await this.#readJson<BodyMeasurement[]>(BODY_MEASUREMENTS_FILE, true)) ??
-      [];
-    measurements.push(measurement);
-    await this.#writeJson(BODY_MEASUREMENTS_FILE, measurements);
-  }
-
-  async listBodyMeasurements(range: DateRange): Promise<BodyMeasurement[]> {
-    const measurements =
-      (await this.#readJson<BodyMeasurement[]>(BODY_MEASUREMENTS_FILE)) ?? [];
-    const from = Date.parse(range.from);
-    const to = Date.parse(range.to);
-    return measurements.filter((m) => {
-      const date = Date.parse(m.date);
-      return date >= from && date <= to;
-    });
   }
 
   // The logging draft

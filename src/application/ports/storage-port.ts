@@ -21,7 +21,6 @@
 
 import type { Session } from '../../domain/session';
 import type { Exercise } from '../../domain/exercise';
-import type { BodyMeasurement } from '../../domain/body-measurement';
 import type { SessionId, ExerciseId } from '../../domain/ids';
 import type { LoggingDraft } from './logging-draft';
 
@@ -80,10 +79,6 @@ export interface StoragePort {
    * id does not resolve to an existing Exercise.
    */
   deleteExerciseCascade(id: ExerciseId): Promise<void>;
-
-  // Body measurements
-  saveBodyMeasurement(measurement: BodyMeasurement): Promise<void>;
-  listBodyMeasurements(range: DateRange): Promise<BodyMeasurement[]>;
 
   // The logging draft (spec 001 FR-024) — UI/session state that must
   // still survive an app close/kill, but is explicitly NOT a Session. Kept
