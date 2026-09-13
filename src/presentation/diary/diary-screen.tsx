@@ -6,19 +6,27 @@
  *
  * `docs/requirements.md` FR-1/FR-6 (design-refinement pass): the primary
  * "Log session" action lives here as a floating action linking to `/log`
- * (there is no persistent nav tab for it — `docs/design.md` §6). A
- * sustained press on a row enters bulk-select (long-press timer below);
- * while a selection is active the FAB is replaced by a floating Cancel/
- * Delete bar and a normal tap toggles a row's selection instead of
- * opening it. Deleting calls `storage.deleteSession` per id (optimistic —
- * constitution Principle II) and keeps the deleted `Session`s in memory
- * for a 5-second `UndoToast` window, restoring each via
- * `storage.saveSession` exactly as it was if undone (FR-6's extension of
- * FR-004's undo guarantee to sessions). `SessionListItem` below is
- * inferred from `requireStorage()`'s own return type rather than imported
- * from `domain/`, so this file never crosses the presentation→domain
- * boundary (`docs/architecture.md`'s forbidden-edge table) while still
- * keeping full `Session` objects for exact restoration.
+ * (there is no persistent nav tab for it — `docs/design.md` §6). Bulk
+ * select is reached either by a sustained press on a row, or (keyboard/
+ * screen-reader path) the "Select sessions" button, which arms selection
+ * mode with nothing yet selected; once active, a tap or an Enter/Space on
+ * a focused row toggles its selection instead of opening it (a native
+ * `<a>`'s Enter keypress already dispatches a `click` event, so the same
+ * `handleRowClick` handles both). While active the FAB is replaced by a
+ * floating Cancel/Delete bar. Deleting/undoing is orchestrated by
+ * `deleteSessionsWithUndo` (`application/diary/diary-bulk-delete.ts`) —
+ * this screen never calls a `StoragePort` write method itself
+ * (`storage-access.ts` documents its instance as read-only for the diary/
+ * search/progression screens); this component only applies the optimistic
+ * UI update and reacts to the returned handle's outcome (rolling back
+ * sessions whose delete failed) or to "Undo" (which the handle guarantees
+ * waits for the original delete to finish before restoring, so the two
+ * can never race for the same id). Multiple delete batches can be pending
+ * at once, each with its own 5-second `UndoToast`. `SessionListItem`
+ * below is inferred from `requireStorage()`'s own return type rather than
+ * imported from `domain/`, so this file never crosses the
+ * presentation→domain boundary (`docs/architecture.md`'s forbidden-edge
+ * table) while still keeping full `Session` objects for exact restoration.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
@@ -32,6 +40,8 @@ import {
   findNearestSessionDate,
   groupSessionsByMonth,
 } from '@/application/diary/diary-grouping';
+import { deleteSessionsWithUndo } from '@/application/diary/diary-bulk-delete';
+import type { BulkDeleteHandle } from '@/application/diary/diary-bulk-delete';
 import type { Exercise, ExerciseId } from '@/application/logging/use-cases';
 import { UndoToast } from '@/presentation/logging/undo-toast';
 import { SessionSavedToast } from './session-saved-toast';
@@ -44,10 +54,16 @@ type SessionListItem = Awaited<
 const LONG_PRESS_MS = 500;
 const DELETE_UNDO_MS = 5000;
 
-interface PendingDelete {
+interface PendingDeleteBatch {
+  batchId: string;
   ids: Set<string>;
   snapshot: SessionListItem[];
   expiresAt: number;
+  handle: BulkDeleteHandle;
+  /** Set by `undoDelete` before it removes this batch, so a still-pending
+   * `handle.settled` reaction (rolling back failed deletes) knows undo
+   * already restored everything and skips its own, now-redundant patch. */
+  undone: { current: boolean };
 }
 
 export function DiaryScreen() {
@@ -69,9 +85,10 @@ export function DiaryScreen() {
     undefined,
   );
   const [jumpDate, setJumpDate] = useState('');
+  const [selectionActive, setSelectionActive] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [pendingDelete, setPendingDelete] = useState<PendingDelete | undefined>(
-    undefined,
+  const [pendingDeletes, setPendingDeletes] = useState<PendingDeleteBatch[]>(
+    [],
   );
   const exercisesByIdRef = useRef(new Map<ExerciseId, Exercise>());
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -110,12 +127,13 @@ export function DiaryScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const bulkActive = selected.size > 0;
+  const bulkActive = selectionActive;
 
   function handlePressStart(sessionId: string) {
     longPressFiredRef.current = false;
     pressTimerRef.current = setTimeout(() => {
       longPressFiredRef.current = true;
+      setSelectionActive(true);
       setSelected((current) => new Set(current).add(sessionId));
     }, LONG_PRESS_MS);
   }
@@ -144,12 +162,30 @@ export function DiaryScreen() {
     }
   }
 
+  /** Keyboard/screen-reader entry point into bulk-select — the long press
+   * above has no keyboard equivalent on its own. Arms selection mode with
+   * nothing yet picked; each row's own Enter/Space (a native `<a>`
+   * dispatches `click` for both) then toggles it via `handleRowClick`. */
+  function startSelection() {
+    setSelectionActive(true);
+  }
+
   function cancelSelection() {
+    setSelectionActive(false);
     setSelected(new Set());
   }
 
-  async function deleteSelection() {
-    if (!sessions) return;
+  function mergeSessionsSortedDesc(
+    current: SessionListItem[] | undefined,
+    toAdd: SessionListItem[],
+  ): SessionListItem[] {
+    const restored = [...(current ?? []), ...toAdd];
+    restored.sort((a, b) => b.dateTime.localeCompare(a.dateTime));
+    return restored;
+  }
+
+  function deleteSelection() {
+    if (!sessions || selected.size === 0) return;
     const storage = requireStorage();
     const ids = selected;
     const toDelete = sessions.filter((session) => ids.has(session.id));
@@ -163,33 +199,80 @@ export function DiaryScreen() {
         buildDiarySessionSummary(session, exercisesByIdRef.current),
       ),
     );
+    setSelectionActive(false);
     setSelected(new Set());
-    setPendingDelete({
-      ids: new Set(ids),
-      snapshot: toDelete,
-      expiresAt: Date.now() + DELETE_UNDO_MS,
-    });
 
-    await Promise.all(
-      toDelete.map((session) => storage.deleteSession(session.id)),
-    );
+    const handle = deleteSessionsWithUndo(storage, toDelete);
+    const batchId = handle.batchId;
+    const undone = { current: false };
+    setPendingDeletes((current) => [
+      ...current,
+      {
+        batchId,
+        ids: new Set(ids),
+        snapshot: toDelete,
+        expiresAt: Date.now() + DELETE_UNDO_MS,
+        handle,
+        undone,
+      },
+    ]);
+
+    void handle.settled.then(({ failures }) => {
+      // Undo already restored everything for this batch — re-adding just
+      // the failures now would duplicate them (finding this ran after an
+      // undo is a race, not a bug: the user can act before a background
+      // delete settles).
+      if (undone.current || failures.length === 0) return;
+      const failedIds = new Set<string>(failures.map((session) => session.id));
+      setSessions((current) => {
+        const restored = mergeSessionsSortedDesc(current, failures);
+        setSummaries(
+          restored.map((session) =>
+            buildDiarySessionSummary(session, exercisesByIdRef.current),
+          ),
+        );
+        return restored;
+      });
+      // Narrow the still-open undo window to the sessions that actually
+      // got deleted — the ones that failed are already back above and
+      // never left storage, so undoing this batch later must not touch
+      // them again.
+      setPendingDeletes((current) =>
+        current
+          .map((batch) =>
+            batch.batchId === batchId
+              ? {
+                  ...batch,
+                  ids: new Set(
+                    [...batch.ids].filter((id) => !failedIds.has(id)),
+                  ),
+                  snapshot: batch.snapshot.filter(
+                    (session) => !failedIds.has(session.id),
+                  ),
+                }
+              : batch,
+          )
+          .filter((batch) => batch.ids.size > 0),
+      );
+    });
   }
 
-  async function undoDelete() {
-    const pending = pendingDelete;
-    if (!pending) return;
-    const storage = requireStorage();
-    setPendingDelete(undefined);
-    await Promise.all(
-      pending.snapshot.map((session) => storage.saveSession(session)),
+  async function undoDelete(batchId: string) {
+    const batch = pendingDeletes.find((b) => b.batchId === batchId);
+    if (!batch) return;
+    batch.undone.current = true;
+    setPendingDeletes((current) =>
+      current.filter((b) => b.batchId !== batchId),
     );
+    // `restore` waits for this batch's own deletes to finish first, so it
+    // can never race them for the same id even if they're still in flight.
+    await batch.handle.restore();
     // Merge back in rather than re-fetching everything: the deletion was
     // optimistic (Principle II), so undo stays symmetric with it — the UI
-    // is what's authoritative here, `saveSession` above is what makes
-    // storage agree with it.
+    // is what's authoritative here, `restore` above is what makes storage
+    // agree with it.
     setSessions((current) => {
-      const restored = [...(current ?? []), ...pending.snapshot];
-      restored.sort((a, b) => b.dateTime.localeCompare(a.dateTime));
+      const restored = mergeSessionsSortedDesc(current, batch.snapshot);
       setSummaries(
         restored.map((session) =>
           buildDiarySessionSummary(session, exercisesByIdRef.current),
@@ -203,13 +286,14 @@ export function DiaryScreen() {
     return <main className="diary-screen" aria-label="Diary" />;
   }
 
-  const undoToast = pendingDelete && (
+  const undoToasts = pendingDeletes.map((batch) => (
     <UndoToast
-      message={`${pendingDelete.ids.size} session${pendingDelete.ids.size === 1 ? '' : 's'} deleted`}
-      expiresAt={pendingDelete.expiresAt}
-      onUndo={() => void undoDelete()}
+      key={batch.batchId}
+      message={`${batch.ids.size} session${batch.ids.size === 1 ? '' : 's'} deleted`}
+      expiresAt={batch.expiresAt}
+      onUndo={() => void undoDelete(batch.batchId)}
     />
-  );
+  ));
 
   if (summaries.length === 0) {
     return (
@@ -222,7 +306,7 @@ export function DiaryScreen() {
           <Icon name="plus" />
           Log session
         </Link>
-        {undoToast}
+        {undoToasts}
         {justLogged && <SessionSavedToast />}
       </main>
     );
@@ -251,6 +335,16 @@ export function DiaryScreen() {
         <p>
           Nearest session: <Link to={`/diary/${nearestId}`}>{nearestId}</Link>
         </p>
+      )}
+      {!bulkActive && (
+        <button
+          type="button"
+          className="diary-screen__select-button"
+          onClick={startSelection}
+        >
+          <Icon name="check" />
+          Select sessions
+        </button>
       )}
       {groups.map((group) => (
         <section key={group.monthKey} aria-label={group.monthKey}>
@@ -331,7 +425,8 @@ export function DiaryScreen() {
             <button
               type="button"
               className="diary-screen__bulk-button diary-screen__bulk-button--delete"
-              onClick={() => void deleteSelection()}
+              disabled={selected.size === 0}
+              onClick={deleteSelection}
             >
               <Icon name="trash" />
               Delete
@@ -340,7 +435,7 @@ export function DiaryScreen() {
         </div>
       )}
 
-      {undoToast}
+      {undoToasts}
       {justLogged && <SessionSavedToast />}
     </main>
   );

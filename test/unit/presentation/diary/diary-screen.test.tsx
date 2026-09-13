@@ -195,6 +195,52 @@ describe('DiaryScreen (FR-001..006)', () => {
     }
   });
 
+  it('"Select sessions" arms bulk-select without a long press, for keyboard/screen-reader use', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await seedSession(storage, 's1', '2026-09-11T10:00:00.000Z', exerciseId);
+    useStorageAccess.getState().configure(storage);
+
+    render(
+      <MemoryRouter>
+        <DiaryScreen />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: /squat/i })).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByRole('toolbar', { name: /selected sessions/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /select sessions/i }));
+
+    expect(
+      screen.getByRole('toolbar', { name: /selected sessions/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/0 sessions selected/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /log session/i }),
+    ).not.toBeInTheDocument();
+
+    // A plain click on the row (the same event a native <a>'s Enter/Space
+    // keypress dispatches) toggles it now that selection mode is active.
+    fireEvent.click(screen.getByRole('link', { name: /squat/i }));
+    expect(screen.getByText(/1 session selected/i)).toBeInTheDocument();
+  });
+
   it('deleting a selection removes it and Undo restores it exactly (FR-6, FR-004)', async () => {
     const storage = new InMemoryStorage();
     const exerciseId = 'ex-1' as ExerciseId;

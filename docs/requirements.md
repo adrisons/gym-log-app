@@ -306,13 +306,18 @@ Create a session and add blocks, exercises and sets.
 - Session detail view, editable after the fact.
 - Jump to a specific date.
 - Sessions can be selected in bulk — entered by a sustained press on a
-  session row, which marks that row selected and replaces the primary
-  logging action with a floating bar offering Cancel and Delete for the
-  current selection. A normal tap on another row while a selection is
-  active toggles that row into or out of the selection instead of opening
+  session row, or by an explicit "Select sessions" control for keyboard/
+  screen-reader use (a sustained press has no keyboard equivalent) — which
+  marks a row selected and replaces the primary logging action with a
+  floating bar offering Cancel and Delete for the current selection. A
+  normal tap (or, once selection mode is active, Enter/Space on a focused
+  row) toggles that row into or out of the selection instead of opening
   it. Deleting a selection removes those sessions and is undoable for at
   least 5 seconds (the same guarantee FR-004 makes for a set, exercise, or
-  block), restoring every deleted session exactly as it was.
+  block), restoring every deleted session exactly as it was — including
+  when a session's own delete failed to reach storage (the deletion never
+  actually happened; the row simply reappears once that's known) and
+  independently of any other delete/undo in progress at the same time.
 
 ### FR-7 — Exercise search `[v1]`
 
