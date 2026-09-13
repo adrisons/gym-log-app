@@ -75,15 +75,27 @@
   min-height: 44px;
   text-align: left;
   cursor: pointer;
-  transition: background var(--duration-short) var(--easing-standard);
+  transition:
+    background var(--duration-short) var(--easing-standard),
+    transform var(--duration-instant) var(--easing-standard);
 }
 
 .logging-button:hover {
   background: var(--color-border);
 }
 
+/* Press feedback (docs/design.md §4.2 — "did my tap register", answered
+   before any write confirms): every button in the app gets this through
+   the one shared class, not per-component. */
 .logging-button:active {
   background: var(--color-border-strong);
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logging-button:active {
+    transform: none;
+  }
 }
 
 .logging-button:focus-visible {
@@ -124,6 +136,18 @@
 .logging-button--primary:hover {
   background: var(--color-accent);
   opacity: 0.9;
+}
+
+/* `.logging-button:active` alone (a class + pseudo-class) outranks
+   `.logging-button--primary` (one class) by specificity, so without this
+   override pressing a primary button swapped in the generic
+   --color-border-strong background under its own --color-accent-foreground
+   text — an unintended, potentially low-contrast pressed state that
+   :hover never surfaces since a press has no hover step on touch/keyboard
+   (Copilot review, PR #22). */
+.logging-button--primary:active {
+  background: var(--color-accent);
+  opacity: 0.8;
 }
 
 .logging-button:disabled {
@@ -212,6 +236,35 @@
   font-family: var(--font-mono);
 }
 
+/* Plays once, only for the one row `LoggingScreen` marks as the set
+   `addSet` most recently committed (`lastAddedSetId`) — not the base
+   `.set-summary` class every row shares, which would replay for every
+   already-logged set the moment the whole list first mounts (e.g. opening
+   a same-day draft with sets already in it, or `SessionDetailScreen`'s
+   read of past sets, which never applies this modifier at all). Answers
+   "where did that thing go" (docs/design.md §4.1) for the set ADR-0007
+   just auto-committed with no confirm tap to anchor to. */
+.set-summary--new {
+  animation: set-summary-enter var(--duration-medium) var(--easing-decelerate);
+}
+
+@keyframes set-summary-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .set-summary--new {
+    animation: none;
+  }
+}
+
 .undo-toast {
   display: flex;
   align-items: center;
@@ -237,14 +290,26 @@
    dense list, a stat line under the block name, exercises as clearly
    separated cards — while keeping the overflow menu, never the inline
    link-row alternative from that same exploration. */
+/* Also the dialog root for `ExerciseTemplatePanel`/`ExerciseCataloguePanel`
+   — a shared flex-column card shell, not exclusive to the collapsible
+   block card below. `gap` spaces those two dialogs' own direct children
+   the plain way; `--collapsible` (the actual `BlockCard`, which has none
+   of that spacing to do — see below) turns it off (Copilot review,
+   PR #22: removing this `gap` outright to make room for the collapse
+   wrapper's own animatable `margin-top` broke the *other* two consumers'
+   spacing, since they never touch that wrapper at all). */
 .block-card {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   padding: var(--space-5);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
+}
+
+.block-card--collapsible {
+  gap: 0;
 }
 
 .block-card__header {
@@ -257,17 +322,77 @@
   flex: none;
 }
 
-/* Matches `.block-card`'s own flex/gap so wrapping the body in this one
-   element (needed for a single `hidden` toggle) doesn't change the visible
-   spacing between the exercise cards and the block's footer control. */
+/* The CSS-grid "animate to auto height" trick: `grid-template-rows`
+   between 1fr and 0fr transitions smoothly (unlike `height: auto`, which
+   can't be animated). `margin-top` (replacing `.block-card`'s own `gap`,
+   which a 0fr row can't shrink through) transitions alongside it so a
+   collapsed card hugs its header instead of keeping a blank gap where the
+   body used to be. */
+.block-card__collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin-top: var(--space-4);
+  transition:
+    grid-template-rows var(--duration-medium) var(--easing-standard),
+    margin-top var(--duration-medium) var(--easing-standard);
+}
+
+.block-card__collapse--collapsed {
+  grid-template-rows: 0fr;
+  margin-top: 0;
+}
+
+/* Matches `.block-card`'s own flex gap so wrapping the body in this one
+   element (needed for a single collapse toggle) doesn't change the visible
+   spacing between the exercise cards and the block's footer control.
+   `overflow: hidden` only while collapsed — not permanently — since
+   `min-height: 0` needs it to let the 0fr row actually shrink past its
+   content's natural height, but applying it whenever the block is merely
+   expanded clipped every exercise/set `OverflowMenu` popover inside this
+   element instead of letting it escape normally (Copilot review, PR #22). */
 .block-card__body {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  min-height: 0;
 }
 
-.block-card__body[hidden] {
-  display: none;
+/* `--transitioning` (`block-card.tsx`, cleared on the wrapper's own
+   `onTransitionEnd`) keeps this clipped through an *expand* too, not just
+   the collapsed steady state — dropping overflow:hidden the instant
+   `--collapsed` is removed let full-height content paint outside the
+   still-growing 0fr->1fr track and overlap the header for the transition's
+   duration (Copilot review, PR #22). */
+.block-card__collapse--collapsed .block-card__body,
+.block-card__collapse--transitioning .block-card__body {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block-card__collapse {
+    transition: none;
+  }
+}
+
+/* ADR-0008: a block's target round count — compact and always visible,
+   never gated by the collapse toggle above (it's the block's own plan,
+   not the exercises/sets content that collapses). */
+.block-card__rounds {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* `.block-card` dropped its own flex `gap` in favor of the collapse
+     wrapper's collapsible `margin-top` (above) — this row sits between the
+     header and that wrapper and needs its own top margin, or it renders
+     flush against the header (Copilot review, PR #22). */
+  margin-top: var(--space-4);
+  font-size: 0.875rem;
+  color: var(--color-foreground-muted);
+}
+
+.block-card__rounds input {
+  width: 4.5rem;
+  padding: var(--space-1) var(--space-2);
 }
 
 .block-card__title {

@@ -37,7 +37,7 @@
  * every way of leaving this screen (this link, a browser back/swipe
  * gesture, …), where router state only ever covered the one explicit
  * link. `justRegisteredWorkout` is set only by `registerWorkout`'s
- * success (ADR-0008, D15) — recording a set no longer implies a Session
+ * success (ADR-0009, D16) — recording a set no longer implies a Session
  * was saved, only that the pending draft was — and reset on the next
  * `initialize()`.
  */
@@ -53,6 +53,7 @@ import {
 } from '@/application/logging/view-models';
 import type { Exercise } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
+import { prefersReducedMotion } from '@/presentation/design/motion';
 import { SessionDateTimeField } from './session-date-time-field';
 import { AddExerciseControl } from './add-exercise-control';
 import { SetRow } from './set-row';
@@ -82,6 +83,8 @@ export function LoggingScreen() {
   const setSessionDateTime = useLoggingSession((s) => s.setSessionDateTime);
   const addExerciseEntry = useLoggingSession((s) => s.addExerciseEntry);
   const addSet = useLoggingSession((s) => s.addSet);
+  const lastAddedSetId = useLoggingSession((s) => s.lastAddedSetId);
+  const clearLastAddedSetId = useLoggingSession((s) => s.clearLastAddedSetId);
   const prefillNextSet = useLoggingSession((s) => s.prefillNextSet);
   const searchExercises = useLoggingSession((s) => s.searchExercises);
   const createExercise = useLoggingSession((s) => s.createExercise);
@@ -93,6 +96,7 @@ export function LoggingScreen() {
   const saveBandLabels = useLoggingSession((s) => s.saveBandLabels);
   const addBlock = useLoggingSession((s) => s.addBlock);
   const renameBlock = useLoggingSession((s) => s.renameBlock);
+  const setBlockRounds = useLoggingSession((s) => s.setBlockRounds);
   const reorderBlockExercise = useLoggingSession((s) => s.reorderBlockExercise);
   const moveExerciseAcrossBlocks = useLoggingSession(
     (s) => s.moveExerciseAcrossBlocks,
@@ -110,6 +114,67 @@ export function LoggingScreen() {
     void initialize();
     // initialize is a stable Zustand action reference; run once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // One-shot consumption: `lastAddedSetId` marks exactly one `.set-summary`
+  // row (`set-summary--new` below) for the entrance animation. Left set
+  // indefinitely, an unrelated remount of this same route — or a
+  // delete-then-undo that restores a set under its original id — would
+  // reapply that animation to a row that isn't actually new anymore
+  // (Copilot review, PR #22). The marked row's own `onAnimationEnd`
+  // consumes it in the normal case (below) — no separate duration
+  // constant to keep in sync with logging.css's `set-summary-enter`,
+  // which would silently drift the moment either one changes. Reduced
+  // motion never fires that animation at all, so it's consumed
+  // immediately here instead.
+  useEffect(() => {
+    if (lastAddedSetId !== undefined && prefersReducedMotion()) {
+      clearLastAddedSetId();
+    }
+  }, [lastAddedSetId, clearLastAddedSetId]);
+
+  // If the OS preference flips to reduced-motion while the marked row's
+  // entrance animation is already mid-flight, the CSS rule above cancels
+  // that running animation outright — a cancelled animation never fires
+  // `animationend`, so the row's own consumption (below) would otherwise
+  // never run and `lastAddedSetId` would stay stuck (Copilot review,
+  // PR #22).
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      if (event.matches && useLoggingSession.getState().lastAddedSetId) {
+        useLoggingSession.getState().clearLastAddedSetId();
+      }
+    };
+    query.addEventListener('change', handleChange);
+    return () => query.removeEventListener('change', handleChange);
+  }, []);
+
+  // Unmounting (navigating away) before the marked row's own
+  // `onAnimationEnd` fires must still consume the marker — otherwise a
+  // later remount of this same route, before initialize() resolves, could
+  // replay the animation for a row left over from a previous visit.
+  // Empty deps deliberately: this must run only on true unmount, reading
+  // whatever is live in the store at that moment, never on every
+  // lastAddedSetId change (which would just be re-added a moment later).
+  //
+  // Known residual gap (Copilot review, PR #22): a `SetRow` debounce timer
+  // deliberately survives unmount (ADR-0007) and can fire *after* this
+  // cleanup runs, re-setting `lastAddedSetId` for a set that was in fact
+  // just committed on the previous visit. A remount before `initialize()`'s
+  // own (synchronous, top-of-function) reset reaches the store can then
+  // paint one frame with that stale marker applied before it's cleared.
+  // Not fixed here: doing so needs the reset to happen before this
+  // component's first paint rather than in an effect (which only runs
+  // after it), and every way to do that reaches outside this component's
+  // own render — e.g. a Zustand `set()` call during another component's
+  // render — trading a one-frame, rarely-reachable animation glitch for a
+  // real risk of state-update-during-render issues. Left as is.
+  useEffect(() => {
+    return () => {
+      useLoggingSession.getState().clearLastAddedSetId();
+    };
   }, []);
 
   if (!draft) {
@@ -144,7 +209,7 @@ export function LoggingScreen() {
             <button
               type="button"
               className="logging-button logging-button--primary"
-              onClick={() => recoverPendingDraft()}
+              onClick={() => void recoverPendingDraft()}
             >
               Recover
             </button>
@@ -217,7 +282,9 @@ export function LoggingScreen() {
             hasName={block.name !== undefined}
             bare={isBare}
             subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'} logged`}
+            rounds={block.rounds}
             onRename={(name) => void renameBlock(block.id, name)}
+            onSetRounds={(rounds) => void setBlockRounds(block.id, rounds)}
             onDelete={() => void deleteBlock(block.id)}
             footer={
               isBare ? undefined : (
@@ -275,8 +342,37 @@ export function LoggingScreen() {
                   <ul className="set-list">
                     {entry.sets.map((set) => {
                       const vm = toSetSummaryViewModel(set);
+                      const isNewest = vm.id === lastAddedSetId;
                       return (
-                        <li key={vm.id} className="set-summary">
+                        <li
+                          key={vm.id}
+                          className={
+                            isNewest
+                              ? 'set-summary set-summary--new'
+                              : 'set-summary'
+                          }
+                          {...(isNewest
+                            ? {
+                                onAnimationEnd: () => {
+                                  // Guards against a stale closure: if a
+                                  // second set committed (moving the
+                                  // marker on) before this row's own
+                                  // animation ended, only *that* row's
+                                  // handler should consume it — this one
+                                  // clearing a marker that has already
+                                  // moved on would strand the newer row's
+                                  // own entrance animation mid-flight
+                                  // (Copilot review, PR #22).
+                                  if (
+                                    useLoggingSession.getState()
+                                      .lastAddedSetId === vm.id
+                                  ) {
+                                    clearLastAddedSetId();
+                                  }
+                                },
+                              }
+                            : {})}
+                        >
                           <span>{vm.loadLabel}</span>
                           <span>{vm.volumeLabel}</span>
                           <OverflowMenu

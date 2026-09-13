@@ -47,6 +47,26 @@
   gap: var(--space-1);
 }
 
+/* Press feedback (docs/design.md §4.5 — every tappable control scales
+   down slightly on press); this link had none at all. `inline-block` is
+   required, not decorative — `transform` has no effect on a non-replaced
+   inline element like a bare `<a>` (Copilot review, PR #24's emoji-pop
+   fix hit the same thing). */
+.diary-screen__jump-nearest-link {
+  display: inline-block;
+  transition: transform var(--duration-instant) var(--easing-standard);
+}
+
+.diary-screen__jump-nearest-link:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diary-screen__jump-nearest-link:active {
+    transform: none;
+  }
+}
+
 /* Keyboard/screen-reader entry point into bulk-select — the long press on
    a row has no keyboard equivalent (`diary-screen.tsx`'s `startSelection`). */
 .diary-screen__select-button {
@@ -63,6 +83,7 @@
   padding: var(--space-2) 0;
   min-height: 44px;
   cursor: pointer;
+  transition: transform var(--duration-instant) var(--easing-standard);
 }
 
 .diary-screen__select-button:hover,
@@ -73,6 +94,18 @@
 .diary-screen__select-button:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
+}
+
+/* Press feedback (docs/design.md §4.2 — every tappable control gets this,
+   not just the ones with their own dedicated button class). */
+.diary-screen__select-button:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diary-screen__select-button:active {
+    transform: none;
+  }
 }
 
 .diary-screen__session-list {
@@ -89,16 +122,29 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   color: inherit;
   text-decoration: none;
+  transition: transform var(--duration-instant) var(--easing-standard);
 }
 
 .diary-screen__session-link:hover,
 .diary-screen__session-link:focus-visible {
   border-color: var(--color-border-strong);
+}
+
+/* Press feedback (docs/design.md §4.5 — every tappable control scales
+   down slightly on press); this row had none at all. */
+.diary-screen__session-link:active {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diary-screen__session-link:active {
+    transform: none;
+  }
 }
 
 /* Bulk-select (`docs/requirements.md` FR-6, ADR-0007's sibling behavior
@@ -152,9 +198,58 @@
   min-width: 44px;
 }
 
+/* Press feedback (docs/design.md §4.5 — every tappable control scales
+   down slightly on press); this link had none at all. `inline-block` is
+   required, not decorative — `transform` has no effect on a non-replaced
+   inline element like a bare `<a>` (Copilot review, PR #24's emoji-pop
+   fix hit the same thing). */
+.session-detail-screen__progression-link {
+  display: inline-block;
+  transition: transform var(--duration-instant) var(--easing-standard);
+}
+
+.session-detail-screen__progression-link:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-detail-screen__progression-link:active {
+    transform: none;
+  }
+}
+
+/* A tinted badge behind the icon (canvas reference: `.chip`) — a plain
+   unfilled icon read as far quieter than the mockup's colour-tinted
+   square, one of the concrete visual gaps against that reference. Neutral
+   by default: Accent is reserved for primary actions/current selection
+   (docs/design.md §1.2/§3.1), so every row getting an accent-tinted badge
+   would both misuse that reservation and weaken the selected-row signal
+   below, which already relies on Accent meaning "selected" and nothing
+   else (Copilot review, PR #24). */
 .diary-screen__session-icon {
   position: relative;
   flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: color-mix(
+    in oklab,
+    var(--color-foreground) 8%,
+    var(--color-surface)
+  );
+  color: var(--color-foreground-muted);
+}
+
+.diary-screen__session-link--selected .diary-screen__session-icon {
+  background: color-mix(
+    in oklab,
+    var(--color-accent) 13%,
+    var(--color-surface)
+  );
+  color: var(--color-accent);
 }
 
 .diary-screen__session-icon-check {
@@ -186,7 +281,7 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-5);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   background: var(--color-accent);
   color: var(--color-accent-foreground);
   border: none;
@@ -196,13 +291,27 @@
   text-decoration: none;
   box-shadow: 0 4px 12px var(--color-border-strong);
   cursor: pointer;
-  transition: background var(--duration-short) var(--easing-standard);
+  transition:
+    background var(--duration-short) var(--easing-standard),
+    transform var(--duration-instant) var(--easing-standard);
 }
 
 .diary-screen__fab:hover,
 .diary-screen__fab:focus-visible {
   background: var(--color-accent);
   opacity: 0.9;
+}
+
+/* Combines with the centering transform above rather than replacing it —
+   docs/design.md §4.2's tap feedback, on the app's most-tapped control. */
+.diary-screen__fab:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diary-screen__fab:active {
+    transform: translateX(-50%);
+  }
 }
 
 .diary-screen__fab svg {
@@ -241,6 +350,17 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  transition: transform var(--duration-instant) var(--easing-standard);
+}
+
+.diary-screen__bulk-button:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diary-screen__bulk-button:active {
+    transform: none;
+  }
 }
 
 .diary-screen__bulk-button--cancel {
@@ -259,7 +379,16 @@
   cursor: not-allowed;
 }
 
-/* SessionSavedToast — docs/design.md §1.1's one bounded exception. */
+/* SessionSavedToast — docs/design.md §1.1's one bounded exception, and the
+   one place the canvas reference's own "reward" treatment (glow burst +
+   sparkles + an emoji pop, canvas: `.toast`/`.toast-glow`/`.toast-sparkle`/
+   `.toast-emoji`) is worth carrying over: it exists to be noticed once,
+   nothing else on this screen needs to fight for the same attention.
+   `--duration-reward` (tokens.css) matches REWARD_ANIMATION_MS in
+   session-saved-toast.tsx exactly (the canvas reference also uses 1.8s) —
+   this is the toast's own one-shot lifecycle, its own named category, not
+   a reusable transition drawn from the instant/short/medium scale the
+   shared UI transitions elsewhere use. */
 .diary-screen__saved-toast {
   position: fixed;
   left: 50%;
@@ -274,27 +403,160 @@
   border: 1px solid var(--color-border);
   box-shadow: 0 4px 12px var(--color-border-strong);
   font-weight: 600;
-  animation: diary-screen__saved-toast-in var(--duration-medium)
-    var(--easing-decelerate);
+  overflow: visible;
+  /* Purely a status announcement, never a control — and the glow below
+     deliberately extends past this box's own bounds, which would
+     otherwise sit over (and intercept taps on) whatever's underneath for
+     the animation's duration (Copilot review, PR #24). */
+  pointer-events: none;
+  animation: diary-screen__saved-toast-in var(--duration-reward)
+    var(--easing-decelerate) forwards;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .diary-screen__saved-toast {
-    animation: none;
-  }
+.diary-screen__saved-toast-glow {
+  position: absolute;
+  inset: calc(-1 * var(--space-4));
+  border-radius: var(--radius-pill);
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--color-accent) 45%, transparent) 0%,
+    transparent 70%
+  );
+  animation: diary-screen__saved-toast-glow var(--duration-reward)
+    var(--easing-standard) forwards;
+  /* `position: fixed` on the toast itself already establishes a stacking
+     context, so this only needs to rank below its own siblings within it
+     — otherwise, as a positioned box, it paints above the in-flow "Session
+     saved" text regardless of DOM order, dimming it at the glow's peak
+     opacity (Copilot review, PR #24). Still paints above the toast's own
+     background, which is the floor of that same stacking context. */
+  z-index: -1;
+}
+
+.diary-screen__saved-toast-sparkle {
+  position: absolute;
+  font-size: 0.8125rem;
+  color: var(--color-accent);
+  animation: diary-screen__saved-toast-sparkle var(--duration-reward)
+    var(--easing-standard) forwards;
+}
+
+.diary-screen__saved-toast-sparkle--1 {
+  top: calc(-1 * var(--space-2));
+  left: var(--space-4);
+}
+
+.diary-screen__saved-toast-sparkle--2 {
+  bottom: calc(-1 * var(--space-2));
+  right: var(--space-4);
+  animation-delay: var(--duration-medium);
+  /* `forwards` alone only pins the *end* state during a delay — the
+     element still shows its un-animated default (opacity: 1) for the
+     delay's own duration, flashing visible immediately instead of
+     staying hidden until its delayed burst starts. `both` also applies
+     the 0% keyframe's opacity: 0 for that lead-in. */
+  animation-fill-mode: both;
 }
 
 .diary-screen__saved-toast-emoji {
+  /* `transform` has no effect on a non-replaced inline box — without this,
+     the scale/rotate keyframe below is silently ignored by every browser
+     and the emoji never actually pops (Copilot review, PR #24). */
+  display: inline-block;
+  position: relative;
   font-size: 1.25rem;
+  animation: diary-screen__saved-toast-emoji var(--duration-reward)
+    var(--easing-decelerate) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diary-screen__saved-toast,
+  .diary-screen__saved-toast-emoji {
+    animation: none;
+  }
+
+  /* Freezing their animation (like the toast/emoji above) would leave
+     these two at their un-animated default — fully opaque — instead of
+     the momentary burst they're meant to be, so a reduced-motion viewer
+     would see a static glow+sparkles hanging on the toast for its whole
+     --duration-reward lifetime. They're decoration only (`aria-hidden`), so hiding
+     them outright is the one bounded exception's actual boundary: text
+     and emoji still acknowledge the save, the fireworks just don't run
+     (Copilot review, PR #24). */
+  .diary-screen__saved-toast-glow,
+  .diary-screen__saved-toast-sparkle {
+    display: none;
+  }
 }
 
 @keyframes diary-screen__saved-toast-in {
-  from {
+  0% {
     opacity: 0;
-    transform: translate(-50%, -8px);
+    transform: translate(-50%, -8px) scale(0.9);
   }
-  to {
+  14% {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translate(-50%, 0) scale(1.04);
+  }
+  22% {
+    transform: translate(-50%, 0) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -4px) scale(0.97);
+  }
+}
+
+@keyframes diary-screen__saved-toast-glow {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  75% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes diary-screen__saved-toast-emoji {
+  0% {
+    transform: scale(0.6) rotate(-8deg);
+  }
+  20% {
+    transform: scale(1.3) rotate(4deg);
+  }
+  35% {
+    transform: scale(1.05) rotate(0deg);
+  }
+  80% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(0.9);
+  }
+}
+
+@keyframes diary-screen__saved-toast-sparkle {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  55% {
+    opacity: 0;
+    transform: scale(0.6);
   }
 }

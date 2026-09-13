@@ -160,8 +160,23 @@ this ADR's own "Neutral" consequence below, not something decided here.
   shape for multiple concurrent drafts on its own terms.
 - `docs/requirements.md` FR-3 / Invariant 2 text is unchanged — this ADR
   narrows what "logging" covers (recording a set) rather than reinterpreting
-  it, so no requirements-document edit is needed, only the spec 001
-  annotations below.
+  it. FR-1's own prose *does* change directly (not just annotated, unlike
+  spec 001 below): it previously described the day-rollover promotion and
+  the per-set save-acknowledgement this ADR retires, so leaving it as-is
+  would make the requirements document actively wrong, not merely silent.
+- `registerWorkout`/`recoverPendingDraft`/`discardPendingDraft` are queued
+  through `logging-store.ts`'s existing `enqueueDraftOp` (the same
+  mechanism PR #22's Copilot review already built for `persistDraft`),
+  rather than a new concurrency primitive: `registerWorkout` re-checks the
+  active draft's identity once its queued turn comes up (so a debounced
+  commit already in flight can't be resurrected, and a double-tap can't
+  register the same content twice); `recoverPendingDraft`/
+  `discardPendingDraft` each re-check `pendingDraft`'s identity the same
+  way, so whichever the user actually clicked first wins and the other
+  is a no-op. The Session's id is `draft.id` itself, not a freshly minted
+  one, so a retry after a partial failure (`saveSession` succeeds,
+  `discardDraft` doesn't) upserts the same `Session` instead of
+  duplicating it (Copilot review, PR #25).
 - `specs/001-log-a-session/spec.md`'s User Story 1 Acceptance Scenarios
   1–3 and FR-024 (the automatic-restore, day-rollover-promotion
   behavior) and `data-model.md`'s `openLoggingForm` row are annotated as

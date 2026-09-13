@@ -170,7 +170,7 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
     // the user having already recovered it (the way an earlier visit to
     // LoggingScreen before navigating here would have), so the active
     // `draft` is the one referencing `ex-1` that this regression targets.
-    useLoggingSession.getState().recoverPendingDraft();
+    await useLoggingSession.getState().recoverPendingDraft();
 
     render(<ExerciseCatalogueScreen />);
 

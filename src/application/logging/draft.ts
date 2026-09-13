@@ -40,7 +40,7 @@ import type {
 export type { LoggingDraft, DraftBlock, DraftExerciseEntry, DraftSet };
 
 /**
- * FR-024/FR-027 (ADR-0008): whether the draft has anything worth keeping —
+ * FR-024/FR-027 (ADR-0009): whether the draft has anything worth keeping —
  * the same threshold that gates both the first `saveDraft` call (nothing
  * is persisted until this is true) and the "Log workout" control's own
  * availability, so "worth saving as a draft" and "worth registering as a
@@ -77,6 +77,7 @@ export function draftToSession(draft: LoggingDraft, id: SessionId): Session {
       // `block.loose` is deliberately dropped here — presentation-only,
       // never part of the persisted `Block` (see `domain/block.ts`).
       type: block.type,
+      ...(block.rounds !== undefined ? { rounds: block.rounds } : {}),
       exercises: block.exercises.map((entry) => ({
         exerciseId: entry.exerciseId,
         notes: entry.notes,
@@ -124,6 +125,7 @@ export function toPersistableDraft(draft: LoggingDraft): LoggingDraft {
       id: block.id,
       ...(block.name !== undefined ? { name: block.name } : {}),
       type: block.type,
+      ...(block.rounds !== undefined ? { rounds: block.rounds } : {}),
       exercises: block.exercises,
     })),
   };
@@ -131,7 +133,7 @@ export function toPersistableDraft(draft: LoggingDraft): LoggingDraft {
 
 /**
  * Repoints every reference to `fromId` onto `toId` in the *active,
- * in-memory* draft (ADR-0008) — the logging store's own counterpart to
+ * in-memory* draft (ADR-0009) — the logging store's own counterpart to
  * `infrastructure/draft-cascade.ts`'s `repointDraftExerciseId`, which only
  * ever touches the *stored* draft (`StoragePort.mergeExercises`'s own
  * contract). `application/` cannot import `infrastructure/`
@@ -425,6 +427,7 @@ function withoutName(block: DraftBlock): DraftBlock {
   const rest: DraftBlock = {
     id: block.id,
     type: block.type,
+    ...(block.rounds !== undefined ? { rounds: block.rounds } : {}),
     exercises: block.exercises,
   };
   return rest;
@@ -445,6 +448,43 @@ export function renameBlock(
           : withoutName(block),
     ),
   };
+}
+
+/**
+ * ADR-0008: sets (or clears, with `undefined`) a block's target round
+ * count. Unlike `addSet`'s `AddSetInput`, this never throws for an
+ * out-of-range value — a draft may hold transient, not-yet-valid state
+ * (this module's own doc comment) — `domain/block.ts`'s `createBlock`
+ * rejects a non-positive-integer `rounds` at promotion time
+ * (`draftToSession`), the same point every other draft-only laxness gets
+ * caught.
+ */
+export function setBlockRounds(
+  draft: LoggingDraft,
+  blockId: string,
+  rounds: number | undefined,
+): LoggingDraft {
+  return {
+    ...draft,
+    blocks: draft.blocks.map((block) =>
+      block.id !== blockId
+        ? block
+        : rounds !== undefined
+          ? { ...block, rounds }
+          : withoutRounds(block),
+    ),
+  };
+}
+
+function withoutRounds(block: DraftBlock): DraftBlock {
+  const rest: DraftBlock = {
+    id: block.id,
+    ...(block.name !== undefined ? { name: block.name } : {}),
+    ...(block.loose !== undefined ? { loose: block.loose } : {}),
+    type: block.type,
+    exercises: block.exercises,
+  };
+  return rest;
 }
 
 /** FR-006: moves an exercise entry within one block, by list position. */

@@ -21,6 +21,19 @@
   color: inherit;
   text-decoration: none;
   margin-bottom: var(--space-2);
+  transition: transform var(--duration-instant) var(--easing-standard);
+}
+
+/* Press feedback (docs/design.md §4.5 — every tappable control scales
+   down slightly on press); this card had none at all. */
+.insight-card:active {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insight-card:active {
+    transform: none;
+  }
 }
 
 .insight-card__claim {

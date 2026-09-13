@@ -16,27 +16,33 @@
  * underlying store (spec 003 quickstart.md's "a fresh script context, not
  * just a re-render").
  *
- * Schema-version scope note: `CURRENT_SCHEMA_VERSION` is 2 as of ADR-0006
- * (Exercise gained `defaultVolumeKind`/`trackEffort`), so a real v1->v2
- * `decideSchemaAction` "migrate" transition now exists in both real
- * adapters (`#migrateExerciseTemplateDefaults`). It has no scenario in
- * *this* suite: `setSchemaVersion` is the only public, schema-check-free
- * way to seed a stale version, and every other `StoragePort` write
- * (including `saveExercise`) runs `#ensureSchemaChecked` first — so a
- * legacy-shaped record saved through this harness would trigger the
- * migrate transition (against whatever already exists, empty here)
- * *before* that same call's own write lands, never producing a genuinely
- * pre-migration stored record to migrate. `decideSchemaAction` itself
- * stays proven at the pure-function level,
+ * Schema-version scope note: `CURRENT_SCHEMA_VERSION` is 3 — v1->v2
+ * (ADR-0006: Exercise gained `defaultVolumeKind`/`trackEffort`) backfills
+ * every pre-existing Exercise; v2->v3 (ADR-0008: Block gained `rounds`)
+ * needs no backfill at all, since `rounds` is optional everywhere it's
+ * read and a pre-existing Block correctly has none — "not specified" *is*
+ * its correct value, not a gap. So only v1->v2 has a real
+ * `decideSchemaAction` "migrate" transition to exercise
+ * (`#migrateExerciseTemplateDefaults`, in both real adapters). It has no
+ * scenario in *this* suite: `setSchemaVersion` is the only public,
+ * schema-check-free way to seed a stale version, and every other
+ * `StoragePort` write (including `saveExercise`) runs
+ * `#ensureSchemaChecked` first — so a legacy-shaped record saved through
+ * this harness would trigger the migrate transition (against whatever
+ * already exists, empty here) *before* that same call's own write lands,
+ * never producing a genuinely pre-migration stored record to migrate.
+ * `decideSchemaAction` itself stays proven at the pure-function level,
  * `test/unit/infrastructure/schema-version.test.ts`, against synthetic
  * current/stored fixtures. This suite proves the three adapter-level
  * cases reachable through the public port: never-initialized, same,
- * newer.
+ * newer — plus (US1-1, below) that a Block's `rounds` round-trips through
+ * both real adapters unchanged.
  *
  * The actual v1->v2 migration — seeding a genuinely pre-migration record
  * below the port and confirming it comes back backfilled with the stored
- * version bumped — is instead covered directly against each real
- * adapter's own underlying storage: see `window.__runMigrationTest` in
+ * version bumped (now landing at v3, the current version, not v2) — is
+ * instead covered directly against each real adapter's own underlying
+ * storage: see `window.__runMigrationTest` in
  * `test/e2e/fixtures/storage-harness.ts` and its callers in
  * `test/e2e/indexed-db-adapter.contract.spec.ts` /
  * `test/e2e/file-system-adapter.contract.spec.ts`.
@@ -142,7 +148,11 @@ const sessionScenarios: Scenario[] = [
       const session = makeSession({
         blocks: [
           {
-            type: 'straightSets',
+            type: 'circuit',
+            // ADR-0008: proves `rounds` round-trips through both real
+            // adapters (IndexedDB's structured clone, File System's JSON
+            // serialization), not just the pure application-layer mapping.
+            rounds: 3,
             exercises: [
               {
                 exerciseId: 'ex-1' as ExerciseId,

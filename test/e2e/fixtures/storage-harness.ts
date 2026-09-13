@@ -38,7 +38,12 @@ import {
 import type { StoragePort } from '../../../src/application/ports/storage-port';
 import { StorageError } from '../../../src/application/errors';
 import type { Exercise } from '../../../src/domain/exercise';
-import type { ExerciseId } from '../../../src/domain/ids';
+import type { Session } from '../../../src/domain/session';
+import type { ExerciseId, SessionId } from '../../../src/domain/ids';
+import {
+  SESSIONS_DIR,
+  sessionFileName,
+} from '../../../src/infrastructure/file-system/layout';
 
 type AdapterKind = 'indexed-db' | 'file-system';
 
@@ -363,6 +368,104 @@ async function runMigrationTestFileSystemFreshAcquire(): Promise<MigrationTestRe
   };
 }
 
+export interface V2ToV3MigrationResult {
+  storedSchemaVersion: number;
+  /** A v2 Session's Block genuinely has no `rounds` field at all (not
+   * merely `undefined`) — ADR-0008 requires that absence to stay exactly
+   * that once the store reports schemaVersion 3, never backfilled to some
+   * default. */
+  roundsStillAbsent: boolean;
+  blockNamePreserved: boolean;
+}
+
+/** A genuine pre-ADR-0008 v2 Session shape: a Block with no `rounds` key. */
+const V2_SESSION = {
+  id: 'v2-session-1',
+  dateTime: '2026-01-01T10:00:00.000Z',
+  notes: '',
+  blocks: [
+    {
+      name: 'Legs',
+      type: 'straightSets',
+      exercises: [],
+    },
+  ],
+};
+
+async function runV2ToV3MigrationTestIndexedDb(): Promise<V2ToV3MigrationResult> {
+  const db = new GymLogDatabase(uniqueName('migration-v2-idb'));
+  await db.sessions.put(V2_SESSION as unknown as Session);
+  await db.meta.put({ key: SCHEMA_VERSION_ROW_KEY, value: 2 });
+
+  const adapter = new IndexedDbStorageAdapter(db);
+  const migrated = await adapter.getSession('v2-session-1' as SessionId);
+  const storedSchemaVersion = await adapter.getSchemaVersion();
+  db.close();
+
+  return {
+    storedSchemaVersion,
+    roundsStillAbsent:
+      migrated?.blocks[0] !== undefined && !('rounds' in migrated.blocks[0]),
+    blockNamePreserved: migrated?.blocks[0]?.name === 'Legs',
+  };
+}
+
+async function runV2ToV3MigrationTestFileSystem(): Promise<V2ToV3MigrationResult> {
+  const opfsRoot = await navigator.storage.getDirectory();
+  const dirName = uniqueName('migration-v2-fs');
+  const storeDir = await opfsRoot.getDirectoryHandle(dirName, {
+    create: true,
+  });
+
+  const sessionsDir = await storeDir.getDirectoryHandle(SESSIONS_DIR, {
+    create: true,
+  });
+  const sessionHandle = await sessionsDir.getFileHandle(
+    sessionFileName('v2-session-1' as SessionId),
+    { create: true },
+  );
+  const sessionWritable = await sessionHandle.createWritable();
+  await sessionWritable.write(JSON.stringify(V2_SESSION));
+  await sessionWritable.close();
+
+  const metaHandle = await storeDir.getFileHandle('_meta.json', {
+    create: true,
+  });
+  const metaWritable = await metaHandle.createWritable();
+  await metaWritable.write(JSON.stringify({ schemaVersion: 2 }));
+  await metaWritable.close();
+
+  const db = new GymLogDatabase(uniqueName('migration-v2-fs-handles'));
+  const adapter = new FileSystemStorageAdapter(
+    async () => storeDir,
+    db,
+    storeDir,
+  );
+
+  const migrated = await adapter.getSession('v2-session-1' as SessionId);
+  // A real write is what actually migrates the stored `_meta.json` version
+  // (see `runMigrationTestFileSystem`'s own doc comment).
+  await adapter.saveBandLabels([]);
+  const storedSchemaVersion = await adapter.getSchemaVersion();
+
+  db.close();
+  await opfsRoot
+    .removeEntry(dirName, { recursive: true })
+    .catch(() => undefined);
+
+  return {
+    storedSchemaVersion,
+    roundsStillAbsent:
+      migrated?.blocks[0] !== undefined && !('rounds' in migrated.blocks[0]),
+    blockNamePreserved: migrated?.blocks[0]?.name === 'Legs',
+  };
+}
+
+window.__runV2ToV3MigrationTest = (adapterKind) =>
+  adapterKind === 'indexed-db'
+    ? runV2ToV3MigrationTestIndexedDb()
+    : runV2ToV3MigrationTestFileSystem();
+
 window.__runMigrationTest = (adapterKind) =>
   adapterKind === 'indexed-db'
     ? runMigrationTestIndexedDb()
@@ -542,6 +645,9 @@ declare global {
       adapterKind: AdapterKind,
     ) => Promise<MigrationTestResult>;
     __runMigrationTestFreshAcquire: () => Promise<MigrationTestResult>;
+    __runV2ToV3MigrationTest: (
+      adapterKind: AdapterKind,
+    ) => Promise<V2ToV3MigrationResult>;
     __runQueuedExerciseMergeTest: () => Promise<QueuedExerciseMergeResult>;
     __runQueuedMergeTombstoneTest: () => Promise<QueuedMergeTombstoneResult>;
   }

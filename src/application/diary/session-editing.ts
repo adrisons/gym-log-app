@@ -46,6 +46,7 @@ export function sessionToEditable(session: Session): EditableSession {
       // FR-2-compliant choice for a block whose original "explicit vs.
       // implicit" provenance wasn't persisted.
       type: block.type,
+      ...(block.rounds !== undefined ? { rounds: block.rounds } : {}),
       exercises: block.exercises.map((entry): DraftExerciseEntry => ({
         id: newId(),
         exerciseId: entry.exerciseId,
@@ -86,6 +87,7 @@ export function editableToSession(
         // `block.loose` is deliberately dropped here — presentation-only,
         // never part of the persisted `Block` (see `domain/block.ts`).
         type: block.type,
+        ...(block.rounds !== undefined ? { rounds: block.rounds } : {}),
         exercises: block.exercises.map((entry) => ({
           exerciseId: entry.exerciseId,
           notes: entry.notes,

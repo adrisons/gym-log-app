@@ -25,19 +25,35 @@
  *
  * Collapse/expand (`docs/requirements.md` FR-2) is local UI state, reset
  * on remount — never persisted as part of the Session, and independent of
- * the block's own 5-second delete-undo window. Collapsing hides the body
- * with the `hidden` attribute rather than omitting it from the tree: a
+ * the block's own 5-second delete-undo window. The body always stays
+ * mounted, collapsed or not — never conditionally rendered — because a
  * `SetRow` inside can have a commit debounced-but-not-yet-fired
- * (ADR-0007), and that timer is deliberately not cancelled on unmount —
- * unmounting it here by conditionally rendering the body would have
- * discarded that in-flight `SetRow` instance's own local state (though not
- * the pending commit itself) the moment a block collapses, which is a
+ * (ADR-0007), and that timer is deliberately not cancelled on unmount;
+ * unmounting the body here would discard that in-flight `SetRow`
+ * instance's own local state the moment a block collapses, which is a
  * mere visual fold, not the "navigated away" case ADR-0007's guarantee is
- * about.
+ * about. Collapsing animates the body's height to zero (`docs/design.md`
+ * §4.1 — this answers "where did that content go") via a CSS grid-rows
+ * transition rather than snapping with the `hidden` attribute, which
+ * can't be animated (its `display: none` applies instantly). `inert`
+ * takes over `hidden`'s job of pulling collapsed content out of the tab
+ * order and off assistive tech while it's visually clipped — the grid
+ * trick alone only hides it visually, `inert` alone doesn't animate, the
+ * two together are what a collapsed-but-still-technically-present region
+ * actually needs.
+ *
+ * `rounds` (ADR-0008) is a target round count for the whole block — always
+ * visible and editable, even while collapsed (it's the block's own plan,
+ * not part of the exercises/sets content collapsing hides), and with no
+ * separate edit-mode toggle: unlike the name field, one small always-shown
+ * number input doesn't compete with the title for space. Commits
+ * immediately on a valid change (FR-1's "no Save button" applies here
+ * too); an empty field means "not specified", never `0`.
  */
-import { useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react';
+import type { ReactNode, TransitionEvent } from 'react';
 import { Icon } from '@/presentation/design/icons';
+import { prefersReducedMotion } from '@/presentation/design/motion';
 import { OverflowMenu } from './overflow-menu';
 import './logging.css';
 
@@ -46,7 +62,9 @@ export interface BlockCardProps {
   hasName: boolean;
   subtitle?: string;
   bare?: boolean;
+  rounds?: number | undefined;
   onRename: (name: string | undefined) => void;
+  onSetRounds: (rounds: number | undefined) => void;
   onDelete: () => void;
   children: ReactNode;
   footer?: ReactNode;
@@ -57,7 +75,9 @@ export function BlockCard({
   hasName,
   subtitle,
   bare = false,
+  rounds,
   onRename,
+  onSetRounds,
   onDelete,
   children,
   footer,
@@ -65,6 +85,55 @@ export function BlockCard({
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState(hasName ? displayName : '');
   const [collapsed, setCollapsed] = useState(false);
+  // Keeps `.block-card__body` clipped (and the region `inert`, below) for
+  // the duration of the collapse's own grid-template-rows transition,
+  // expanding included — toggling `collapsed` alone drops overflow:hidden
+  // (and `inert`) the instant `--collapsed` is removed, while the row is
+  // still animating open, so an exercise/set's full-height content can
+  // briefly paint outside the still-growing track and overlap the header,
+  // and focus/assistive tech can enter a region that isn't actually
+  // visible yet (Copilot review, PR #22). Cleared by the wrapper's own
+  // `onTransitionEnd` rather than a timeout duplicating the CSS
+  // transition's duration as a JS literal — nothing to keep in sync if
+  // that duration ever changes. Never set true under
+  // `prefers-reduced-motion` in the first place, since no transition
+  // fires there to end and clear it — leaving it permanently true would
+  // reintroduce the very overflow-menu clipping bug this mechanism
+  // replaced.
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // If the OS preference flips to reduced-motion mid-transition, the CSS
+  // transition `handleCollapseTransitionEnd` normally waits on stops
+  // firing at all — leaving `isTransitioning` (and the `inert` it drives)
+  // stuck true forever, permanently hiding this block's content from
+  // focus/assistive tech (Copilot review, PR #22).
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setIsTransitioning(false);
+      }
+    };
+    query.addEventListener('change', handleChange);
+    return () => query.removeEventListener('change', handleChange);
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((current) => !current);
+    if (!prefersReducedMotion()) {
+      setIsTransitioning(true);
+    }
+  }
+
+  function handleCollapseTransitionEnd(event: TransitionEvent<HTMLDivElement>) {
+    // `.block-card__collapse` transitions both `grid-template-rows` and
+    // `margin-top` in parallel (see logging.css) — react to just one so
+    // this doesn't fire twice per toggle.
+    if (event.propertyName === 'grid-template-rows') {
+      setIsTransitioning(false);
+    }
+  }
 
   if (bare) {
     return (
@@ -76,7 +145,10 @@ export function BlockCard({
   }
 
   return (
-    <section className="block-card" aria-label={displayName}>
+    <section
+      className="block-card block-card--collapsible"
+      aria-label={displayName}
+    >
       <div className="block-card__header">
         {editing ? (
           <form
@@ -113,7 +185,7 @@ export function BlockCard({
               aria-label={
                 collapsed ? `Expand ${displayName}` : `Collapse ${displayName}`
               }
-              onClick={() => setCollapsed((current) => !current)}
+              onClick={toggleCollapsed}
             >
               <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} />
             </button>
@@ -164,9 +236,41 @@ export function BlockCard({
           </>
         )}
       </div>
-      <div className="block-card__body" hidden={collapsed}>
-        {children}
-        {footer}
+      <label className="block-card__rounds">
+        <span>Rounds</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          step={1}
+          className="logging-field-input"
+          value={rounds ?? ''}
+          onChange={(event) => {
+            const raw = event.target.value;
+            if (raw === '') {
+              onSetRounds(undefined);
+              return;
+            }
+            // `Number`, not `parseInt` — a typed "2.5" must fail the
+            // integer check below and be rejected (reverting to whatever
+            // `rounds` already held), not get silently floor-truncated to
+            // a value the user never actually entered.
+            const parsed = Number(raw);
+            if (Number.isInteger(parsed) && parsed >= 1) {
+              onSetRounds(parsed);
+            }
+          }}
+        />
+      </label>
+      <div
+        className={`block-card__collapse${collapsed ? ' block-card__collapse--collapsed' : ''}${isTransitioning ? ' block-card__collapse--transitioning' : ''}`}
+        inert={collapsed || isTransitioning}
+        onTransitionEnd={handleCollapseTransitionEnd}
+      >
+        <div className="block-card__body">
+          {children}
+          {footer}
+        </div>
       </div>
     </section>
   );

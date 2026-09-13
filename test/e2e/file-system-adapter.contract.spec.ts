@@ -59,11 +59,32 @@ test('ADR-0006 v1->v2 migration backfills a legacy Exercise and bumps the stored
   expect(outcome.defaultLoadTypePreserved).toBe(true);
   expect(outcome.defaultVolumeKind).toBe('reps');
   expect(outcome.trackEffort).toBe(false);
-  expect(outcome.storedSchemaVersion).toBe(2);
+  // CURRENT_SCHEMA_VERSION has since advanced to 3 (ADR-0008); a legacy v1
+  // record still runs this same v1->v2 backfill on its way up and lands at
+  // whatever the current version now is — there is no v2->v3 data rewrite
+  // to add (ADR-0008: `Block.rounds` needs none).
+  expect(outcome.storedSchemaVersion).toBe(3);
   // The port's own read-time normalization would report a correctly
   // shaped record either way — this is the field that actually tells a
   // real physical migration apart from that safety net alone.
   expect(outcome.rawFileMigrated).toBe(true);
+});
+
+test('ADR-0008 v2->v3: a Block with no `rounds` upgrades cleanly, with rounds left absent', async ({
+  page,
+  browserName,
+}) => {
+  test.setTimeout(90_000);
+  test.skip(browserName !== 'chromium', 'File System Access is chromium-only.');
+
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const outcome = await page.evaluate(() =>
+    window.__runV2ToV3MigrationTest('file-system'),
+  );
+
+  expect(outcome.blockNamePreserved).toBe(true);
+  expect(outcome.roundsStillAbsent).toBe(true);
+  expect(outcome.storedSchemaVersion).toBe(3);
 });
 
 test('ADR-0006 migration survives a gesture-less first write followed by a real handle acquisition against a pre-existing v1 directory', async ({
@@ -82,7 +103,9 @@ test('ADR-0006 migration survives a gesture-less first write followed by a real 
   expect(outcome.defaultLoadTypePreserved).toBe(true);
   expect(outcome.defaultVolumeKind).toBe('reps');
   expect(outcome.trackEffort).toBe(false);
-  expect(outcome.storedSchemaVersion).toBe(2);
+  // CURRENT_SCHEMA_VERSION has since advanced to 3 (ADR-0008); see the
+  // sibling test above for why this lands at 3, not 2.
+  expect(outcome.storedSchemaVersion).toBe(3);
   // The port's own read-time normalization would report a correctly
   // shaped record either way — this is the field that actually tells a
   // real physical migration apart from that safety net alone.

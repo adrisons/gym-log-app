@@ -72,7 +72,7 @@ the neutral roles only (`docs/design.md` §3.1; `docs/requirements.md` FR-10).
 | Category | Contents (names; values may be provisional) |
 |---|---|
 | Radii | `--radius-sm`, `--radius-md`, `--radius-lg` — gentle rounding on interactive surfaces (`docs/design.md` §1.2) |
-| Durations | `--duration-instant`, `--duration-short`, `--duration-medium` — named categories, not magic numbers (`docs/design.md` rule 2) |
+| Durations | `--duration-instant`, `--duration-short`, `--duration-medium` — named categories, not magic numbers (`docs/design.md` rule 2). `--duration-reward` is a fourth, deliberately narrow addition: the one-shot save-toast "reward" animation's own lifecycle (`docs/design.md` §1.1's bounded exception), not a reusable transition length — never reach for it outside that one component. |
 | Easings | `--easing-standard`, `--easing-decelerate`, `--easing-accelerate` — named behaviours |
 | Spacing | `--space-1` … `--space-6` (or a named scale) — spacing roles, not literals (`docs/development-principles.md` §5) |
 

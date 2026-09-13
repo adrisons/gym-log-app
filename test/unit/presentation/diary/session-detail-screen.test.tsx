@@ -83,6 +83,66 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     });
   });
 
+  it("edits and clears a block's rounds, persisting each change via saveSession (ADR-0008, Copilot review regression)", async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const sessionId = 's1' as SessionId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [
+          createBlock({
+            type: 'circuit',
+            rounds: 3,
+            exercises: [{ exerciseId, notes: '', sets: [] }],
+          }),
+        ],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <Routes>
+          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Squat' }),
+      ).toBeInTheDocument();
+    });
+    const roundsInput = screen.getByLabelText('Rounds');
+    expect(roundsInput).toHaveValue(3);
+
+    await userEvent.clear(roundsInput);
+    await userEvent.type(roundsInput, '5');
+    await waitFor(async () => {
+      const saved = await storage.getSession(sessionId);
+      expect(saved?.blocks[0]?.rounds).toBe(5);
+    });
+
+    await userEvent.clear(roundsInput);
+    await waitFor(async () => {
+      const saved = await storage.getSession(sessionId);
+      expect(saved?.blocks[0]).not.toHaveProperty('rounds');
+    });
+  });
+
   it('adding an exercise via the bottom control creates and persists a new block when the last block is named', async () => {
     const storage = new InMemoryStorage();
     const exerciseId = 'ex-1' as ExerciseId;

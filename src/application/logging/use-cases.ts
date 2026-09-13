@@ -12,7 +12,7 @@ import type {
   LoggingDraft,
 } from '@/application/ports/storage-port';
 import { createDraft, draftToSession } from '@/application/logging/draft';
-import { newSessionId, newExerciseId } from '@/application/logging/ids';
+import { newExerciseId } from '@/application/logging/ids';
 import { matchExercise, normalize } from '@/shared/fuzzy-match';
 import { renameExercise, deleteExercise } from '@/domain/exercise';
 import type { Exercise } from '@/domain/exercise';
@@ -42,7 +42,7 @@ export type { SessionId };
 export { normalize };
 
 /**
- * FR-001, FR-028 (ADR-0008). Opening the logging form never creates or
+ * FR-001, FR-028 (ADR-0009). Opening the logging form never creates or
  * persists anything by itself: `draft` is always a brand-new, in-memory-
  * only `LoggingDraft` — the caller (the logging store) only writes it to
  * storage once the user's own first edit changes it. `pendingDraft` is
@@ -70,18 +70,29 @@ export async function discardDraft(storage: StoragePort): Promise<void> {
 }
 
 /**
- * FR-027 (ADR-0008): the one and only way a `Session` is created from the
+ * FR-027 (ADR-0009): the one and only way a `Session` is created from the
  * logging screen. Converts `draft` to a real `Session` (`draftToSession`),
  * saves it, clears whatever draft is stored (there is at most one), and
  * returns a brand-new, in-memory-only draft for the caller to make its new
  * active one — the same "fresh, unpersisted" contract `openLoggingForm`
  * itself returns, so the screen is immediately ready for the next workout.
+ *
+ * The Session's id is `draft.id` itself (cast, not a fresh
+ * `newSessionId()`) — deliberately, so this call is idempotent under
+ * retry: `saveSession` is a plain upsert keyed by id in every adapter
+ * (Copilot review, PR #25). If `saveSession` succeeds but the following
+ * `discardDraft` fails (a real, if rare, local-storage failure), the
+ * draft is left stored and could be recovered and registered again —
+ * with a freshly-minted id, that would create a second, duplicate
+ * `Session` for the same workout; keyed off the draft's own stable id
+ * instead, a retry just re-saves the same `Session` record rather than
+ * duplicating it.
  */
 export async function registerWorkout(
   storage: StoragePort,
   draft: LoggingDraft,
 ): Promise<{ session: Session; draft: LoggingDraft }> {
-  const session = draftToSession(draft, newSessionId());
+  const session = draftToSession(draft, draft.id as SessionId);
   await storage.saveSession(session);
   await storage.discardDraft();
   return { session, draft: createDraft(new Date().toISOString()) };

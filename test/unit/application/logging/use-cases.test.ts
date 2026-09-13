@@ -25,7 +25,7 @@ import type { ExerciseId, SessionId } from '@/domain/ids';
 // searchExercises/createExercise are US1. Every other use case in this
 // file is added by later phases (US3/US2/US4) — see tasks.md.
 
-describe('openLoggingForm (FR-001, FR-024, FR-028; ADR-0008)', () => {
+describe('openLoggingForm (FR-001, FR-024, FR-028; ADR-0009)', () => {
   let storage: InMemoryStorage;
 
   beforeEach(() => {
@@ -99,7 +99,7 @@ describe('discardDraft (FR-024, FR-028, Acceptance Scenario 3)', () => {
   });
 });
 
-describe('registerWorkout (FR-027; ADR-0008)', () => {
+describe('registerWorkout (FR-027; ADR-0009)', () => {
   it('converts the draft to a Session, clears the stored draft, and returns a fresh unpersisted draft', async () => {
     const storage = new InMemoryStorage();
     const draft = addBlock(
@@ -140,6 +140,27 @@ describe('registerWorkout (FR-027; ADR-0008)', () => {
     await registerWorkout(storage, active);
 
     expect(await storage.getDraft()).toBeUndefined();
+  });
+
+  it('is retry-safe: calling it twice on the same draft upserts one Session, never two (Copilot review, PR #25)', async () => {
+    const storage = new InMemoryStorage();
+    const draft = addBlock(
+      createDraft('2026-09-11T08:00:00.000Z'),
+      undefined,
+      'straightSets',
+    );
+
+    // Simulates a `discardDraft` failure on the first attempt: the caller
+    // sees a rejection and the same `draft` is registered again.
+    const first = await registerWorkout(storage, draft);
+    const second = await registerWorkout(storage, draft);
+
+    expect(second.session.id).toBe(first.session.id);
+    const sessions = await storage.listSessions({
+      from: '2000-01-01',
+      to: '2100-01-01',
+    });
+    expect(sessions).toHaveLength(1);
   });
 });
 
