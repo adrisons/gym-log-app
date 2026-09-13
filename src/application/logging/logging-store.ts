@@ -173,26 +173,47 @@ export interface LoggingSessionState {
 
 export const useLoggingSession = create<LoggingSessionState>((set, get) => {
   // Every draft-mutating action below persists through this one chain
-  // instead of calling `storage.saveDraft` directly — two reasons:
+  // instead of calling `storage.saveDraft` directly, and `initialize()`'s
+  // own read (`readDraft`, below) is queued onto it too instead of calling
+  // `openLoggingForm` directly — three reasons:
   // (1) it serializes writes against each other, so a slower earlier write
-  // can never finish after (and clobber) a faster later one; (2)
-  // `initialize()` awaits whatever is currently chained here before
-  // trusting its own storage read, since a write already in flight when
-  // that read starts (e.g. ADR-0007's debounce timer, which outlives
-  // unmount) can otherwise still be unpersisted when the read runs and
-  // hand back a pre-write snapshot even though nothing further mutates
-  // `draft` during the read itself (Copilot review, PR #22).
+  // can never finish after (and clobber) a faster later one;
+  // (2) `openLoggingForm` can itself call `storage.saveDraft` when it
+  // rotates a stale draft into a `Session` and starts a new one for today
+  // — queuing it here keeps that rotation from interleaving with an
+  // in-flight write for the *old* draft (e.g. ADR-0007's debounce timer,
+  // which outlives unmount) instead of running against storage
+  // independently and unordered (Copilot review, PR #22);
+  // (3) `initialize()` no longer needs its own separate wait before
+  // trusting `readDraft`'s result — queuing it here already orders it
+  // after whatever write was already pending, which a before/after
+  // identity check on `draft` alone couldn't guarantee on its own.
+  //
+  // `pendingDraftWrite` itself is kept *always-settled* (the `.catch(() =>
+  // {})` below): if it instead held the last write's own promise, one
+  // rejected write would leave every later `persistDraft`/`readDraft` call
+  // — including a future `initialize()` — permanently awaiting a rejected
+  // promise (Copilot review, PR #22). The caller-facing promise each
+  // function returns (`attempt`) still rejects normally.
   let pendingDraftWrite: Promise<void> = Promise.resolve();
   const persistDraft = (
     storage: StoragePort,
     draft: LoggingDraft,
   ): Promise<void> => {
-    const next = pendingDraftWrite.then(
+    const attempt = pendingDraftWrite.then(
       () => storage.saveDraft(draft),
       () => storage.saveDraft(draft),
     );
-    pendingDraftWrite = next;
-    return next;
+    pendingDraftWrite = attempt.catch(() => {});
+    return attempt;
+  };
+  const readDraft = (storage: StoragePort): Promise<LoggingDraft> => {
+    const attempt = pendingDraftWrite.then(() => openLoggingForm(storage));
+    pendingDraftWrite = attempt.then(
+      () => undefined,
+      () => undefined,
+    );
+    return attempt;
   };
 
   /**
@@ -268,16 +289,15 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       const draftBeforeReads = get().draft;
       const catalogueBeforeReads = get().catalogue;
       const bandLabelsBeforeReads = get().bandLabels;
-      // Wait out whatever draft write is already in flight *before*
-      // reading — a debounced commit (ADR-0007's timer outlives unmount)
-      // can be mid-`storage.saveDraft` right as this runs, and the read
-      // below can otherwise race it and return the pre-write snapshot even
-      // though nothing further mutates `draft` in our own window, which
-      // the before/after identity check right after can't catch on its own
-      // (Copilot review, PR #22).
-      await pendingDraftWrite;
+      // `readDraft` (not `openLoggingForm` directly) queues this read
+      // behind whatever draft write is already pending — a debounced
+      // commit (ADR-0007's timer outlives unmount) can be mid-write right
+      // as this runs, and reading around it can otherwise return the
+      // pre-write snapshot even though nothing further mutates `draft` in
+      // our own window, which the before/after identity check right after
+      // can't catch on its own (Copilot review, PR #22).
       const [draft, catalogue, sessions, bandLabels] = await Promise.all([
-        openLoggingForm(storage),
+        readDraft(storage),
         storage.listExercises(),
         storage.listSessions(FULL_RANGE),
         storage.listBandLabels(),

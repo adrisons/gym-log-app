@@ -47,6 +47,26 @@
   gap: var(--space-1);
 }
 
+/* Press feedback (docs/design.md §4.5 — every tappable control scales
+   down slightly on press); this link had none at all. `inline-block` is
+   required, not decorative — `transform` has no effect on a non-replaced
+   inline element like a bare `<a>` (Copilot review, PR #24's emoji-pop
+   fix hit the same thing). */
+.diary-screen__jump-nearest-link {
+  display: inline-block;
+  transition: transform var(--duration-instant) var(--easing-standard);
+}
+
+.diary-screen__jump-nearest-link:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diary-screen__jump-nearest-link:active {
+    transform: none;
+  }
+}
+
 /* Keyboard/screen-reader entry point into bulk-select — the long press on
    a row has no keyboard equivalent (`diary-screen.tsx`'s `startSelection`). */
 .diary-screen__select-button {

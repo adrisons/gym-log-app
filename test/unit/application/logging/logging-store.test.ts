@@ -107,6 +107,44 @@ describe('useLoggingSession (research.md §5)', () => {
       useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets;
     expect(finalSets.map((s) => s.id)).toContain(committedSetId);
   });
+
+  it('a rejected draft write does not permanently break later initialize()/persistDraft calls (Copilot review, PR #22)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+
+    const saveDraftSpy = vi
+      .spyOn(storage, 'saveDraft')
+      .mockImplementationOnce(() =>
+        Promise.reject(new Error('simulated storage failure')),
+      );
+
+    // The failing call's own caller still sees the rejection...
+    await expect(
+      useLoggingSession.getState().addSet(entryId, {
+        volume: { kind: 'reps', count: 8 },
+        load: { kind: 'none' },
+        setKind: 'working',
+      }),
+    ).rejects.toThrow('simulated storage failure');
+
+    saveDraftSpy.mockRestore();
+
+    // ...but the shared write queue itself must not stay poisoned by it —
+    // otherwise every later persistDraft/initialize() call would await a
+    // permanently rejected promise instead of the app's own next action.
+    await expect(
+      useLoggingSession.getState().initialize(),
+    ).resolves.toBeUndefined();
+    expect(useLoggingSession.getState().draft).toBeDefined();
+
+    await expect(
+      useLoggingSession.getState().addExerciseEntry('ex-2' as ExerciseId),
+    ).resolves.toBeUndefined();
+  });
 });
 
 describe('useLoggingSession undo stack (FR-004, FR-023)', () => {

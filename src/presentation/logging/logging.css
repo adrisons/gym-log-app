@@ -267,13 +267,26 @@
    dense list, a stat line under the block name, exercises as clearly
    separated cards — while keeping the overflow menu, never the inline
    link-row alternative from that same exploration. */
+/* Also the dialog root for `ExerciseTemplatePanel`/`ExerciseCataloguePanel`
+   — a shared flex-column card shell, not exclusive to the collapsible
+   block card below. `gap` spaces those two dialogs' own direct children
+   the plain way; `--collapsible` (the actual `BlockCard`, which has none
+   of that spacing to do — see below) turns it off (Copilot review,
+   PR #22: removing this `gap` outright to make room for the collapse
+   wrapper's own animatable `margin-top` broke the *other* two consumers'
+   spacing, since they never touch that wrapper at all). */
 .block-card {
   display: flex;
   flex-direction: column;
+  gap: var(--space-4);
   padding: var(--space-5);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
+}
+
+.block-card--collapsible {
+  gap: 0;
 }
 
 .block-card__header {

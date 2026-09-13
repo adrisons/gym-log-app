@@ -386,7 +386,13 @@ export function DiaryScreen() {
       </label>
       {nearestId && (
         <p>
-          Nearest session: <Link to={`/diary/${nearestId}`}>{nearestId}</Link>
+          Nearest session:{' '}
+          <Link
+            to={`/diary/${nearestId}`}
+            className="diary-screen__jump-nearest-link"
+          >
+            {nearestId}
+          </Link>
         </p>
       )}
       {!bulkActive && (

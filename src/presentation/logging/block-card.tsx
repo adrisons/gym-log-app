@@ -145,7 +145,10 @@ export function BlockCard({
   }
 
   return (
-    <section className="block-card" aria-label={displayName}>
+    <section
+      className="block-card block-card--collapsible"
+      aria-label={displayName}
+    >
       <div className="block-card__header">
         {editing ? (
           <form
