@@ -13,7 +13,7 @@
  * stays one-shot (a later remount of that same route, with nothing new
  * logged since, renders nothing here at all).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './diary.css';
 
 const VISIBLE_MS = 1800;
@@ -24,8 +24,14 @@ export interface SessionSavedToastProps {
 
 export function SessionSavedToast({ onDismiss }: SessionSavedToastProps) {
   const [visible, setVisible] = useState(true);
+  // Flips true in cleanup, false again the instant a following `setup` runs
+  // — persists across React's dev-only StrictMode mount→cleanup→mount
+  // probe (a ref, unlike the effect's own closure state, survives it) so
+  // the deferred check below can tell that probe apart from a real unmount.
+  const cleanedUpRef = useRef(false);
 
   useEffect(() => {
+    cleanedUpRef.current = false;
     let dismissed = false;
     const dismiss = () => {
       if (dismissed) return;
@@ -42,10 +48,23 @@ export function SessionSavedToast({ onDismiss }: SessionSavedToastProps) {
       // consume the one-shot flag this mount was conditioned on — otherwise
       // it survives to a later remount of this same route and replays
       // "Session saved" even though nothing new was logged since (Copilot
-      // review, PR #22). The `dismissed` guard keeps this from also firing
-      // a second time right after the timeout's own call above, once
+      // review, PR #22). Calling `onDismiss` straight from cleanup isn't
+      // safe under StrictMode, though: its dev-only mount→cleanup→mount
+      // probe runs this same cleanup on every real mount too, which would
+      // clear the flag (and so unmount this component) a tick after it
+      // ever appears. Deferring one microtask, and checking whether a
+      // following `setup` already reset `cleanedUpRef` back to false by
+      // then, tells that probe apart from a real unmount — only a real one
+      // leaves the ref still true when the microtask runs (Copilot review,
+      // PR #22). The `dismissed` guard still keeps this from also firing a
+      // second time right after the timeout's own call above, once
       // clearing the flag causes `DiaryScreen` to unmount this component.
-      dismiss();
+      cleanedUpRef.current = true;
+      queueMicrotask(() => {
+        if (cleanedUpRef.current) {
+          dismiss();
+        }
+      });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

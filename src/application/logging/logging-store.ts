@@ -172,6 +172,29 @@ export interface LoggingSessionState {
 }
 
 export const useLoggingSession = create<LoggingSessionState>((set, get) => {
+  // Every draft-mutating action below persists through this one chain
+  // instead of calling `storage.saveDraft` directly — two reasons:
+  // (1) it serializes writes against each other, so a slower earlier write
+  // can never finish after (and clobber) a faster later one; (2)
+  // `initialize()` awaits whatever is currently chained here before
+  // trusting its own storage read, since a write already in flight when
+  // that read starts (e.g. ADR-0007's debounce timer, which outlives
+  // unmount) can otherwise still be unpersisted when the read runs and
+  // hand back a pre-write snapshot even though nothing further mutates
+  // `draft` during the read itself (Copilot review, PR #22).
+  let pendingDraftWrite: Promise<void> = Promise.resolve();
+  const persistDraft = (
+    storage: StoragePort,
+    draft: LoggingDraft,
+  ): Promise<void> => {
+    const next = pendingDraftWrite.then(
+      () => storage.saveDraft(draft),
+      () => storage.saveDraft(draft),
+    );
+    pendingDraftWrite = next;
+    return next;
+  };
+
   /**
    * Shared by `deleteBlock`/`deleteExerciseEntry`/`deleteSet`: applies the
    * draft change immediately (Principle II — never held pending), persists
@@ -203,7 +226,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       undoStack: [...state.undoStack, undoEntry],
       ...(markedSetStillPresent ? {} : { lastAddedSetId: undefined }),
     }));
-    await storage.saveDraft(touched);
+    await persistDraft(storage, touched);
     setTimeout(
       () => {
         set((state) => ({
@@ -237,23 +260,44 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       // flight; resetting afterward would silently erase that signal
       // (Copilot review, PR #22).
       set({ justLoggedASet: false, lastAddedSetId: undefined });
+      // Captured synchronously, before awaiting anything below — a
+      // concurrent action's own optimistic `set()` call (e.g. `addSet`)
+      // always runs synchronously too, so capturing these any later (after
+      // the `pendingDraftWrite` wait just below, say) risks absorbing that
+      // same mutation into "before" instead of detecting it as a change.
       const draftBeforeReads = get().draft;
+      const catalogueBeforeReads = get().catalogue;
+      const bandLabelsBeforeReads = get().bandLabels;
+      // Wait out whatever draft write is already in flight *before*
+      // reading — a debounced commit (ADR-0007's timer outlives unmount)
+      // can be mid-`storage.saveDraft` right as this runs, and the read
+      // below can otherwise race it and return the pre-write snapshot even
+      // though nothing further mutates `draft` in our own window, which
+      // the before/after identity check right after can't catch on its own
+      // (Copilot review, PR #22).
+      await pendingDraftWrite;
       const [draft, catalogue, sessions, bandLabels] = await Promise.all([
         openLoggingForm(storage),
         storage.listExercises(),
         storage.listSessions(FULL_RANGE),
         storage.listBandLabels(),
       ]);
-      // A debounced commit (ADR-0007's timer outlives unmount) or another
-      // mutation can land on `draft` while the reads above are in flight;
-      // applying this now-stale read would silently discard it (Copilot
-      // review, PR #22) — only overwrite `draft` if nothing else already
-      // did while we were reading.
+      // Same reasoning as `draft` above, for the other two slices these
+      // reads can also race: `createExercise`/`updateExerciseTemplate`
+      // against `catalogue`, `saveBandLabels` against `bandLabels`
+      // (Copilot review, PR #22) — only overwrite a slice if nothing else
+      // already did while we were reading.
       set((state) => ({
         draft: state.draft === draftBeforeReads ? draft : state.draft,
-        catalogue,
+        catalogue:
+          state.catalogue === catalogueBeforeReads
+            ? catalogue
+            : state.catalogue,
         sessions,
-        bandLabels,
+        bandLabels:
+          state.bandLabels === bandLabelsBeforeReads
+            ? bandLabels
+            : state.bandLabels,
       }));
     },
 
@@ -266,7 +310,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       if (!storage || !current) return;
       const updated = touch({ ...current, dateTime: iso });
       set({ draft: updated });
-      await storage.saveDraft(updated);
+      await persistDraft(storage, updated);
     },
 
     addExerciseEntry: async (exerciseId, blockId) => {
@@ -276,7 +320,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
         addExerciseEntryToDraft(current, exerciseId, blockId),
       );
       set({ draft: updated });
-      await storage.saveDraft(updated);
+      await persistDraft(storage, updated);
     },
 
     addSet: async (entryId, input) => {
@@ -312,7 +356,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
         justLoggedASet: true,
         lastAddedSetId: newSetId,
       }));
-      await storage.saveDraft(updated);
+      await persistDraft(storage, updated);
     },
 
     prefillNextSet: (blockId, entryId) => {
@@ -388,7 +432,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       if (!storage || !current) return;
       const updated = touch(addBlockToDraft(current, name, type));
       set({ draft: updated });
-      await storage.saveDraft(updated);
+      await persistDraft(storage, updated);
     },
 
     renameBlock: async (blockId, name) => {
@@ -396,7 +440,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       if (!storage || !current) return;
       const updated = touch(renameBlockInDraft(current, blockId, name));
       set({ draft: updated });
-      await storage.saveDraft(updated);
+      await persistDraft(storage, updated);
     },
 
     setBlockRounds: async (blockId, rounds) => {
@@ -404,7 +448,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       if (!storage || !current) return;
       const updated = touch(setBlockRoundsInDraft(current, blockId, rounds));
       set({ draft: updated });
-      await storage.saveDraft(updated);
+      await persistDraft(storage, updated);
     },
 
     reorderBlockExercise: async (blockId, fromIndex, toIndex) => {
@@ -414,7 +458,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
         reorderBlockExerciseInDraft(current, blockId, fromIndex, toIndex),
       );
       set({ draft: updated });
-      await storage.saveDraft(updated);
+      await persistDraft(storage, updated);
     },
 
     moveExerciseAcrossBlocks: async (
@@ -435,7 +479,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
         ),
       );
       set({ draft: updated });
-      await storage.saveDraft(updated);
+      await persistDraft(storage, updated);
     },
 
     deleteBlock: async (blockId) => {
@@ -463,7 +507,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
         draft: restored,
         undoStack: state.undoStack.filter((e) => e.id !== id),
       }));
-      await storage.saveDraft(restored);
+      await persistDraft(storage, restored);
     },
 
     renameExerciseWithCollisionCheck: async (exerciseId, newName) => {

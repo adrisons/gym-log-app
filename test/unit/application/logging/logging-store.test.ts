@@ -61,6 +61,52 @@ describe('useLoggingSession (research.md §5)', () => {
       useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets;
     expect(finalSets.map((s) => s.id)).toContain(committedSetId);
   });
+
+  it("waits out a draft write already in flight before trusting its own storage read, even when nothing further mutates draft during initialize()'s own reads (Copilot review, PR #22)", async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+
+    // Gate `saveDraft` itself (not a read) so the committed set is applied
+    // to Zustand's `draft` optimistically — before initialize() even
+    // starts — while its own persistence to storage is still pending, as
+    // ADR-0007's debounce timer firing just before a route remount would.
+    let releaseWrite = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    const originalSaveDraft = storage.saveDraft.bind(storage);
+    vi.spyOn(storage, 'saveDraft').mockImplementation(async (draft) => {
+      await gate;
+      return originalSaveDraft(draft);
+    });
+
+    const addSetPromise = useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const committedSetId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+
+    // initialize() starts while the write above is still gated — with no
+    // further mutation during its own reads, only waiting out that
+    // already-in-flight write (not the before/after identity check alone)
+    // keeps its `openLoggingForm` read from racing storage.saveDraft and
+    // returning the pre-write snapshot.
+    const initializePromise = useLoggingSession.getState().initialize();
+
+    releaseWrite();
+    await addSetPromise;
+    await initializePromise;
+
+    const finalSets =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets;
+    expect(finalSets.map((s) => s.id)).toContain(committedSetId);
+  });
 });
 
 describe('useLoggingSession undo stack (FR-004, FR-023)', () => {

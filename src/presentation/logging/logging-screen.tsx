@@ -128,6 +128,24 @@ export function LoggingScreen() {
     }
   }, [lastAddedSetId, clearLastAddedSetId]);
 
+  // If the OS preference flips to reduced-motion while the marked row's
+  // entrance animation is already mid-flight, the CSS rule above cancels
+  // that running animation outright — a cancelled animation never fires
+  // `animationend`, so the row's own consumption (below) would otherwise
+  // never run and `lastAddedSetId` would stay stuck (Copilot review,
+  // PR #22).
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      if (event.matches && useLoggingSession.getState().lastAddedSetId) {
+        useLoggingSession.getState().clearLastAddedSetId();
+      }
+    };
+    query.addEventListener('change', handleChange);
+    return () => query.removeEventListener('change', handleChange);
+  }, []);
+
   // Unmounting (navigating away) before the marked row's own
   // `onAnimationEnd` fires must still consume the marker — otherwise a
   // later remount of this same route, before initialize() resolves, could

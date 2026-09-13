@@ -358,7 +358,10 @@ export function SessionDetailScreen() {
               const exercise = catalogue.find((e) => e.id === entry.exerciseId);
               return (
                 <div key={entry.id}>
-                  <Link to={`/exercises/${entry.exerciseId}/progression`}>
+                  <Link
+                    to={`/exercises/${entry.exerciseId}/progression`}
+                    className="session-detail-screen__progression-link"
+                  >
                     View {entryVm.exerciseName} progression
                   </Link>
                   <ExerciseEntryCard
