@@ -87,20 +87,28 @@ describe('BlockCard (FR-006, FR-007)', () => {
       </BlockCard>,
     );
 
-    expect(screen.getByText('content')).toBeVisible();
+    const collapseWrap = screen
+      .getByText('content')
+      .closest('.block-card__collapse')!;
+    expect(collapseWrap).not.toHaveClass('block-card__collapse--collapsed');
+    expect(collapseWrap).not.toHaveAttribute('inert');
 
     await userEvent.click(
       screen.getByRole('button', { name: /collapse block 1/i }),
     );
-    // Hidden, not unmounted — a `SetRow` inside can have a debounced
+    // Animated to zero height and taken out of the tab order/AT tree
+    // (`inert`) — never unmounted: a `SetRow` inside can have a debounced
     // commit in flight (ADR-0007) that must survive a mere visual collapse.
-    expect(screen.getByText('content')).not.toBeVisible();
+    expect(screen.getByText('content')).toBeInTheDocument();
+    expect(collapseWrap).toHaveClass('block-card__collapse--collapsed');
+    expect(collapseWrap).toHaveAttribute('inert');
     expect(screen.getByText('Block 1')).toBeInTheDocument();
 
     await userEvent.click(
       screen.getByRole('button', { name: /expand block 1/i }),
     );
-    expect(screen.getByText('content')).toBeVisible();
+    expect(collapseWrap).not.toHaveClass('block-card__collapse--collapsed');
+    expect(collapseWrap).not.toHaveAttribute('inert');
   });
 
   it('bare mode renders only children/footer, no header chrome', () => {

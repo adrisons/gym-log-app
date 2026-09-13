@@ -196,13 +196,27 @@
   text-decoration: none;
   box-shadow: 0 4px 12px var(--color-border-strong);
   cursor: pointer;
-  transition: background var(--duration-short) var(--easing-standard);
+  transition:
+    background var(--duration-short) var(--easing-standard),
+    transform var(--duration-instant) var(--easing-standard);
 }
 
 .diary-screen__fab:hover,
 .diary-screen__fab:focus-visible {
   background: var(--color-accent);
   opacity: 0.9;
+}
+
+/* Combines with the centering transform above rather than replacing it —
+   docs/design.md §4.2's tap feedback, on the app's most-tapped control. */
+.diary-screen__fab:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diary-screen__fab:active {
+    transform: translateX(-50%);
+  }
 }
 
 .diary-screen__fab svg {
@@ -241,6 +255,17 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  transition: transform var(--duration-instant) var(--easing-standard);
+}
+
+.diary-screen__bulk-button:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diary-screen__bulk-button:active {
+    transform: none;
+  }
 }
 
 .diary-screen__bulk-button--cancel {

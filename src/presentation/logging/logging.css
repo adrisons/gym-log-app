@@ -75,15 +75,27 @@
   min-height: 44px;
   text-align: left;
   cursor: pointer;
-  transition: background var(--duration-short) var(--easing-standard);
+  transition:
+    background var(--duration-short) var(--easing-standard),
+    transform var(--duration-instant) var(--easing-standard);
 }
 
 .logging-button:hover {
   background: var(--color-border);
 }
 
+/* Press feedback (docs/design.md §4.2 — "did my tap register", answered
+   before any write confirms): every button in the app gets this through
+   the one shared class, not per-component. */
 .logging-button:active {
   background: var(--color-border-strong);
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logging-button:active {
+    transform: none;
+  }
 }
 
 .logging-button:focus-visible {
@@ -179,6 +191,10 @@
   gap: var(--space-2);
 }
 
+/* Plays once, on mount, for the one freshly-committed set — existing rows
+   keep the same key (`vm.id`) and never remount, so this never replays
+   for them. Answers "where did that thing go" (docs/design.md §4.1) for
+   the set ADR-0007 just auto-committed with no confirm tap to anchor to. */
 .set-summary {
   display: flex;
   gap: var(--space-3);
@@ -187,6 +203,24 @@
   border-radius: var(--radius-sm);
   background: var(--color-surface-raised);
   font-family: var(--font-mono);
+  animation: set-summary-enter var(--duration-medium) var(--easing-decelerate);
+}
+
+@keyframes set-summary-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .set-summary {
+    animation: none;
+  }
 }
 
 .undo-toast {
@@ -234,17 +268,36 @@
   flex: none;
 }
 
+/* The CSS-grid "animate to auto height" trick: `grid-template-rows`
+   between 1fr and 0fr transitions smoothly (unlike `height: auto`, which
+   can't be animated), and the single row's own content — `.block-card__body`
+   — controls the actual layout underneath. `overflow: hidden` on the row
+   is what makes 0fr actually clip instead of just being ignored. */
+.block-card__collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--duration-medium) var(--easing-standard);
+}
+
+.block-card__collapse--collapsed {
+  grid-template-rows: 0fr;
+}
+
 /* Matches `.block-card`'s own flex/gap so wrapping the body in this one
-   element (needed for a single `hidden` toggle) doesn't change the visible
+   element (needed for a single collapse toggle) doesn't change the visible
    spacing between the exercise cards and the block's footer control. */
 .block-card__body {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  overflow: hidden;
+  min-height: 0;
 }
 
-.block-card__body[hidden] {
-  display: none;
+@media (prefers-reduced-motion: reduce) {
+  .block-card__collapse {
+    transition: none;
+  }
 }
 
 .block-card__title {

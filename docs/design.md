@@ -236,6 +236,36 @@ Recording a set never shows a blocking loading state — writes are
 optimistic (§4.2). Any place that genuinely waits on something slow (e.g. a
 large import) shows progress, not an indefinite spinner.
 
+### 4.5 Where motion is actually used
+
+A concrete register, not an exhaustive one — each entry is chosen because
+it answers one of §4.1's two questions, using the fixed duration/easing
+categories (`--duration-instant/short/medium`,
+`--easing-standard/decelerate/accelerate` — `tokens.css`), never an ad hoc
+value:
+
+- **Press feedback** (*did my tap register*): every button (the shared
+  `.logging-button` class, the diary FAB, the bulk-select bar's actions)
+  scales down slightly on `:active`, instant-category duration, before any
+  write confirms.
+- **A newly-recorded set** (*where did that thing go*): the set's own
+  summary line fades and settles into place on mount — plays once, for
+  that one freshly-committed row, never for rows already there (they keep
+  their existing key and never remount).
+- **A block's collapse/expand** (*where did that content go*): animates to
+  zero height rather than snapping, while staying mounted and `inert`
+  (`BlockCard`'s own doc comment — a debounced set commit, ADR-0007, must
+  survive this).
+- **Changing screens** (*where did that thing go*, for the screen itself):
+  one rule on the composition root's content wrapper, not per-screen —
+  every route's root element fades and settles in on mount, medium
+  category, since it's a bigger shift than a button press.
+
+All of the above are `prefers-reduced-motion`-guarded (§4.3) — the
+information each one carries (a set was recorded, a block is collapsed,
+the route changed) is already present without the motion, so turning it
+off loses nothing.
+
 ---
 
 ## 5. Interaction states

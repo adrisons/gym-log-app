@@ -25,15 +25,22 @@
  *
  * Collapse/expand (`docs/requirements.md` FR-2) is local UI state, reset
  * on remount — never persisted as part of the Session, and independent of
- * the block's own 5-second delete-undo window. Collapsing hides the body
- * with the `hidden` attribute rather than omitting it from the tree: a
+ * the block's own 5-second delete-undo window. The body always stays
+ * mounted, collapsed or not — never conditionally rendered — because a
  * `SetRow` inside can have a commit debounced-but-not-yet-fired
- * (ADR-0007), and that timer is deliberately not cancelled on unmount —
- * unmounting it here by conditionally rendering the body would have
- * discarded that in-flight `SetRow` instance's own local state (though not
- * the pending commit itself) the moment a block collapses, which is a
+ * (ADR-0007), and that timer is deliberately not cancelled on unmount;
+ * unmounting the body here would discard that in-flight `SetRow`
+ * instance's own local state the moment a block collapses, which is a
  * mere visual fold, not the "navigated away" case ADR-0007's guarantee is
- * about.
+ * about. Collapsing animates the body's height to zero (`docs/design.md`
+ * §4.1 — this answers "where did that content go") via a CSS grid-rows
+ * transition rather than snapping with the `hidden` attribute, which
+ * can't be animated (its `display: none` applies instantly). `inert`
+ * takes over `hidden`'s job of pulling collapsed content out of the tab
+ * order and off assistive tech while it's visually clipped — the grid
+ * trick alone only hides it visually, `inert` alone doesn't animate, the
+ * two together are what a collapsed-but-still-technically-present region
+ * actually needs.
  */
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -164,9 +171,14 @@ export function BlockCard({
           </>
         )}
       </div>
-      <div className="block-card__body" hidden={collapsed}>
-        {children}
-        {footer}
+      <div
+        className={`block-card__collapse${collapsed ? ' block-card__collapse--collapsed' : ''}`}
+        inert={collapsed}
+      >
+        <div className="block-card__body">
+          {children}
+          {footer}
+        </div>
       </div>
     </section>
   );
