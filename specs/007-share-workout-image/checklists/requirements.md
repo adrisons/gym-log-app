@@ -62,3 +62,10 @@
   (new) covers a session mixing Strength with a later-added non-Strength
   discipline. (8) SC-001's tap budget now accounts for the "a stat" flow's
   two sub-choices (exercise and range) instead of undercounting them.
+- **`/speckit-clarify` session (2026-09-13), 2 questions asked and
+  answered**: (1) the post-logging prompt (FR-001) keeps its unconditional
+  trigger — every session with ≥1 confirmed set, not just ones with a new
+  PR; "don't show this again" already covers prompt fatigue. (2) FR-008's
+  manual override for "single highlight" only offers exercise entries with
+  at least one working set, matching FR-015's exclusion of warm-up-only
+  sessions from this content type. See `## Clarifications` in spec.md.

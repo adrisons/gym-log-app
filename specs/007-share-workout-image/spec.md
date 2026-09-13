@@ -75,6 +75,13 @@ what settings persistence already has."
 > is not a canonical entity under §3.1/Principle III, matching the
 > precedent already set in spec 006.
 
+## Clarifications
+
+### Session 2026-09-13
+
+- Q: Should the post-logging share prompt (FR-001) appear after every session with at least one confirmed set, or only when that session contains a new personal record? → A: Every session with at least one confirmed set — matches Strava's "offer to share any activity" pattern; "don't show this again" (FR-003) already covers prompt fatigue. FR-001 keeps its current unconditional trigger.
+- Q: When the user overrides "single highlight"'s default exercise, which of the session's exercises should the picker offer? → A: Only exercise entries with at least one working set (§5.1) — consistent with FR-015 already excluding warm-up-only sessions from this content type entirely.
+
 ## Context *(mandatory)*
 
 Every prior spec builds evidence the user can see inside the app: a diary
@@ -290,8 +297,10 @@ elsewhere for that same data.
   e1RM-eligible working sets (§5.2 — Weight loads, or Bodyweight with a
   numeric added load, 1–12 reps); (3) if no working set in the session is
   e1RM-eligible, the first exercise entry in the session's own order. The
-  user MUST be able to choose a different exercise entry logged in that
-  same session instead of the default.
+  user MUST be able to choose a different exercise entry instead of the
+  default, from among the session's exercise entries that have at least one
+  working set (§5.1) — an exercise entry with only warm-up sets is not
+  offered here, consistent with FR-015.
 - **FR-009**: When the highlighted set's load type has no numeric value
   (Band, Bodyweight without a numeric added load, Free text, or None —
   §3.2), the highlight MUST show that load in its own terms and MUST NOT
