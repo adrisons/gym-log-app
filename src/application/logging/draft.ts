@@ -419,6 +419,7 @@ function withoutRounds(block: DraftBlock): DraftBlock {
   const rest: DraftBlock = {
     id: block.id,
     ...(block.name !== undefined ? { name: block.name } : {}),
+    ...(block.loose !== undefined ? { loose: block.loose } : {}),
     type: block.type,
     exercises: block.exercises,
   };

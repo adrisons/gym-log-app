@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BlockCard } from '@/presentation/logging/block-card';
 
@@ -128,6 +128,31 @@ describe('BlockCard (FR-006, FR-007)', () => {
     await userEvent.type(roundsInput, '3');
 
     expect(onSetRounds).toHaveBeenLastCalledWith(3);
+  });
+
+  it('rejects a non-integer rounds value rather than silently truncating it', async () => {
+    const onSetRounds = vi.fn();
+    render(
+      <BlockCard
+        displayName="Block 1"
+        hasName={false}
+        rounds={3}
+        onRename={() => {}}
+        onSetRounds={onSetRounds}
+        onDelete={() => {}}
+      >
+        <p>content</p>
+      </BlockCard>,
+    );
+
+    const roundsInput = screen.getByRole('spinbutton', { name: /rounds/i });
+    onSetRounds.mockClear();
+
+    fireEvent.change(roundsInput, { target: { value: '2.5' } });
+
+    // Never called with the floor-truncated 2 — a decimal is rejected
+    // outright, not silently rounded down to a value never entered.
+    expect(onSetRounds).not.toHaveBeenCalled();
   });
 
   it('clearing the rounds field reports undefined, not zero', async () => {

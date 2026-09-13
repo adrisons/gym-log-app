@@ -442,6 +442,29 @@ describe('addBlock/renameBlock (FR-006, FR-007)', () => {
     expect(cleared.blocks[0]?.name).toBe('Circuit A');
   });
 
+  it("clearing rounds preserves a loose block's `loose` flag (undocumented-schema-field regression)", () => {
+    const draft: LoggingDraft = {
+      id: 'draft-1',
+      dateTime: '2026-09-11T18:00:00.000Z',
+      lastEditedAt: '2026-09-11T18:00:00.000Z',
+      notes: '',
+      blocks: [
+        {
+          id: 'block-1',
+          loose: true,
+          type: 'straightSets',
+          rounds: 3,
+          exercises: [],
+        },
+      ],
+    };
+
+    const cleared = setBlockRounds(draft, 'block-1', undefined);
+
+    expect(cleared.blocks[0]?.rounds).toBeUndefined();
+    expect(cleared.blocks[0]?.loose).toBe(true);
+  });
+
   it('setBlockRounds does not validate — a draft may hold a transient, not-yet-valid value (validated at promotion, ADR-0008)', () => {
     const draft = addBlock(
       createDraft('2026-09-11T18:00:00.000Z'),

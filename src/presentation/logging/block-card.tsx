@@ -191,7 +191,11 @@ export function BlockCard({
               onSetRounds(undefined);
               return;
             }
-            const parsed = Number.parseInt(raw, 10);
+            // `Number`, not `parseInt` — a typed "2.5" must fail the
+            // integer check below and be rejected (reverting to whatever
+            // `rounds` already held), not get silently floor-truncated to
+            // a value the user never actually entered.
+            const parsed = Number(raw);
             if (Number.isInteger(parsed) && parsed >= 1) {
               onSetRounds(parsed);
             }
