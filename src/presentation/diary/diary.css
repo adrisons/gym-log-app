@@ -293,7 +293,7 @@
    sparkles + an emoji pop, canvas: `.toast`/`.toast-glow`/`.toast-sparkle`/
    `.toast-emoji`) is worth carrying over: it exists to be noticed once,
    nothing else on this screen needs to fight for the same attention.
-   `--duration-reward` (tokens.css) matches VISIBLE_MS in
+   `--duration-reward` (tokens.css) matches REWARD_ANIMATION_MS in
    session-saved-toast.tsx exactly (the canvas reference also uses 1.8s) —
    this is the toast's own one-shot lifecycle, its own named category, not
    a reusable transition drawn from the instant/short/medium scale the
@@ -359,6 +359,12 @@
   bottom: calc(-1 * var(--space-2));
   right: var(--space-4);
   animation-delay: var(--duration-medium);
+  /* `forwards` alone only pins the *end* state during a delay — the
+     element still shows its un-animated default (opacity: 1) for the
+     delay's own duration, flashing visible immediately instead of
+     staying hidden until its delayed burst starts. `both` also applies
+     the 0% keyframe's opacity: 0 for that lead-in. */
+  animation-fill-mode: both;
 }
 
 .diary-screen__saved-toast-emoji {

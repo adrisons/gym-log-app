@@ -56,8 +56,8 @@
      --duration-reward is its own category, not a slower member of the
      three above: it times the one-shot save-toast "reward" animation
      (SessionSavedToast) end to end, matching that component's own
-     VISIBLE_MS lifetime exactly — not a reusable UI transition length the
-     way instant/short/medium are. */
+     REWARD_ANIMATION_MS lifetime exactly — not a reusable UI transition
+     length the way instant/short/medium are. */
   --duration-instant: 80ms;
   --duration-short: 150ms;
   --duration-medium: 260ms;
