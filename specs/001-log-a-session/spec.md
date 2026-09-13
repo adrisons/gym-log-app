@@ -16,6 +16,10 @@ changed through the exercise's own menu and applying only to new sets;
 is left otherwise unedited as the historical record of what actually
 shipped in PR #9.
 
+**Amended by ADR-0008** (schema v3): a `Block` may now carry an optional
+target round count — see the note at FR-006 below. `docs/requirements.md`
+§3.1/FR-2 carries the current rule.
+
 **Input**: User description: "The logging critical path from docs/requirements.md: FR-1 (log a session), FR-2 (blocks), FR-3 (sets and load), FR-4 (effort), FR-5 (exercise catalogue). Smallest complete, independently valuable slice; first spec in the build order in docs/agent-brief.md. Regenerated to fold in owner decisions of 2026-09-09: sessions have no open/closed lifecycle, effort is a 1–5 integer scale, a seed exercise catalogue ships, plus the merge/rename/block-delete/validation rules resolved in review."
 
 ## Context *(mandatory)*
@@ -440,7 +444,10 @@ result — independently verifiable without blocks, load types, or effort.
   close even though it is not a stored Session.
 - **FR-006**: The system MUST let the user create, rename, reorder, and
   delete blocks within a session, and reorder exercises within a block and
-  across blocks.
+  across blocks. _(Amended by ADR-0008: a block may also carry an optional
+  target round count — e.g. "3 rounds" of a circuit — editable immediately
+  with no confirm step, independent of and never derived from how many
+  sets each exercise entry in it actually has logged.)_
 - **FR-007**: The system MUST display an unnamed block by its position
   (e.g. "Block 2"), never as "Untitled" or blank.
 - **FR-008**: The system MUST pre-fill a new set for an exercise with the

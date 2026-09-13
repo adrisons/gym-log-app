@@ -39,7 +39,22 @@ import { ExerciseEntryCard } from '../logging/exercise-entry-card';
 import { SetRow } from '../logging/set-row';
 import { AddExerciseControl } from '../logging/add-exercise-control';
 import { ExerciseTemplatePanel } from '../logging/exercise-template-panel';
+import type { DraftBlock } from '@/application/logging/draft';
 import './diary.css';
+
+/** ADR-0008: rebuilds a block without `rounds`, for clearing it — mirrors
+ * `application/logging/draft.ts`'s own `withoutRounds` (this screen edits
+ * an `EditableSession` locally rather than going through that module's
+ * actions, so it needs its own copy of the same shape-preserving rebuild). */
+function withoutRounds(block: DraftBlock): DraftBlock {
+  return {
+    id: block.id,
+    ...(block.name !== undefined ? { name: block.name } : {}),
+    ...(block.loose !== undefined ? { loose: block.loose } : {}),
+    type: block.type,
+    exercises: block.exercises,
+  };
+}
 
 export function SessionDetailScreen() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -287,6 +302,7 @@ export function SessionDetailScreen() {
             hasName={block.name !== undefined}
             bare={isBare}
             subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'} logged`}
+            rounds={block.rounds}
             onRename={(name) =>
               persist((editable) => ({
                 ...editable,
@@ -294,6 +310,18 @@ export function SessionDetailScreen() {
                   b.id === block.id
                     ? { ...b, ...(name !== undefined ? { name } : {}) }
                     : b,
+                ),
+              }))
+            }
+            onSetRounds={(rounds) =>
+              persist((editable) => ({
+                ...editable,
+                blocks: editable.blocks.map((b) =>
+                  b.id !== block.id
+                    ? b
+                    : rounds !== undefined
+                      ? { ...b, rounds }
+                      : withoutRounds(b),
                 ),
               }))
             }

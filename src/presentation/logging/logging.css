@@ -338,6 +338,22 @@
   }
 }
 
+/* ADR-0008: a block's target round count — compact and always visible,
+   never gated by the collapse toggle above (it's the block's own plan,
+   not the exercises/sets content that collapses). */
+.block-card__rounds {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+  color: var(--color-foreground-muted);
+}
+
+.block-card__rounds input {
+  width: 4.5rem;
+  padding: var(--space-1) var(--space-2);
+}
+
 .block-card__title {
   display: flex;
   flex: 1 1 auto;

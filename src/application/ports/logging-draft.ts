@@ -51,6 +51,10 @@ export interface DraftBlock {
    */
   loose?: boolean; // stripped before either real adapter writes a draft (`application/logging/draft.ts`'s `toPersistableDraft`) — never reaches disk/IndexedDB, so it needs no ADR/migration of its own
   type: 'straightSets' | 'superset' | 'circuit';
+  /** A target round count for the whole block (ADR-0008) — mirrors
+   * `domain/block.ts`'s `Block.rounds` exactly, including its "unset
+   * means not specified" semantics. */
+  rounds?: number;
   exercises: DraftExerciseEntry[];
 }
 

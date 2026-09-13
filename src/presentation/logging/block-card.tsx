@@ -41,6 +41,14 @@
  * trick alone only hides it visually, `inert` alone doesn't animate, the
  * two together are what a collapsed-but-still-technically-present region
  * actually needs.
+ *
+ * `rounds` (ADR-0008) is a target round count for the whole block — always
+ * visible and editable, even while collapsed (it's the block's own plan,
+ * not part of the exercises/sets content collapsing hides), and with no
+ * separate edit-mode toggle: unlike the name field, one small always-shown
+ * number input doesn't compete with the title for space. Commits
+ * immediately on a valid change (FR-1's "no Save button" applies here
+ * too); an empty field means "not specified", never `0`.
  */
 import { useState } from 'react';
 import type { ReactNode, TransitionEvent } from 'react';
@@ -54,7 +62,9 @@ export interface BlockCardProps {
   hasName: boolean;
   subtitle?: string;
   bare?: boolean;
+  rounds?: number | undefined;
   onRename: (name: string | undefined) => void;
+  onSetRounds: (rounds: number | undefined) => void;
   onDelete: () => void;
   children: ReactNode;
   footer?: ReactNode;
@@ -65,7 +75,9 @@ export function BlockCard({
   hasName,
   subtitle,
   bare = false,
+  rounds,
   onRename,
+  onSetRounds,
   onDelete,
   children,
   footer,
@@ -204,6 +216,32 @@ export function BlockCard({
           </>
         )}
       </div>
+      <label className="block-card__rounds">
+        <span>Rounds</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          step={1}
+          className="logging-field-input"
+          value={rounds ?? ''}
+          onChange={(event) => {
+            const raw = event.target.value;
+            if (raw === '') {
+              onSetRounds(undefined);
+              return;
+            }
+            // `Number`, not `parseInt` — a typed "2.5" must fail the
+            // integer check below and be rejected (reverting to whatever
+            // `rounds` already held), not get silently floor-truncated to
+            // a value the user never actually entered.
+            const parsed = Number(raw);
+            if (Number.isInteger(parsed) && parsed >= 1) {
+              onSetRounds(parsed);
+            }
+          }}
+        />
+      </label>
       <div
         className={`block-card__collapse${collapsed ? ' block-card__collapse--collapsed' : ''}${isTransitioning ? ' block-card__collapse--transitioning' : ''}`}
         inert={collapsed || isTransitioning}

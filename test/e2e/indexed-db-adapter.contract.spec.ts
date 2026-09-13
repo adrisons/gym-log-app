@@ -42,5 +42,23 @@ test('ADR-0006 v1->v2 migration backfills a legacy Exercise and bumps the stored
   expect(outcome.defaultLoadTypePreserved).toBe(true);
   expect(outcome.defaultVolumeKind).toBe('reps');
   expect(outcome.trackEffort).toBe(false);
-  expect(outcome.storedSchemaVersion).toBe(2);
+  // CURRENT_SCHEMA_VERSION has since advanced to 3 (ADR-0008); a legacy v1
+  // record still runs this same v1->v2 backfill on its way up and lands at
+  // whatever the current version now is — there is no v2->v3 data rewrite
+  // to add (ADR-0008: `Block.rounds` needs none).
+  expect(outcome.storedSchemaVersion).toBe(3);
+});
+
+test('ADR-0008 v2->v3: a Block with no `rounds` upgrades cleanly, with rounds left absent', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const outcome = await page.evaluate(() =>
+    window.__runV2ToV3MigrationTest('indexed-db'),
+  );
+
+  expect(outcome.blockNamePreserved).toBe(true);
+  expect(outcome.roundsStillAbsent).toBe(true);
+  expect(outcome.storedSchemaVersion).toBe(3);
 });
