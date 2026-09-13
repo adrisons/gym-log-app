@@ -139,7 +139,9 @@ One vocabulary, used identically in code, UI and documentation.
   keeps adding to or stops adding to. More than one session per day is
   allowed, and each is fully independent.
 - **Block.** An ordered grouping inside a session: optional name ("Superset A",
-  "Legs"), type (straight sets / superset / circuit), and an ordered list of
+  "Legs"), type (straight sets / superset / circuit), optional target rounds
+  (how many times the whole block — every exercise entry in it — is meant to
+  be repeated, e.g. "3 rounds" of a circuit; ADR-0008), and an ordered list of
   exercise entries.
 - **Exercise entry.** A reference to a catalogue exercise, its order within the
   block, notes, and its sets.
@@ -230,6 +232,12 @@ Create a session and add blocks, exercises and sets.
   name, position label, and summary counts (exercise/set totals) visible,
   and expanded again. Purely a display state: never persisted as part of
   the Session record, and never affects what FR-004's undo restores.
+- A block can optionally carry a target number of rounds (ADR-0008) — how
+  many times the whole block is meant to be repeated, independent of how
+  many sets each exercise entry in it actually has logged. Editing it is
+  immediate, with no confirm step (FR-1's "no Save button" extends here
+  too); left unset, a block has no round count and nothing about it implies
+  one.
 
 ### FR-3 — Sets and load `[v1]`
 
@@ -538,6 +546,7 @@ before code.
 | D10 | Whether the app tracks body composition (weight, body fat, etc.) | **Closed:** no — removed from scope entirely, in any version. This application is exercises and training metrics only; it never records body measurements. FR-10 (previously "Body composition") is retired; its ID is left unassigned rather than renumbering the FRs after it. |
 | D11 | What happens to a Set's history when an exercise's set-entry template changes | **Closed:** nothing — the template (default load type, default volume kind, whether effort is tracked) only decides what a *new* set defaults to; every already-recorded Set keeps exactly what it was given, no reconciliation or deprecation. Schema v2. → ADR-0006 |
 | D12 | Whether recording a set requires an explicit confirm step | **Closed:** no — a set commits automatically the moment the user's own edit makes it valid (FR-3); the previous generic confirm control is retired, with a narrow "Repeat last set" control kept for the one case (an untouched, pre-filled row) an automatic trigger has nothing to anchor to. No schema change. → ADR-0007 |
+| D13 | Whether a Block can carry a target round count, and what it means | **Closed:** yes — an optional integer field on `Block` naming how many times the whole block is meant to be repeated (e.g. "3 rounds" of a circuit), independent of and never inferred from how many sets each exercise entry in it has actually logged. Additive, optional, no default value backfilled for existing blocks. Schema v3. → ADR-0008 |
 
 ---
 

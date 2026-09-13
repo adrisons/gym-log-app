@@ -89,6 +89,7 @@ No open/closed lifecycle field (FR-002).
 interface Block {
   name?: string;
   type: 'straightSets' | 'superset' | 'circuit';
+  rounds?: number; // added by ADR-0008 (schema v3) — target round count for the whole block; positive integer or absent, never derived from exercises' own set counts
   exercises: ExerciseEntry[]; // ordered; [] is valid (FR-017)
 }
 ```

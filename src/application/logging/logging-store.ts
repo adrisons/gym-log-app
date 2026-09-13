@@ -53,6 +53,7 @@ import {
   prefillNextSet as prefillNextSetFromDraft,
   addBlock as addBlockToDraft,
   renameBlock as renameBlockInDraft,
+  setBlockRounds as setBlockRoundsInDraft,
   reorderBlockExercise as reorderBlockExerciseInDraft,
   moveExerciseAcrossBlocks as moveExerciseAcrossBlocksInDraft,
   deleteBlock as deleteBlockFromDraft,
@@ -125,6 +126,10 @@ export interface LoggingSessionState {
     type: DraftBlock['type'],
   ) => Promise<void>;
   renameBlock: (blockId: string, name: string | undefined) => Promise<void>;
+  setBlockRounds: (
+    blockId: string,
+    rounds: number | undefined,
+  ) => Promise<void>;
   reorderBlockExercise: (
     blockId: string,
     fromIndex: number,
@@ -335,6 +340,14 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       const { storage, draft: current } = get();
       if (!storage || !current) return;
       const updated = touch(renameBlockInDraft(current, blockId, name));
+      set({ draft: updated });
+      await storage.saveDraft(updated);
+    },
+
+    setBlockRounds: async (blockId, rounds) => {
+      const { storage, draft: current } = get();
+      if (!storage || !current) return;
+      const updated = touch(setBlockRoundsInDraft(current, blockId, rounds));
       set({ draft: updated });
       await storage.saveDraft(updated);
     },

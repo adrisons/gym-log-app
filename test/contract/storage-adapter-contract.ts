@@ -142,7 +142,11 @@ const sessionScenarios: Scenario[] = [
       const session = makeSession({
         blocks: [
           {
-            type: 'straightSets',
+            type: 'circuit',
+            // ADR-0008: proves `rounds` round-trips through both real
+            // adapters (IndexedDB's structured clone, File System's JSON
+            // serialization), not just the pure application-layer mapping.
+            rounds: 3,
             exercises: [
               {
                 exerciseId: 'ex-1' as ExerciseId,

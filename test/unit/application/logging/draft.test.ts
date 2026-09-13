@@ -9,6 +9,7 @@ import {
   addBlock,
   renameBlock,
   findBlockIdForEntry,
+  setBlockRounds,
   reorderBlockExercise,
   moveExerciseAcrossBlocks,
   deleteBlock,
@@ -99,6 +100,41 @@ describe('LoggingDraft (data-model.md "LoggingDraft")', () => {
     });
   });
 
+  it("draftToSession carries a block's rounds through to the persisted Session (ADR-0008)", () => {
+    const exerciseId = 'exercise-1' as ExerciseId;
+    const draft: LoggingDraft = {
+      id: 'draft-1',
+      dateTime: '2026-09-11T18:00:00.000Z',
+      lastEditedAt: '2026-09-11T18:00:00.000Z',
+      notes: '',
+      blocks: [
+        {
+          id: 'block-1',
+          type: 'circuit',
+          rounds: 3,
+          exercises: [],
+        },
+        {
+          id: 'block-2',
+          type: 'straightSets',
+          exercises: [
+            {
+              id: 'entry-1',
+              exerciseId,
+              notes: '',
+              sets: [],
+            },
+          ],
+        },
+      ],
+    };
+
+    const session = draftToSession(draft, 'session-1' as SessionId);
+
+    expect(session.blocks[0]?.rounds).toBe(3);
+    expect(session.blocks[1]).not.toHaveProperty('rounds');
+  });
+
   it('draftToSession handles a draft with zero blocks (FR-017 applies to a submitted draft too)', () => {
     const draft = createDraft('2026-09-11T18:00:00.000Z');
     const session = draftToSession(draft, 'session-2' as SessionId);
@@ -143,6 +179,27 @@ describe('LoggingDraft (data-model.md "LoggingDraft")', () => {
       type: 'straightSets',
       exercises: [],
     });
+  });
+
+  it("toPersistableDraft keeps a block's rounds (ADR-0008)", () => {
+    const draft: LoggingDraft = {
+      id: 'draft-1',
+      dateTime: '2026-09-11T18:00:00.000Z',
+      lastEditedAt: '2026-09-11T18:00:00.000Z',
+      notes: '',
+      blocks: [
+        {
+          id: 'block-1',
+          type: 'circuit',
+          rounds: 3,
+          exercises: [],
+        },
+      ],
+    };
+
+    const persistable = toPersistableDraft(draft);
+
+    expect(persistable.blocks[0]?.rounds).toBe(3);
   });
 });
 
@@ -366,6 +423,35 @@ describe('addBlock/renameBlock (FR-006, FR-007)', () => {
 
     const cleared = renameBlock(renamed, blockId, undefined);
     expect(cleared.blocks[0]?.name).toBeUndefined();
+  });
+
+  it("setBlockRounds sets or clears a block's target round count (ADR-0008), preserving its name either way", () => {
+    const draft = addBlock(
+      createDraft('2026-09-11T18:00:00.000Z'),
+      'Circuit A',
+      'circuit',
+    );
+    const blockId = draft.blocks[0]!.id;
+
+    const withRounds = setBlockRounds(draft, blockId, 3);
+    expect(withRounds.blocks[0]?.rounds).toBe(3);
+    expect(withRounds.blocks[0]?.name).toBe('Circuit A');
+
+    const cleared = setBlockRounds(withRounds, blockId, undefined);
+    expect(cleared.blocks[0]?.rounds).toBeUndefined();
+    expect(cleared.blocks[0]?.name).toBe('Circuit A');
+  });
+
+  it('setBlockRounds does not validate — a draft may hold a transient, not-yet-valid value (validated at promotion, ADR-0008)', () => {
+    const draft = addBlock(
+      createDraft('2026-09-11T18:00:00.000Z'),
+      undefined,
+      'circuit',
+    );
+    const blockId = draft.blocks[0]!.id;
+
+    expect(() => setBlockRounds(draft, blockId, 0)).not.toThrow();
+    expect(setBlockRounds(draft, blockId, 0).blocks[0]?.rounds).toBe(0);
   });
 });
 

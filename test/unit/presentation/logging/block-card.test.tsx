@@ -10,6 +10,7 @@ describe('BlockCard (FR-006, FR-007)', () => {
         displayName="Block 2"
         hasName={false}
         onRename={() => {}}
+        onSetRounds={() => {}}
         onDelete={() => {}}
       >
         <p>content</p>
@@ -26,6 +27,7 @@ describe('BlockCard (FR-006, FR-007)', () => {
         displayName="Block 1"
         hasName={false}
         onRename={onRename}
+        onSetRounds={() => {}}
         onDelete={() => {}}
       >
         <p>content</p>
@@ -46,6 +48,7 @@ describe('BlockCard (FR-006, FR-007)', () => {
         displayName="Block 1"
         hasName={false}
         onRename={() => {}}
+        onSetRounds={() => {}}
         onDelete={onDelete}
       >
         <p>content</p>
@@ -66,6 +69,7 @@ describe('BlockCard (FR-006, FR-007)', () => {
         hasName={true}
         subtitle="2 exercises · 5 sets logged"
         onRename={() => {}}
+        onSetRounds={() => {}}
         onDelete={() => {}}
       >
         <p>content</p>
@@ -81,6 +85,7 @@ describe('BlockCard (FR-006, FR-007)', () => {
         displayName="Block 1"
         hasName={false}
         onRename={() => {}}
+        onSetRounds={() => {}}
         onDelete={() => {}}
       >
         <p>content</p>
@@ -103,6 +108,72 @@ describe('BlockCard (FR-006, FR-007)', () => {
     expect(screen.getByText('content')).toBeVisible();
   });
 
+  it('shows an unset rounds field by default and reports a typed value (ADR-0008)', async () => {
+    const onSetRounds = vi.fn();
+    render(
+      <BlockCard
+        displayName="Block 1"
+        hasName={false}
+        onRename={() => {}}
+        onSetRounds={onSetRounds}
+        onDelete={() => {}}
+      >
+        <p>content</p>
+      </BlockCard>,
+    );
+
+    const roundsInput = screen.getByRole('spinbutton', { name: /rounds/i });
+    expect(roundsInput).toHaveValue(null);
+
+    await userEvent.type(roundsInput, '3');
+
+    expect(onSetRounds).toHaveBeenLastCalledWith(3);
+  });
+
+  it('clearing the rounds field reports undefined, not zero', async () => {
+    const onSetRounds = vi.fn();
+    render(
+      <BlockCard
+        displayName="Block 1"
+        hasName={false}
+        rounds={3}
+        onRename={() => {}}
+        onSetRounds={onSetRounds}
+        onDelete={() => {}}
+      >
+        <p>content</p>
+      </BlockCard>,
+    );
+
+    const roundsInput = screen.getByRole('spinbutton', { name: /rounds/i });
+    expect(roundsInput).toHaveValue(3);
+
+    await userEvent.clear(roundsInput);
+
+    expect(onSetRounds).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("rounds stays visible while the block is collapsed (it is the block's own plan, not its logged content)", async () => {
+    render(
+      <BlockCard
+        displayName="Block 1"
+        hasName={false}
+        rounds={3}
+        onRename={() => {}}
+        onSetRounds={() => {}}
+        onDelete={() => {}}
+      >
+        <p>content</p>
+      </BlockCard>,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /collapse block 1/i }),
+    );
+
+    expect(screen.getByRole('spinbutton', { name: /rounds/i })).toBeVisible();
+  });
+
   it('bare mode renders only children/footer, no header chrome', () => {
     render(
       <BlockCard
@@ -110,6 +181,7 @@ describe('BlockCard (FR-006, FR-007)', () => {
         hasName={false}
         bare
         onRename={() => {}}
+        onSetRounds={() => {}}
         onDelete={() => {}}
         footer={<p>footer content</p>}
       >

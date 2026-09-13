@@ -34,6 +34,14 @@
  * the pending commit itself) the moment a block collapses, which is a
  * mere visual fold, not the "navigated away" case ADR-0007's guarantee is
  * about.
+ *
+ * `rounds` (ADR-0008) is a target round count for the whole block — always
+ * visible and editable, even while collapsed (it's the block's own plan,
+ * not part of the exercises/sets content collapsing hides), and with no
+ * separate edit-mode toggle: unlike the name field, one small always-shown
+ * number input doesn't compete with the title for space. Commits
+ * immediately on a valid change (FR-1's "no Save button" applies here
+ * too); an empty field means "not specified", never `0`.
  */
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -46,7 +54,9 @@ export interface BlockCardProps {
   hasName: boolean;
   subtitle?: string;
   bare?: boolean;
+  rounds?: number | undefined;
   onRename: (name: string | undefined) => void;
+  onSetRounds: (rounds: number | undefined) => void;
   onDelete: () => void;
   children: ReactNode;
   footer?: ReactNode;
@@ -57,7 +67,9 @@ export function BlockCard({
   hasName,
   subtitle,
   bare = false,
+  rounds,
   onRename,
+  onSetRounds,
   onDelete,
   children,
   footer,
@@ -164,6 +176,28 @@ export function BlockCard({
           </>
         )}
       </div>
+      <label className="block-card__rounds">
+        <span>Rounds</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          step={1}
+          className="logging-field-input"
+          value={rounds ?? ''}
+          onChange={(event) => {
+            const raw = event.target.value;
+            if (raw === '') {
+              onSetRounds(undefined);
+              return;
+            }
+            const parsed = Number.parseInt(raw, 10);
+            if (Number.isInteger(parsed) && parsed >= 1) {
+              onSetRounds(parsed);
+            }
+          }}
+        />
+      </label>
       <div className="block-card__body" hidden={collapsed}>
         {children}
         {footer}
