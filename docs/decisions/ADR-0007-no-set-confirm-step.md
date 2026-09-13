@@ -99,3 +99,30 @@ because at that point the auto-commit rule above already covers them.
 - No schema change: this is presentation/application-layer behavior only:
   `Set` shape, `LoggingDraft` shape, and the storage port are all
   unaffected.
+
+## Addendum: a fresh Bodyweight row needs the same tap
+
+A gap surfaced in review after the above shipped: a Bodyweight load is
+"present" (FR-010's OR-rule) even with no added/assisted component
+entered (`domain/load.ts`'s `createLoad`), so a brand-new set on a
+Bodyweight exercise — no previous set to pre-fill from, nothing else
+required — is already valid the instant the row mounts, same as a
+pre-filled row. Unlike a pre-filled row, though, it has no prior value to
+repeat, so `RepeatLastSetControl`'s original scope ("pre-filled and
+untouched" only) left it with no way to ever commit: nothing the user
+could edit, and no auto-commit-on-mount allowed (that's the exact
+resurrection bug this ADR exists to prevent). `RepeatLastSetControl` now
+covers this second case too, under the same "valid but untouched" gate,
+labelled **Log this set** instead of "Repeat last set" so it never implies
+a previous value that doesn't exist.
+
+Also addressed: the debounced commit is read through a ref refreshed every
+render (`onConfirmRef`), not the closure captured when the edit fired —
+without it, moving the exercise entry to a different block while a commit
+was still pending would fire against the block it *used* to be in, since
+`onConfirm` is a closure over `blockId`/`entryId` constructed at the call
+site (`logging-screen.tsx`). And `BlockCard`'s collapse toggle now hides
+its body with the `hidden` attribute rather than removing it from the
+tree — conditionally unmounting it would have discarded a `SetRow`'s own
+pending-commit state on a mere visual collapse, which is not the
+"navigated away" case this ADR's non-cancellation guarantee is about.

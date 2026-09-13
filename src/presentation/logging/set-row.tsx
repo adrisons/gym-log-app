@@ -30,18 +30,31 @@
  *
  * Either way, the moment the pending result is valid (FR-019) it's what
  * gets committed, straight to `onConfirm` (this component has no
- * `StoragePort` access — `docs/architecture.md`'s presentation row). A
- * row that is merely pre-filled and untouched never schedules anything on
- * its own — nothing here ever fires from mounting with a prefilled value,
- * only from a real edit — so the one remaining tap, `RepeatLastSetControl`,
- * covers exactly that case (FR-008's "single tap" repeat) and disappears
- * the instant the user changes anything.
+ * `StoragePort` access — `docs/architecture.md`'s presentation row). A row
+ * that is already valid but untouched never schedules anything on its
+ * own — nothing here ever fires from mounting with a prefilled value, only
+ * from a real edit — so the one remaining tap, `RepeatLastSetControl`,
+ * covers that case and disappears the instant the user changes anything.
+ * Two situations reach "valid but untouched": a pre-filled row (FR-008's
+ * "single tap" repeat), and a fresh Bodyweight-load row with no previous
+ * set at all — Bodyweight counts as "present" with no component entered
+ * (`domain/load.ts`), so it is already a legal `Set` before any field is
+ * touched, and with nothing to edit there would otherwise be no way to
+ * record it at all. The control's label tells the two apart.
+ *
+ * `onConfirm` is read through a ref that's refreshed on every render
+ * (`onConfirmRef`), not captured directly in the debounce's closure: the
+ * prop passed down here closes over this row's current `blockId`/`entryId`
+ * at the call site (`logging-screen.tsx`), and if the exercise entry is
+ * moved to another block while a commit is still pending, the timer must
+ * call the *current* `onConfirm` (bound to the new block) when it fires,
+ * not the one captured back when the edit happened.
  *
  * Keyed by the parent on the entry's set count (`key={entryId}-${sets.length}`)
  * so this component remounts, and its local input state re-initializes
  * from a fresh `prefill`, every time a set is actually added.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { WeightLoadInput } from './weight-load-input';
 import { BandLoadInput } from './band-load-input';
 import { BodyweightLoadInput } from './bodyweight-load-input';
@@ -137,6 +150,14 @@ export function SetRow({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
+  // Kept current every render (not read via a captured closure) so a
+  // debounce timer already in flight calls whatever `onConfirm` is by the
+  // time it fires, not the one bound to this row's block at the moment the
+  // edit happened — see the stale-block-id note above.
+  const onConfirmRef = useRef(onConfirm);
+  useEffect(() => {
+    onConfirmRef.current = onConfirm;
+  }, [onConfirm]);
 
   const buildInput = (fields: FieldSnapshot): AddSetInput | undefined => {
     const load: { kind: Load['kind']; present: boolean } = (() => {
@@ -225,12 +246,15 @@ export function SetRow({
     if (input) {
       debounceRef.current = setTimeout(() => {
         debounceRef.current = undefined;
-        onConfirm(input);
+        onConfirmRef.current(input);
       }, COMMIT_DEBOUNCE_MS);
     }
   }
 
-  const repeatInput = !touched && prefill !== undefined ? liveInput : undefined;
+  // Valid without any edit: either a pre-filled repeat (FR-008), or a
+  // fresh Bodyweight-only row with nothing else required (see file
+  // doc comment) — the two cases `RepeatLastSetControl` covers.
+  const untouchedValidInput = !touched ? liveInput : undefined;
 
   return (
     <div className="set-row">
@@ -278,8 +302,11 @@ export function SetRow({
           onChange={(value) => updateField('effort', value, setEffort)}
         />
       )}
-      {repeatInput && (
-        <RepeatLastSetControl onRepeat={() => onConfirm(repeatInput)} />
+      {untouchedValidInput && (
+        <RepeatLastSetControl
+          onRepeat={() => onConfirm(untouchedValidInput)}
+          {...(prefill === undefined ? { label: 'Log this set' } : {})}
+        />
       )}
       {!liveInput && (
         <p className="logging-screen__field-label" role="status">

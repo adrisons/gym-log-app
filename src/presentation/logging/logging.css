@@ -234,6 +234,19 @@
   flex: none;
 }
 
+/* Matches `.block-card`'s own flex/gap so wrapping the body in this one
+   element (needed for a single `hidden` toggle) doesn't change the visible
+   spacing between the exercise cards and the block's footer control. */
+.block-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.block-card__body[hidden] {
+  display: none;
+}
+
 .block-card__title {
   display: flex;
   flex: 1 1 auto;
