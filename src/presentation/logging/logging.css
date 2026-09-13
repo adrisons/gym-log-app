@@ -138,6 +138,18 @@
   opacity: 0.9;
 }
 
+/* `.logging-button:active` alone (a class + pseudo-class) outranks
+   `.logging-button--primary` (one class) by specificity, so without this
+   override pressing a primary button swapped in the generic
+   --color-border-strong background under its own --color-accent-foreground
+   text — an unintended, potentially low-contrast pressed state that
+   :hover never surfaces since a press has no hover step on touch/keyboard
+   (Copilot review, PR #22). */
+.logging-button--primary:active {
+  background: var(--color-accent);
+  opacity: 0.8;
+}
+
 .logging-button:disabled {
   color: var(--color-foreground-subtle);
   background: var(--color-surface-raised);
