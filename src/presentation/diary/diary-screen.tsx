@@ -247,6 +247,17 @@ export function DiaryScreen() {
         undone,
       },
     ]);
+    // `UndoToast` renders nothing once its own countdown reaches zero, but
+    // this batch's own bookkeeping (its `Session` snapshot, its handle)
+    // stays referenced until something removes it — undoing does, but an
+    // expired, never-undone batch otherwise never would, growing this list
+    // for as long as the screen stays mounted.
+    setTimeout(() => {
+      if (undone.current) return;
+      setPendingDeletes((current) =>
+        current.filter((batch) => batch.batchId !== batchId),
+      );
+    }, DELETE_UNDO_MS);
 
     void handle.settled.then(({ failures }) => {
       // Undo already restored everything for this batch — re-adding just
@@ -297,13 +308,20 @@ export function DiaryScreen() {
     );
     // `restore` waits for this batch's own deletes to finish first, so it
     // can never race them for the same id even if they're still in flight.
-    await batch.handle.restore();
+    const { failures } = await batch.handle.restore();
     // Merge back in rather than re-fetching everything: the deletion was
     // optimistic (Principle II), so undo stays symmetric with it — the UI
     // is what's authoritative here, `restore` above is what makes storage
-    // agree with it.
+    // agree with it. Only the sessions `restore` actually confirmed are
+    // re-added — one failed `saveSession` must never make the visible list
+    // claim a session is back when storage disagrees (the rest of the
+    // batch still restores normally; there's nothing to undo the undo of).
+    const failedIds = new Set(failures.map((session) => session.id));
+    const restoredSessions = batch.snapshot.filter(
+      (session) => !failedIds.has(session.id),
+    );
     setSessions((current) => {
-      const restored = mergeSessionsSortedDesc(current, batch.snapshot);
+      const restored = mergeSessionsSortedDesc(current, restoredSessions);
       setSummaries(
         restored.map((session) =>
           buildDiarySessionSummary(session, exercisesByIdRef.current),

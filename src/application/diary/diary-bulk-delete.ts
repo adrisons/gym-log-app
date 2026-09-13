@@ -20,6 +20,11 @@
  *   actually finished, whichever way it finished. Restoring a session
  *   whose delete had already failed (so it was never really gone) is a
  *   harmless, idempotent overwrite with its own unchanged content.
+ *   Returns its own `BulkDeleteOutcome` too: one `saveSession` rejecting
+ *   must never stop the others (`Promise.allSettled`, not `Promise.all`)
+ *   or leave the caller unable to tell which ones actually made it back —
+ *   the caller only re-adds the sessions that are confirmed restored, so
+ *   the visible list never claims a session is back when storage disagrees.
  */
 import type { StoragePort } from '@/application/ports/storage-port';
 import type { Session } from '@/domain/session';
@@ -35,7 +40,7 @@ export interface BulkDeleteHandle {
    * import `shared` directly (`docs/architecture.md`'s table). */
   batchId: string;
   settled: Promise<BulkDeleteOutcome>;
-  restore: () => Promise<void>;
+  restore: () => Promise<BulkDeleteOutcome>;
 }
 
 export function deleteSessionsWithUndo(
@@ -55,9 +60,14 @@ export function deleteSessionsWithUndo(
     settled,
     restore: async () => {
       await settled;
-      await Promise.all(
+      const results = await Promise.allSettled(
         sessions.map((session) => storage.saveSession(session)),
       );
+      return {
+        failures: sessions.filter(
+          (_, index) => results[index]!.status === 'rejected',
+        ),
+      };
     },
   };
 }

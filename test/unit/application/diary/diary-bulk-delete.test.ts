@@ -122,4 +122,20 @@ describe('deleteSessionsWithUndo (FR-6, presentation/application boundary)', () 
 
     expect(storage.saveSession).toHaveBeenCalledWith(sessions[0]);
   });
+
+  it("restore reports exactly the sessions whose save rejected, still saving the rest (one failure doesn't abandon the batch)", async () => {
+    const storage = fakeStorage({
+      saveSession: vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('storage unavailable')),
+    });
+    const [ok, failing] = [session('s1'), session('s2')];
+
+    const handle = deleteSessionsWithUndo(storage, [ok!, failing!]);
+    const outcome = await handle.restore();
+
+    expect(storage.saveSession).toHaveBeenCalledTimes(2);
+    expect(outcome.failures).toEqual([failing]);
+  });
 });
