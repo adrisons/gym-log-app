@@ -62,13 +62,20 @@ export class IndexedDbStorageAdapter implements StoragePort {
         'schema-too-new',
       );
     }
-    if (action === 'migrate') {
+    if (action === 'migrate' && stored < 2) {
       // v1 -> v2 (ADR-0006): every stored Exercise gains
       // defaultVolumeKind/trackEffort. Additive with safe defaults
       // (reps / effort not tracked) — no other stored shape changes, so
-      // this is the whole v2 migration.
+      // this is the whole v2 migration. Gated on `stored < 2` rather than
+      // just `action === 'migrate'` — a v2 record upgrading straight to
+      // v3 already has these fields, and running this unconditionally on
+      // every future version bump would keep re-rewriting every Exercise
+      // for a backfill it no longer needs (Copilot review, PR #21).
       await this.#migrateExerciseTemplateDefaults();
     }
+    // v2 -> v3 (ADR-0008): Block.rounds is optional, and its absence in
+    // every already-stored Session is itself valid v3 data — no stored
+    // shape changes, so this step has no backfill of its own to run.
     if (action === 'migrate' || stored === 0) {
       // `stored === 0` (the never-initialized sentinel, itself decided
       // as 'open' since there is nothing to migrate) still needs this

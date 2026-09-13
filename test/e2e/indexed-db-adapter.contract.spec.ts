@@ -48,3 +48,17 @@ test('ADR-0006 v1->v2 migration backfills a legacy Exercise and bumps the stored
   // to add (ADR-0008: `Block.rounds` needs none).
   expect(outcome.storedSchemaVersion).toBe(3);
 });
+
+test('ADR-0008 v2->v3: a Block with no `rounds` upgrades cleanly, with rounds left absent', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const outcome = await page.evaluate(() =>
+    window.__runV2ToV3MigrationTest('indexed-db'),
+  );
+
+  expect(outcome.blockNamePreserved).toBe(true);
+  expect(outcome.roundsStillAbsent).toBe(true);
+  expect(outcome.storedSchemaVersion).toBe(3);
+});

@@ -290,7 +290,8 @@ export class FileSystemStorageAdapter implements StoragePort {
         'schema-too-new',
       );
     }
-    if (action === 'migrate') {
+    if (action === 'migrate' && stored < 2) {
+      // See #checkSchema's own v1 -> v2 comment — same gate applies here.
       const exercises =
         (await this.#readJsonFromHandle<Exercise[]>(handle, EXERCISES_FILE)) ??
         [];
@@ -380,12 +381,16 @@ export class FileSystemStorageAdapter implements StoragePort {
         'schema-too-new',
       );
     }
-    if (action === 'migrate') {
+    if (action === 'migrate' && stored < 2) {
       // v1 -> v2 (ADR-0006): see IndexedDbStorageAdapter's own migration
       // comment — every stored Exercise gains defaultVolumeKind/trackEffort
-      // with safe defaults.
+      // with safe defaults. Gated on `stored < 2`, not just
+      // `action === 'migrate'` — see IndexedDbStorageAdapter's #checkSchema
+      // (Copilot review, PR #21).
       await this.#migrateExerciseTemplateDefaults();
     }
+    // v2 -> v3 (ADR-0008): see IndexedDbStorageAdapter's #checkSchema —
+    // nothing to backfill for this step.
     if (action === 'migrate' || stored === 0) {
       // See IndexedDbStorageAdapter's #checkSchema for the full rationale
       // — the never-initialized sentinel (stored === 0) needs the same

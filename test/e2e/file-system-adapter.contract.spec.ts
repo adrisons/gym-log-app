@@ -70,6 +70,23 @@ test('ADR-0006 v1->v2 migration backfills a legacy Exercise and bumps the stored
   expect(outcome.rawFileMigrated).toBe(true);
 });
 
+test('ADR-0008 v2->v3: a Block with no `rounds` upgrades cleanly, with rounds left absent', async ({
+  page,
+  browserName,
+}) => {
+  test.setTimeout(90_000);
+  test.skip(browserName !== 'chromium', 'File System Access is chromium-only.');
+
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const outcome = await page.evaluate(() =>
+    window.__runV2ToV3MigrationTest('file-system'),
+  );
+
+  expect(outcome.blockNamePreserved).toBe(true);
+  expect(outcome.roundsStillAbsent).toBe(true);
+  expect(outcome.storedSchemaVersion).toBe(3);
+});
+
 test('ADR-0006 migration survives a gesture-less first write followed by a real handle acquisition against a pre-existing v1 directory', async ({
   page,
   browserName,
