@@ -342,6 +342,39 @@ cross-references elsewhere in the codebase are not renumbered.
 Save a session as a template and start from it. The only planned concession
 towards planning, and still prescribes nothing.
 
+### FR-14 — Share as image `[later]`
+
+Generate a shareable image summarising training content, for use outside the
+app (e.g. posting to Instagram). A one-way, on-device export — not a social
+feature (D12): no account, no in-app sharing, no third-party posting API, no
+peer visibility. The same shape as FR-12's export, with a visual artifact
+instead of a data file.
+
+- Offered from two entry points: (a) an optional prompt shown right after
+  logging a session, with a "don't show again" preference the user can set
+  permanently (§11 settings); (b) on demand, at any time, from the session
+  detail view's menu.
+- Before the image is generated, the user picks one of three content types:
+  - **Session summary** — the exercises performed and headline numbers (e.g.
+    tonnage, set count). Not offered when the session has too many exercises
+    for the text to stay legible in the image.
+  - **A single highlight** — one exercise or personal record called out
+    prominently (e.g. "130kg in Hip Thrust!").
+  - **A stat** — either a training-consistency calendar (a summary of which
+    days were trained) or an exercise's progression chart over the last 6
+    months or the last year (reusing FR-8's chart and its data-sufficiency
+    rules).
+- Every number shown on the image comes from an existing computation (§5,
+  FR-8, FR-9); this feature introduces no new metric (Principle VI).
+- The image's visual style follows the app's design tokens and is easily
+  recognisable as coming from the app; the app's name appears small along the
+  bottom edge.
+- Ships with one aspect ratio (1:1, square); other ratios (e.g. a 9:16 story
+  format) are a later extension, not this feature.
+- Generation is entirely on-device; the only hand-off is the platform's
+  native share sheet or a saved file — never a direct API call to a
+  third-party platform (Principle IV, Invariant 1).
+
 ---
 
 ## 5. Computation rules
@@ -495,6 +528,7 @@ before code.
 | D9 | Whether the app ships a seed exercise catalogue | **Closed:** yes — a seed set of common strength exercises is present from first launch so there is no empty state on the logging critical path; seed entries are ordinary editable catalogue entries and the list is app-bundle data, not persisted schema. → ADR-0005 |
 | D10 | Whether the app tracks body composition (weight, body fat, etc.) | **Closed:** no — removed from scope entirely, in any version. This application is exercises and training metrics only; it never records body measurements. FR-10 (previously "Body composition") is retired; its ID is left unassigned rather than renumbering the FRs after it. |
 | D11 | What happens to a Set's history when an exercise's set-entry template changes | **Closed:** nothing — the template (default load type, default volume kind, whether effort is tracked) only decides what a *new* set defaults to; every already-recorded Set keeps exactly what it was given, no reconciliation or deprecation. Schema v2. → ADR-0006 |
+| D12 | Whether generating a shareable image for external platforms (e.g. Instagram) falls under the constitution's "social network" non-goal | **Closed:** no — it is a one-way, on-device export (render an image locally, hand off via the platform's native share sheet or a saved file), not a multi-user or in-app social feature. No account, no backend, no peer visibility, no third-party posting API; consistent with Invariant 1 (nothing leaves the device without the user explicitly choosing to send it). Targeted at the "Later" phase (§9), not MVP/v1/v1.1. → FR-14 |
 
 ---
 
@@ -521,7 +555,8 @@ before code.
   open question (§8) pending its own future decision.
 - **Later, only with a recorded decision** — multi-device sync, import from
   other apps, report export, further exercise disciplines beyond the first
-  one added under v1.1.
+  one added under v1.1, and sharing training content as an image for
+  external platforms (FR-14, D12).
 
 ---
 
