@@ -1,15 +1,24 @@
 /**
- * FR-001/002/003/006: reverse-chronological session list, grouped by
- * month, one-line summarized, with jump-to-date and an FR-006 empty
+ * FR-001/002/006: reverse-chronological session list, grouped by month,
+ * one-line summarized, with search-by-exercise-name and an FR-006 empty
  * state. Reads `listExercises()`/`listSessions()` directly via
  * `requireStorage()`.
  *
- * `docs/requirements.md` FR-1/FR-6 (design-refinement pass): the primary
- * "Log session" action lives here as a floating action linking to `/log`
- * (there is no persistent nav tab for it — `docs/design.md` §6). Bulk
- * select is reached either by a sustained press on a row, or (keyboard/
- * screen-reader path) the "Select sessions" button, which arms selection
- * mode with nothing yet selected; once active, a tap or Enter/Space on a
+ * `docs/requirements.md` FR-1/FR-6 (ADR-0009): the primary "Log session"
+ * action lives here as a floating action linking to `/log` (there is no
+ * persistent nav tab for it — `docs/design.md` §6). Search filters the
+ * list by exercise name (`application/diary/diary-search.ts`), replacing
+ * an earlier jump-to-a-specific-date control (ADR-0009).
+ *
+ * Bulk select (ADR-0009, Gmail's tap-the-avatar pattern) is reached either
+ * by a sustained press on a row, or by tapping the row's own leading icon
+ * — a real, always-present `<button>` sibling of the row's navigation
+ * `<Link>` (nesting an interactive control inside an anchor is invalid
+ * HTML, and the two would otherwise fight over the same click), which both
+ * arms selection mode and selects that row in one tap; no separate
+ * keyboard/screen-reader-only control is needed since the icon button is
+ * itself reachable that way. Deselecting the last selected row exits
+ * selection mode automatically. Once active, a tap or Enter/Space on a
  * focused row toggles its selection instead of opening it — a native `<a>`
  * dispatches `click` for Enter on its own, but not for Space (which
  * scrolls instead), so `onKeyDown` handles Space explicitly while active.
@@ -18,10 +27,10 @@
  * touch interaction still fires *synthetic* compatibility mouse events
  * afterward, which would otherwise re-run the same start/end logic a
  * second time and could immediately toggle a just-made touch selection
- * back off. A selected row swaps to `role="button"`/`aria-pressed` while
- * active, since that's what it actually behaves as in this mode (a toggle,
- * not a navigation link) — screen-reader/assistive-tech users need that
- * exposed, not just the visual selected style. While active the FAB is
+ * back off. A selected row's Link swaps to `role="button"`/`aria-pressed`
+ * while active, since that's what it actually behaves as in this mode (a
+ * toggle, not a navigation link) — screen-reader/assistive-tech users need
+ * that exposed, not just the visual selected style. While active the FAB is
  * replaced by a floating Cancel/Delete bar. Deleting/undoing is orchestrated by
  * `deleteSessionsWithUndo` (`application/diary/diary-bulk-delete.ts`) —
  * this screen never calls a `StoragePort` write method itself
@@ -41,15 +50,14 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent, PointerEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/presentation/design/icons';
+import { formatDiaryDate } from '@/presentation/design/format-date';
 import { requireStorage } from '@/application/storage-access';
 import { useLoggingSession } from '@/application/logging/logging-store';
 import { allStoredDataRange } from '@/application/date-range';
 import { buildDiarySessionSummary } from '@/application/diary/diary-summary';
 import type { DiarySessionSummary } from '@/application/diary/diary-summary';
-import {
-  findNearestSessionDate,
-  groupSessionsByMonth,
-} from '@/application/diary/diary-grouping';
+import { groupSessionsByMonth } from '@/application/diary/diary-grouping';
+import { filterSessionsByExerciseName } from '@/application/diary/diary-search';
 import { deleteSessionsWithUndo } from '@/application/diary/diary-bulk-delete';
 import type { BulkDeleteHandle } from '@/application/diary/diary-bulk-delete';
 import type { Exercise, ExerciseId } from '@/application/logging/use-cases';
@@ -94,7 +102,7 @@ export function DiaryScreen() {
   const [summaries, setSummaries] = useState<DiarySessionSummary[] | undefined>(
     undefined,
   );
-  const [jumpDate, setJumpDate] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectionActive, setSelectionActive] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingDeletes, setPendingDeletes] = useState<PendingDeleteBatch[]>(
@@ -185,13 +193,32 @@ export function DiaryScreen() {
     }
   }
 
+  /** Deselecting the last selected row exits selection mode automatically
+   * (ADR-0009, Gmail's own behavior) — Cancel in the floating bar still
+   * does the same thing explicitly. */
   function toggleSelected(sessionId: string) {
     setSelected((current) => {
       const next = new Set(current);
       if (next.has(sessionId)) next.delete(sessionId);
       else next.add(sessionId);
+      if (next.size === 0) setSelectionActive(false);
       return next;
     });
+  }
+
+  /** The row's own leading icon (ADR-0009): tapping it both arms selection
+   * mode (if not already active) and toggles that row in one tap — Gmail's
+   * tap-the-avatar pattern. A real, always-present `<button>`, so this is
+   * also the keyboard/screen-reader entry point into bulk-select; no
+   * separate "Select sessions" control is needed. */
+  function handleIconSelect(event: MouseEvent, sessionId: string) {
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false;
+      event.preventDefault();
+      return;
+    }
+    if (!selectionActive) setSelectionActive(true);
+    toggleSelected(sessionId);
   }
 
   function handleRowClick(event: MouseEvent, sessionId: string) {
@@ -215,14 +242,6 @@ export function DiaryScreen() {
       event.preventDefault();
       toggleSelected(sessionId);
     }
-  }
-
-  /** Keyboard/screen-reader entry point into bulk-select — the long press
-   * above has no keyboard equivalent on its own. Arms selection mode with
-   * nothing yet picked; each row's own Enter/Space (a native `<a>`
-   * dispatches `click` for both) then toggles it via `handleRowClick`. */
-  function startSelection() {
-    setSelectionActive(true);
   }
 
   function cancelSelection() {
@@ -389,45 +408,32 @@ export function DiaryScreen() {
     );
   }
 
-  const groups = groupSessionsByMonth(summaries);
-  const nearestId = jumpDate
-    ? findNearestSessionDate(summaries, jumpDate)
-    : undefined;
+  const filteredSummaries = filterSessionsByExerciseName(
+    summaries,
+    searchQuery,
+  );
+  const groups = groupSessionsByMonth(filteredSummaries);
 
   return (
     <main className="diary-screen" aria-label="Diary">
       <h1>Diary</h1>
-      <label className="diary-screen__jump">
-        <span className="diary-screen__jump-label">
-          <Icon name="calendar" />
-          Jump to date
+      <label className="diary-screen__search">
+        <span className="diary-screen__search-label">
+          <Icon name="search" />
+          Search by exercise
         </span>
         <input
-          type="date"
-          value={jumpDate}
-          onChange={(event) => setJumpDate(event.target.value)}
+          type="text"
+          className="logging-field-input"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="e.g. bench press"
         />
       </label>
-      {nearestId && (
-        <p>
-          Nearest session:{' '}
-          <Link
-            to={`/diary/${nearestId}`}
-            className="diary-screen__jump-nearest-link"
-          >
-            {nearestId}
-          </Link>
+      {filteredSummaries.length === 0 && (
+        <p className="diary-screen__empty">
+          No sessions match &ldquo;{searchQuery.trim()}&rdquo;.
         </p>
-      )}
-      {!bulkActive && (
-        <button
-          type="button"
-          className="diary-screen__select-button"
-          onClick={startSelection}
-        >
-          <Icon name="check" />
-          Select sessions
-        </button>
       )}
       {groups.map((group) => (
         <section key={group.monthKey} aria-label={group.monthKey}>
@@ -437,16 +443,8 @@ export function DiaryScreen() {
               const isSelected = selected.has(session.sessionId);
               return (
                 <li key={session.sessionId}>
-                  <Link
-                    to={`/diary/${session.sessionId}`}
-                    className={`diary-screen__session-link${isSelected ? ' diary-screen__session-link--selected' : ''}`}
-                    // While a selection is active this row behaves as a
-                    // toggle, not a navigation link — expose that role/state
-                    // for assistive tech rather than leaving only the
-                    // visual `--selected` style to carry it.
-                    {...(bulkActive
-                      ? { role: 'button', 'aria-pressed': isSelected }
-                      : {})}
+                  <div
+                    className={`diary-screen__session-row${isSelected ? ' diary-screen__session-row--selected' : ''}`}
                     onPointerDown={(event: PointerEvent) =>
                       handlePressStart(
                         session.sessionId,
@@ -460,14 +458,16 @@ export function DiaryScreen() {
                     onPointerUp={handlePressEnd}
                     onPointerLeave={handlePressEnd}
                     onPointerCancel={handlePressEnd}
-                    onClick={(event) =>
-                      handleRowClick(event, session.sessionId)
-                    }
-                    onKeyDown={(event) =>
-                      handleRowKeyDown(event, session.sessionId)
-                    }
                   >
-                    <span className="diary-screen__session-icon">
+                    <button
+                      type="button"
+                      className="diary-screen__session-icon"
+                      aria-pressed={isSelected}
+                      aria-label={`${isSelected ? 'Deselect' : 'Select'} session logged ${formatDiaryDate(session.dateTime)}`}
+                      onClick={(event) =>
+                        handleIconSelect(event, session.sessionId)
+                      }
+                    >
                       <Icon name="dumbbell" />
                       {isSelected && (
                         <span
@@ -477,21 +477,39 @@ export function DiaryScreen() {
                           <Icon name="check" />
                         </span>
                       )}
-                    </span>
-                    <span className="diary-screen__session-link-body">
-                      <span className="diary-screen__session-link-date">
-                        {new Date(session.dateTime).toLocaleDateString()}
+                    </button>
+                    <Link
+                      to={`/diary/${session.sessionId}`}
+                      className="diary-screen__session-link"
+                      // While a selection is active this row behaves as a
+                      // toggle, not a navigation link — expose that role/state
+                      // for assistive tech rather than leaving only the
+                      // visual `--selected` style to carry it.
+                      {...(bulkActive
+                        ? { role: 'button', 'aria-pressed': isSelected }
+                        : {})}
+                      onClick={(event) =>
+                        handleRowClick(event, session.sessionId)
+                      }
+                      onKeyDown={(event) =>
+                        handleRowKeyDown(event, session.sessionId)
+                      }
+                    >
+                      <span className="diary-screen__session-link-body">
+                        <span className="diary-screen__session-link-date">
+                          {formatDiaryDate(session.dateTime)}
+                        </span>
+                        <span className="diary-screen__session-link-detail">
+                          {session.mainExerciseNames.join(', ')}
+                        </span>
+                        <span className="diary-screen__session-link-detail">
+                          {session.setCount} sets
+                          {session.kindOfWork && ` · ${session.kindOfWork}`}
+                        </span>
                       </span>
-                      <span className="diary-screen__session-link-detail">
-                        {session.mainExerciseNames.join(', ')}
-                      </span>
-                      <span className="diary-screen__session-link-detail">
-                        {session.setCount} sets
-                        {session.kindOfWork && ` · ${session.kindOfWork}`}
-                      </span>
-                    </span>
-                    <Icon name="chevron-right" />
-                  </Link>
+                      <Icon name="chevron-right" />
+                    </Link>
+                  </div>
                 </li>
               );
             })}
