@@ -101,6 +101,22 @@ field is editable and edits persist.
 6. **Given** no sessions have ever been logged, **When** the diary screen
    opens, **Then** it shows an explicit empty state rather than an empty or
    blank list.
+7. **Given** the diary list, **When** the user presses and holds a session
+   row, **Then** that row is marked selected and a floating bar appears
+   offering Cancel and Delete for the current selection, replacing the
+   screen's primary logging action for as long as the selection is active.
+8. **Given** a selection is active, **When** the user taps a different
+   session row (a normal tap, not a press-and-hold), **Then** that row
+   toggles into or out of the selection instead of opening its detail view.
+9. **Given** one or more sessions are selected, **When** the user taps
+   Delete, **Then** those sessions are removed and the primary logging
+   action reappears; the deletion is undoable for at least 5 seconds
+   (`docs/requirements.md` FR-004's guarantee, extended to sessions),
+   restoring every deleted session exactly as it was via
+   `StoragePort.saveSession`.
+10. **Given** a selection is active, **When** the user taps Cancel, **Then**
+    the selection is cleared with nothing deleted and the primary logging
+    action reappears.
 
 ---
 
@@ -374,6 +390,17 @@ marked as personal records.
   progression computations) MUST be regenerated from `listSessions`/
   `listExercises` rather than persisted as a separate source of truth,
   consistent with `docs/requirements.md` §6.
+- **FR-024** _(added by this design-refinement pass, `docs/requirements.md`
+  FR-6)_: The diary screen MUST let the user select sessions in bulk via a
+  sustained press on a row, which marks that row selected and replaces the
+  screen's primary logging action with a floating bar offering Cancel and
+  Delete for the current selection. While a selection is active, a normal
+  tap on another row MUST toggle that row into or out of the selection
+  rather than opening its detail view. Deleting the selection MUST call
+  `StoragePort.deleteSession` for each selected id and MUST be undoable for
+  at least 5 seconds (the same guarantee `docs/requirements.md` FR-004
+  makes for a set/exercise/block), restoring every deleted session via
+  `StoragePort.saveSession` exactly as it was if undone within that window.
 
 ### Key Entities *(include if feature involves data)*
 

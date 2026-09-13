@@ -15,6 +15,12 @@ import './logging.css';
 export interface WheelPickerOption<T> {
   value: T;
   label: string;
+  /**
+   * Optional status-role tint (docs/design.md §1.2 refinement note — the
+   * effort control's graduated intensity). Decoration only: `label` is
+   * always what carries the meaning (§3.3 — color never stands alone).
+   */
+  tone?: 'success' | 'warning' | 'danger';
 }
 
 export interface WheelPickerProps<T> {
@@ -167,7 +173,7 @@ export function WheelPicker<T>({
           id={`${idPrefix}-${index}`}
           role="option"
           aria-selected={index === selectedIndex}
-          className={`wheel-picker__item${index === selectedIndex ? ' wheel-picker__item--selected' : ''}`}
+          className={`wheel-picker__item${index === selectedIndex ? ' wheel-picker__item--selected' : ''}${option.tone ? ` wheel-picker__item--${option.tone}` : ''}`}
         >
           {option.label}
         </div>

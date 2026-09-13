@@ -5,9 +5,10 @@
  * src/ (SC-007, enforced by scripts/check-no-color-literals.sh + an ESLint
  * no-restricted-syntax rule).
  *
- * Values here are the approved visual identity ("Electric", refined) —
- * chosen through a design exploration outside the codebase (three initial
- * directions, a fusion of two, then two refinement passes) and confirmed by
+ * Values here are the approved visual identity ("Electric", refined; see
+ * docs/design.md §1.2's refinement note for the warm-neutral/rounded pass
+ * that superseded the original cool-neutral/square-structural values) —
+ * chosen through a design exploration outside the codebase and confirmed by
  * the project owner. Every token role from
  * specs/000-scaffolding/data-model.md §2 is present, for both light and
  * dark, matching docs/design.md §3.1's role vocabulary exactly.
@@ -22,17 +23,18 @@
  */
 
 :root {
-  /* Colour roles — docs/design.md §3.1. Cool neutrals, one electric-blue
+  /* Colour roles — docs/design.md §3.1. Warm neutrals (§1.2 refinement
+     note — superseded: the previous cool-gray scale), one electric-blue
      accent reserved for primary actions and current selection; danger/
      warning/success stay visibly distinct from the accent hue. */
-  --color-canvas: #f3f4f6;
+  --color-canvas: #fbfaf7;
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
-  --color-foreground: #14161a;
-  --color-foreground-muted: #5b6070;
-  --color-foreground-subtle: #8a8f9e;
-  --color-border: #dcdee4;
-  --color-border-strong: #c3c6d0;
+  --color-foreground: #201e1a;
+  --color-foreground-muted: #635e58;
+  --color-foreground-subtle: #948e84;
+  --color-border: #e9e4dc;
+  --color-border-strong: #d6cec2;
   --color-accent: #2f5bff;
   --color-accent-foreground: #ffffff;
   --color-focus-ring: #2f5bff;
@@ -40,13 +42,13 @@
   --color-warning: #b5560f;
   --color-success: #1f9d55;
 
-  /* Radii — square by default (a deliberate part of this identity: cards,
-     fields, and the block-progress grid are hard-edged); only controls the
-     user directly taps get a small radius, so "tappable" reads distinctly
-     from "structural". */
-  --radius-sm: 6px;
-  --radius-md: 6px;
-  --radius-lg: 6px;
+  /* Radii — one rounded system (docs/design.md §1.2 refinement note,
+     confirmed by the project owner via a Claude Design canvas exploration).
+     Superseded: the previous square-structural/small-interactive split. */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
 
   /* Durations — named categories, not magic numbers (docs/design.md rule 2) */
   --duration-instant: 80ms;
@@ -77,14 +79,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-canvas: #0e0f12;
-    --color-surface: #17181e;
-    --color-surface-raised: #1d1f27;
-    --color-foreground: #e7e9ee;
-    --color-foreground-muted: #9aa0b3;
-    --color-foreground-subtle: #656b7d;
-    --color-border: #262a35;
-    --color-border-strong: #363c4a;
+    --color-canvas: #14120e;
+    --color-surface: #1e1c17;
+    --color-surface-raised: #26221b;
+    --color-foreground: #eeeae2;
+    --color-foreground-muted: #b3a99a;
+    --color-foreground-subtle: #7d7568;
+    --color-border: #353026;
+    --color-border-strong: #4a4335;
     --color-accent: #7e9cff;
     --color-accent-foreground: #0a0e1f;
     --color-focus-ring: #7e9cff;
@@ -95,14 +97,14 @@
 }
 
 :root[data-theme='dark'] {
-  --color-canvas: #0e0f12;
-  --color-surface: #17181e;
-  --color-surface-raised: #1d1f27;
-  --color-foreground: #e7e9ee;
-  --color-foreground-muted: #9aa0b3;
-  --color-foreground-subtle: #656b7d;
-  --color-border: #262a35;
-  --color-border-strong: #363c4a;
+  --color-canvas: #14120e;
+  --color-surface: #1e1c17;
+  --color-surface-raised: #26221b;
+  --color-foreground: #eeeae2;
+  --color-foreground-muted: #b3a99a;
+  --color-foreground-subtle: #7d7568;
+  --color-border: #353026;
+  --color-border-strong: #4a4335;
   --color-accent: #7e9cff;
   --color-accent-foreground: #0a0e1f;
   --color-focus-ring: #7e9cff;
@@ -122,21 +124,19 @@ body {
   font-family: var(--font-ui);
 }
 
-/* Heading identity (docs/design.md §1.2: "Section headings and primary
-   titles use the heavier weight, uppercase, in the approved identity" —
-   hierarchy expressed through weight/size, not through repeating the same
-   treatment at every level). Every screen lays headings out with flex +
-   gap already, so margins are zeroed here rather than left to the
-   browser default. h3 (an exercise/block's own name — user-entered
-   content, not a structural heading) intentionally keeps its natural
-   case. */
+/* Heading identity (docs/design.md §1.2 refinement note: "headings dropped
+   the uppercase treatment in favor of weight alone" — hierarchy expressed
+   through weight/size, not through repeating the same treatment at every
+   level). Every screen lays headings out with flex + gap already, so
+   margins are zeroed here rather than left to the browser default. h3 (an
+   exercise/block's own name — user-entered content, not a structural
+   heading) intentionally keeps its natural case. */
 h1,
 h2 {
   margin: 0;
   font-family: var(--font-ui);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--color-foreground);
 }
 
@@ -158,14 +158,14 @@ h3 {
 
 /* An explicit light choice always wins over the OS preference. */
 :root[data-theme='light'] {
-  --color-canvas: #f3f4f6;
+  --color-canvas: #fbfaf7;
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
-  --color-foreground: #14161a;
-  --color-foreground-muted: #5b6070;
-  --color-foreground-subtle: #8a8f9e;
-  --color-border: #dcdee4;
-  --color-border-strong: #c3c6d0;
+  --color-foreground: #201e1a;
+  --color-foreground-muted: #635e58;
+  --color-foreground-subtle: #948e84;
+  --color-border: #e9e4dc;
+  --color-border-strong: #d6cec2;
   --color-accent: #2f5bff;
   --color-accent-foreground: #ffffff;
   --color-focus-ring: #2f5bff;

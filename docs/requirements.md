@@ -205,6 +205,18 @@ Create a session and add blocks, exercises and sets.
 - Every destructive action (delete set, exercise, block) is undoable from the
   same screen for at least 5 seconds.
 - Closing the app at any moment loses nothing that was entered.
+- The logging form is reached from a single prominent action on the diary
+  (a floating action, not a persistent navigation destination) — logging is
+  still the app's primary purpose (§1.1), so it stays one tap from the
+  screen the user opens the app to, without occupying a permanent slot in
+  the primary navigation that would otherwise sit idle between sessions.
+  Leaving the logging form after entering at least one set returns to the
+  diary with a brief, self-dismissing acknowledgement that what was
+  entered has been saved (`docs/design.md` §1.1's bounded exception). This
+  does not change D6/FR-024: the draft it just saved keeps no open/closed
+  state and is promoted to a listed Session on the existing schedule (the
+  next time the form opens on a later calendar day) — the acknowledgement
+  confirms the data is safe, not that a new diary row has appeared.
 - Logging is selective by design (§3.3): the user adds only the exercises
   they want a record of. Nothing in the flow requires accounting for every
   exercise physically performed in the session.
@@ -214,6 +226,10 @@ Create a session and add blocks, exercises and sets.
 - Create, rename, reorder and delete blocks within a session.
 - Reorder exercises within a block and across blocks.
 - An unnamed block is shown by its position, not as "Untitled".
+- A block can be collapsed to hide its exercises and sets while keeping its
+  name, position label, and summary counts (exercise/set totals) visible,
+  and expanded again. Purely a display state: never persisted as part of
+  the Session record, and never affects what FR-004's undo restores.
 
 ### FR-3 — Sets and load `[v1]`
 
@@ -235,6 +251,13 @@ Create a session and add blocks, exercises and sets.
   unset position for a load-only set); the wheel itself is the quick-increment
   mechanism, so it carries no separate ± buttons either. Duration and distance
   keep a numeric field with quick increments (configurable defaults).
+- A set has no confirm step: it is recorded the moment the user's own edit
+  to the load, volume, or effort control makes it valid (§3.3's "either load
+  or volume present" rule) — there is nothing to tap for a freshly-entered
+  value (ADR-0007, supersedes this FR's earlier "confirming is one tap"
+  wording below). A row that is merely pre-filled and still untouched does
+  nothing on its own — see the next bullet for how an identical repeat
+  still works in one tap.
 - Bands are picked from a user-owned, reorderable list with free labels.
 - Free text accepts up to 40 characters and autocompletes from what has already
   been used for that exercise.
@@ -243,6 +266,12 @@ Create a session and add blocks, exercises and sets.
   field for an exercise — each set is its own record, and the heaviest one,
   the best one, or a session total is a computation over that entry's sets
   (§5), never a fact entered separately.
+- **(ADR-0007, supersedes the wording above)** Adding a set defaults to the
+  previous set's values (unchanged), but "confirming is one tap" no longer
+  names a general confirm control — there is none. Recording an *identical*
+  repeat of the previous set (the pre-filled row, untouched) is still one
+  tap, on a control explicitly labelled for that ("Repeat last set"), never
+  a generic "confirm"/"Add set" action offered on every set.
 
 ### FR-4 — Effort `[v1]`
 
@@ -276,6 +305,19 @@ Create a session and add blocks, exercises and sets.
   discipline — never a separately-entered field).
 - Session detail view, editable after the fact.
 - Jump to a specific date.
+- Sessions can be selected in bulk — entered by a sustained press on a
+  session row, or by an explicit "Select sessions" control for keyboard/
+  screen-reader use (a sustained press has no keyboard equivalent) — which
+  marks a row selected and replaces the primary logging action with a
+  floating bar offering Cancel and Delete for the current selection. A
+  normal tap (or, once selection mode is active, Enter/Space on a focused
+  row) toggles that row into or out of the selection instead of opening
+  it. Deleting a selection removes those sessions and is undoable for at
+  least 5 seconds (the same guarantee FR-004 makes for a set, exercise, or
+  block), restoring every deleted session exactly as it was — including
+  when a session's own delete failed to reach storage (the deletion never
+  actually happened; the row simply reappears once that's known) and
+  independently of any other delete/undo in progress at the same time.
 
 ### FR-7 — Exercise search `[v1]`
 
@@ -495,6 +537,7 @@ before code.
 | D9 | Whether the app ships a seed exercise catalogue | **Closed:** yes — a seed set of common strength exercises is present from first launch so there is no empty state on the logging critical path; seed entries are ordinary editable catalogue entries and the list is app-bundle data, not persisted schema. → ADR-0005 |
 | D10 | Whether the app tracks body composition (weight, body fat, etc.) | **Closed:** no — removed from scope entirely, in any version. This application is exercises and training metrics only; it never records body measurements. FR-10 (previously "Body composition") is retired; its ID is left unassigned rather than renumbering the FRs after it. |
 | D11 | What happens to a Set's history when an exercise's set-entry template changes | **Closed:** nothing — the template (default load type, default volume kind, whether effort is tracked) only decides what a *new* set defaults to; every already-recorded Set keeps exactly what it was given, no reconciliation or deprecation. Schema v2. → ADR-0006 |
+| D12 | Whether recording a set requires an explicit confirm step | **Closed:** no — a set commits automatically the moment the user's own edit makes it valid (FR-3); the previous generic confirm control is retired, with a narrow "Repeat last set" control kept for the one case (an untouched, pre-filled row) an automatic trigger has nothing to anchor to. No schema change. → ADR-0007 |
 
 ---
 

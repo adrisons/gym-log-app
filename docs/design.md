@@ -52,7 +52,18 @@ interface follows these:
 - **Short.** A label is one to three words; a description is one sentence.
 - **Never editorializing.** The app records what happened; it does not
   praise, warn, or judge. A personal record is stated as a fact ("Heaviest
-  set yet"), never as congratulation with exclamation marks.
+  set yet"), never as congratulation with exclamation marks. **One narrowly
+  bounded exception**: returning to the diary immediately after logging a
+  session shows a single brief, non-blocking, self-dismissing
+  acknowledgement that the session was saved (`docs/requirements.md`
+  FR-1) — it exists only there, carries no number, streak, or comparison,
+  never blocks or requires dismissal, and does not recur anywhere else in
+  the app. It is a save confirmation, not encouragement, and the exception
+  is this specific and this small on purpose — it does not open the door
+  to praise or streaks elsewhere. This is also the one place §1.2's
+  "no imagery" is knowingly relaxed: the acknowledgement may carry a small
+  emoji as its one visual expression (motion respects reduced-motion,
+  §4.3 — the content, not just the animation, is what confirms the save).
 - **Errors state the fact, then the fix**, and never blame the user: "That
   set wasn't saved. Your other sets are safe," followed by what to try next.
   No technical codes in the sentence.
@@ -77,21 +88,40 @@ interface follows these:
 - **Imagery**: none. No illustrations, no mascots, no stock photography —
   the interface is entirely typographic and numeric. Nothing competes with
   the number the user is trying to read at a glance.
-- **Corners and edges**: structural surfaces (cards, panels, the layout
-  grid) are square — a deliberate, consistent hard edge, not softened.
-  Only elements the user directly taps (buttons, the active input) carry a
-  small, consistent radius, so "this is interactive" reads at a glance
-  against an otherwise square system, rather than rounding being a general
-  stylistic softness applied everywhere alike.
+- **Corners and edges**: every surface — structural (cards, panels) and
+  interactive (buttons, the active input) alike — shares one rounded
+  identity; "this is interactive" reads from weight, color and position,
+  never from being the only rounded thing on an otherwise hard-edged
+  screen. A control the user directly taps may round further toward a full
+  pill where that reads as more clearly tappable (the confirm-style
+  actions, the floating action); structural cards stay at the base radius.
+  Superseded: the original identity's opposite convention (square
+  structural surfaces, small radius reserved for interactive elements) —
+  see the refinement note below.
 
 **Visual identity, decided**: the concrete values realizing the criteria
-above (palette, the two type roles, the interactive-vs-structural radius
-split) were chosen through a design exploration and confirmed by the
-project owner; they live as tokens in
-`src/presentation/design/tokens.css`/`tokens.ts`, never here (§7). Section
-headings and primary titles use the heavier weight, uppercase, in the
-approved identity — this is the "type" and "hierarchy through weight, not
-repetition" criteria above expressed concretely, not a new criterion.
+above (palette, the two type roles, the corner-radius system) were chosen
+through a design exploration and confirmed by the project owner; they live
+as tokens in `src/presentation/design/tokens.css`/`tokens.ts`, never here
+(§7). Section headings and primary titles use a heavier weight for
+hierarchy — through weight, not through repetition or an uppercase
+treatment.
+
+**Refinement note (this pass)**: the original "Electric" identity (square
+structural surfaces, all-caps headings) was revisited end-to-end through a
+Claude Design canvas exploration and confirmed by the project owner as the
+new reference to follow. What changed: corners moved from the
+square/small-radius split to one rounded system (above); headings dropped
+the uppercase treatment in favor of weight alone; the effort control
+(FR-4) shows its 1–5 scale as a graduated intensity — 1–2 in the success
+role, 3–4 in the warning role, 5 in the danger role — always alongside the
+numeral (§3.3's rule that color never stands alone still holds; this is a
+new use of the existing status roles, not a new role). The neutral scale itself moved from a cool gray to a warm, slightly
+off-white/off-black cast in both themes — still meeting the same contrast
+minimums (§3.3) — while the accent and status (danger/warning/success)
+hues are unchanged. What did not change: the accent and status hues; the
+two type roles; "no imagery, no illustrations" (only the §1.1 bounded
+exception above); every rule in §2 through §6 below.
 
 ---
 
@@ -110,6 +140,19 @@ options.
 **One clear primary action per screen** during logging — the next thing to
 tap should never be ambiguous. Secondary actions (edit, delete, reorder)
 are present but visually quieter.
+
+**Destructive actions read the same at every level.** Deleting a block, an
+exercise entry, or a set is offered through the same affordance (a
+secondary, visually quiet menu next to the thing it acts on) at every
+level of that hierarchy — a user who has found it once at one level has
+found it everywhere, rather than a block getting a menu and a set getting
+a bare button.
+
+**Structure can be collapsed without being lost.** A block long enough to
+push the next one off-screen can be collapsed to its header (name,
+position, summary counts) and expanded again — the goal is a long session
+staying scannable, never hiding data the user would otherwise have to
+delete to regain legibility.
 
 **No decoration that costs attention.** Motion, color, and imagery exist
 only where they communicate state or guide focus. Anything ornamental that
@@ -231,6 +274,13 @@ Charts and lists that carry more information (progression, insights,
 history) are allowed more density on a wider layout, but never at the cost
 of legibility on the narrow one — content reflows and re-prioritizes rather
 than shrinking past a readable size.
+
+The logging form itself is reached from a floating action on the diary,
+not a permanent slot in the primary navigation (`docs/requirements.md`
+FR-1) — the primary navigation surfaces destinations the user returns to
+repeatedly (diary, search, insights, exercises); logging is instead the
+thing the user does *from* one of those, one prominent tap away, so the
+navigation never carries a tab that sits idle between sessions.
 
 Text wraps; it never scrolls sideways to be read.
 

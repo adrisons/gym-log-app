@@ -23,6 +23,7 @@ export type TokenName =
   | '--radius-sm'
   | '--radius-md'
   | '--radius-lg'
+  | '--radius-pill'
   | '--duration-instant'
   | '--duration-short'
   | '--duration-medium'

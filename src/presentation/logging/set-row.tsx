@@ -6,18 +6,59 @@
  * any more; that only happens through the exercise's own "Edit tracked
  * fields" menu item (`ExerciseTemplatePanel`). Effort only appears when
  * the template tracks it. Pre-filled from the entry's previous set
- * (FR-008, load/volume only, never effort). Confirming builds an
- * `AddSetInput` and hands it to the parent, which calls the store's
- * `addSet` action (this component has no `StoragePort` access —
- * `docs/architecture.md`'s presentation row).
+ * (FR-008, load/volume only, never effort).
+ *
+ * ADR-0007: there is no confirm button. Every field's edit schedules one
+ * shared, short (`COMMIT_DEBOUNCE_MS`) debounced commit for the row,
+ * reset on each further edit to any field — so filling in weight, then
+ * reps, then effort in quick succession still produces exactly one set
+ * with all three, not one set per field. This is why no single control
+ * commits on its own `onChange`: a wheel driven by repeated arrow-key
+ * presses (or a quick-increment button tapped several times) fires
+ * `onChange` once per step, and committing immediately on each step would
+ * otherwise record a distinct set per intermediate value on the way to
+ * the one the user actually meant (a real bug caught testing this in a
+ * browser — dialing reps to 5 via arrow keys produced five 1-rep sets
+ * before this fix). Deliberately no commit-on-blur either: leaving the
+ * weight field to tab into reps is the ordinary way to fill this row, and
+ * flushing right there would record the weight alone before reps ever
+ * gets touched — the same fragmentation bug in a different guise. The
+ * debounce is intentionally NOT cancelled on unmount either: a value the
+ * user actually typed should still land even if they navigate away within
+ * the window (constitution Principle II — closing the app, or leaving the
+ * screen, must lose nothing already entered).
+ *
+ * Either way, the moment the pending result is valid (FR-019) it's what
+ * gets committed, straight to `onConfirm` (this component has no
+ * `StoragePort` access — `docs/architecture.md`'s presentation row). A row
+ * that is already valid but untouched never schedules anything on its
+ * own — nothing here ever fires from mounting with a prefilled value, only
+ * from a real edit — so the one remaining tap, `RepeatLastSetControl`,
+ * covers that case and disappears the instant the user changes anything.
+ * Two situations reach "valid but untouched": a pre-filled row (FR-008's
+ * "single tap" repeat), and a fresh Bodyweight-load row with no previous
+ * set at all — Bodyweight counts as "present" with no component entered
+ * (`domain/load.ts`), so it is already a legal `Set` before any field is
+ * touched, and with nothing to edit there would otherwise be no way to
+ * record it at all. The control's label tells the two apart.
+ *
+ * `onConfirm` identifies the entry only by its own id (`logging-screen.tsx`
+ * calls the store's `addSet(entry.id, input)`, never `block.id`) — a set's
+ * commit resolves which block the entry currently lives under fresh, at
+ * the moment it actually fires (`draft.ts`'s `findBlockIdForEntry`), not
+ * from whatever this row's props happened to close over when the edit was
+ * made. This matters because moving the exercise entry to a different
+ * block (`moveExerciseAcrossBlocks`) unmounts this component entirely and
+ * mounts a new one under the new block — a pending debounced commit is a
+ * plain `setTimeout` that outlives that unmount (deliberately, see above),
+ * so nothing about *this instance's own props* can be "kept fresh" for it;
+ * the fix has to live where the commit is finally applied, not here.
  *
  * Keyed by the parent on the entry's set count (`key={entryId}-${sets.length}`)
  * so this component remounts, and its local input state re-initializes
- * from a fresh `prefill`, every time a set is actually added — the
- * simplest way to get "confirming an identical set is a single tap"
- * (FR-008) without a manual state-sync effect.
+ * from a fresh `prefill`, every time a set is actually added.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { WeightLoadInput } from './weight-load-input';
 import { BandLoadInput } from './band-load-input';
 import { BodyweightLoadInput } from './bodyweight-load-input';
@@ -25,10 +66,12 @@ import { FreeTextLoadInput } from './free-text-load-input';
 import { VolumeInput, MAX_REPS } from './volume-input';
 import type { VolumeKind } from './volume-input';
 import { EffortPicker } from './effort-picker';
-import { SetConfirmControl } from './set-confirm-control';
+import { RepeatLastSetControl } from './repeat-last-set-control';
 import type { AddSetInput, SetPrefill } from '@/application/logging/draft';
 import type { Load } from '@/application/logging/use-cases';
 import './logging.css';
+
+export const COMMIT_DEBOUNCE_MS = 500;
 
 export interface SetRowProps {
   prefill: SetPrefill | undefined;
@@ -52,13 +95,22 @@ function initialVolumeValue(
     // doesn't offer (it only goes to `MAX_REPS` — domain `createVolume`
     // has no upper bound). Left as-is, `WheelPicker` would silently fall
     // back to its "unset" position while this out-of-range value stayed
-    // held here, letting Add set confirm it despite the wheel visibly
-    // showing nothing selected. Normalizing to `undefined` here keeps
-    // what's held in sync with what's shown.
+    // held here, letting an edit elsewhere auto-commit it despite the
+    // wheel visibly showing nothing selected. Normalizing to `undefined`
+    // here keeps what's held in sync with what's shown.
     return volume.count <= MAX_REPS ? volume.count : undefined;
   }
   if (volume.kind === 'duration') return volume.seconds;
   return volume.metres;
+}
+
+interface FieldSnapshot {
+  weightKg: number | undefined;
+  bandLabel: string | undefined;
+  bodyweightKg: number | undefined;
+  freeText: string;
+  volumeValue: number | undefined;
+  effort: 1 | 2 | 3 | 4 | 5 | undefined;
 }
 
 export function SetRow({
@@ -98,94 +150,165 @@ export function SetRow({
   const [effort, setEffort] = useState<1 | 2 | 3 | 4 | 5 | undefined>(
     undefined,
   );
+  const [touched, setTouched] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
-  const load: { kind: Load['kind']; present: boolean } = (() => {
-    switch (loadKind) {
-      case 'weight':
-        return { kind: 'weight', present: weightKg !== undefined };
-      case 'band':
-        return { kind: 'band', present: Boolean(bandLabel) };
-      case 'bodyweight':
-        return { kind: 'bodyweight', present: true };
-      case 'freeText':
-        return { kind: 'freeText', present: freeText.trim() !== '' };
-      case 'none':
-        return { kind: 'none', present: false };
-    }
-  })();
+  const buildInput = (fields: FieldSnapshot): AddSetInput | undefined => {
+    const load: { kind: Load['kind']; present: boolean } = (() => {
+      switch (loadKind) {
+        case 'weight':
+          return { kind: 'weight', present: fields.weightKg !== undefined };
+        case 'band':
+          return { kind: 'band', present: Boolean(fields.bandLabel) };
+        case 'bodyweight':
+          return { kind: 'bodyweight', present: true };
+        case 'freeText':
+          return { kind: 'freeText', present: fields.freeText.trim() !== '' };
+        case 'none':
+          return { kind: 'none', present: false };
+      }
+    })();
 
-  const canConfirm = load.present || volumeValue !== undefined;
-
-  const handleConfirm = () => {
-    if (!canConfirm) return;
+    const canConfirm = load.present || fields.volumeValue !== undefined;
+    if (!canConfirm) return undefined;
 
     const builtLoad: AddSetInput['load'] =
-      loadKind === 'weight' && weightKg !== undefined
-        ? { kind: 'weight', value: weightKg, unit: 'kg' }
-        : loadKind === 'band' && bandLabel
-          ? { kind: 'band', label: bandLabel }
+      loadKind === 'weight' && fields.weightKg !== undefined
+        ? { kind: 'weight', value: fields.weightKg, unit: 'kg' }
+        : loadKind === 'band' && fields.bandLabel
+          ? { kind: 'band', label: fields.bandLabel }
           : loadKind === 'bodyweight'
             ? {
                 kind: 'bodyweight',
-                ...(bodyweightKg !== undefined
-                  ? { addedOrAssistedKg: bodyweightKg }
+                ...(fields.bodyweightKg !== undefined
+                  ? { addedOrAssistedKg: fields.bodyweightKg }
                   : {}),
               }
-            : loadKind === 'freeText' && freeText.trim() !== ''
-              ? { kind: 'freeText', text: freeText.trim() }
+            : loadKind === 'freeText' && fields.freeText.trim() !== ''
+              ? { kind: 'freeText', text: fields.freeText.trim() }
               : { kind: 'none' };
 
     const builtVolume: AddSetInput['volume'] =
-      volumeValue === undefined
+      fields.volumeValue === undefined
         ? undefined
         : volumeKind === 'reps'
-          ? { kind: 'reps', count: volumeValue }
+          ? { kind: 'reps', count: fields.volumeValue }
           : volumeKind === 'duration'
-            ? { kind: 'duration', seconds: volumeValue }
-            : { kind: 'distance', metres: volumeValue };
+            ? { kind: 'duration', seconds: fields.volumeValue }
+            : { kind: 'distance', metres: fields.volumeValue };
 
-    const input: AddSetInput = {
+    return {
       ...(builtVolume !== undefined ? { volume: builtVolume } : {}),
       load: builtLoad,
-      ...(effort !== undefined ? { effort } : {}),
+      ...(fields.effort !== undefined ? { effort: fields.effort } : {}),
       setKind: 'working',
     };
-    onConfirm(input);
   };
+
+  const currentFields: FieldSnapshot = {
+    weightKg,
+    bandLabel,
+    bodyweightKg,
+    freeText,
+    volumeValue,
+    effort,
+  };
+  const liveInput = buildInput(currentFields);
+
+  function clearPendingCommit() {
+    if (debounceRef.current !== undefined) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = undefined;
+    }
+  }
+
+  /** Marks the row touched, stores a field's new value, and (re)schedules
+   * the row's one shared debounced commit — computed now, from `value`
+   * substituted in explicitly alongside this render's other fields, not
+   * read back off state later when the timer fires (state may have moved
+   * on by then; `value` and the other fields as of *this* edit are what
+   * this specific commit should reflect). */
+  function updateField<K extends keyof FieldSnapshot>(
+    field: K,
+    value: FieldSnapshot[K],
+    setter: (value: FieldSnapshot[K]) => void,
+  ) {
+    setTouched(true);
+    setter(value);
+    clearPendingCommit();
+    const input = buildInput({ ...currentFields, [field]: value });
+    if (input) {
+      debounceRef.current = setTimeout(() => {
+        debounceRef.current = undefined;
+        onConfirm(input);
+      }, COMMIT_DEBOUNCE_MS);
+    }
+  }
+
+  // Valid without any edit: either a pre-filled repeat (FR-008), or a
+  // fresh Bodyweight-only row with nothing else required (see file
+  // doc comment) — the two cases `RepeatLastSetControl` covers.
+  const untouchedValidInput = !touched ? liveInput : undefined;
 
   return (
     <div className="set-row">
       {loadKind === 'weight' && (
-        <WeightLoadInput valueKg={weightKg} onChange={setWeightKg} />
+        <WeightLoadInput
+          valueKg={weightKg}
+          onChange={(value) => updateField('weightKg', value, setWeightKg)}
+        />
       )}
       {loadKind === 'band' && (
         <BandLoadInput
           bandLabels={bandLabels}
           selectedLabel={bandLabel}
-          onSelectLabel={setBandLabel}
+          onSelectLabel={(value) =>
+            updateField('bandLabel', value, setBandLabel)
+          }
           onSaveBandLabels={onSaveBandLabels}
         />
       )}
       {loadKind === 'bodyweight' && (
         <BodyweightLoadInput
           addedOrAssistedKg={bodyweightKg}
-          onChange={setBodyweightKg}
+          onChange={(value) =>
+            updateField('bodyweightKg', value, setBodyweightKg)
+          }
         />
       )}
       {loadKind === 'freeText' && (
         <FreeTextLoadInput
           text={freeText}
           suggestions={freeTextSuggestions}
-          onChange={setFreeText}
+          onChange={(value) => updateField('freeText', value, setFreeText)}
         />
       )}
       <VolumeInput
         kind={volumeKind}
         value={volumeValue}
-        onValueChange={setVolumeValue}
+        onValueChange={(value) =>
+          updateField('volumeValue', value, setVolumeValue)
+        }
       />
-      {trackEffort && <EffortPicker value={effort} onChange={setEffort} />}
-      <SetConfirmControl canConfirm={canConfirm} onConfirm={handleConfirm} />
+      {trackEffort && (
+        <EffortPicker
+          value={effort}
+          onChange={(value) => updateField('effort', value, setEffort)}
+        />
+      )}
+      {untouchedValidInput && (
+        <RepeatLastSetControl
+          onRepeat={() => onConfirm(untouchedValidInput)}
+          {...(prefillMatchesLoadKind ? {} : { label: 'Log this set' })}
+        />
+      )}
+      {!liveInput && (
+        <p className="logging-screen__field-label" role="status">
+          Enter a load or a rep count to record this set.
+        </p>
+      )}
     </div>
   );
 }

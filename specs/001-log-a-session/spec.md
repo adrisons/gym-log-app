@@ -169,17 +169,23 @@ core value on its own.
 6. **Given** an exercise already has at least one set in the current
    session, **When** the user adds another set to it, **Then** the new set
    is pre-filled with the previous set's load and volume (not its effort),
-   so confirming it is one tap.
+   so confirming it is one tap. _(Amended by ADR-0007: "confirming" here is
+   a tap on "Repeat last set" — the row's own dedicated one-tap-repeat
+   control, not a general confirm button.)_
 7. **Given** the user just recorded a set, **When** the set is saved,
    **Then** there is no visible "Save" control anywhere on the screen — the
-   set appears recorded the instant it is confirmed.
+   set appears recorded the instant it is confirmed. _(Since ADR-0007, this
+   now also holds for a freshly-typed set: there is no confirm control to
+   see at all — the set records itself the moment the edit that completes
+   it lands.)_
 8. **Given** the user closes the app (backgrounds it, loses connectivity,
    the OS kills it) immediately after entering a set, **When** they reopen
    the app, **Then** that set is still there, unchanged.
 9. **Given** the user taps the confirm control twice in quick succession on
    a pre-filled set, **When** the second tap lands within ~1 second, **Then**
    only one set is recorded; a deliberate second identical set after that
-   window records normally.
+   window records normally. _(Amended by ADR-0007: "the confirm control" is
+   now "Repeat last set"; the debounce guarantee is otherwise unchanged.)_
 
 ---
 
@@ -342,7 +348,9 @@ result — independently verifiable without blocks, load types, or effort.
 - Confirming a set that is still invalid per FR-019 (no volume, and Load is
   None or unset) stores nothing: the confirm action is a silent no-op, or
   the confirm control is unavailable, until the set has a volume or a
-  non-None load.
+  non-None load. _(Amended by ADR-0007: with auto-commit, this means an
+  edit that leaves the set invalid simply commits nothing — same outcome,
+  no control to disable.)_
 - Two overlapping 5-second undo windows: a set is individually deleted, and
   before its own undo window elapses the containing block is deleted too.
   Block-undo restores the block to exactly its state at the moment of block
@@ -438,7 +446,11 @@ result — independently verifiable without blocks, load types, or effort.
 - **FR-008**: The system MUST pre-fill a new set for an exercise with the
   previous set's load and volume for that same exercise, so confirming an
   identical set is a single tap. Effort is deliberately NOT carried forward
-  — it is re-entered or left blank on each set.
+  — it is re-entered or left blank on each set. _(Amended by ADR-0007: there
+  is no general confirm control any more — a freshly-edited valid set
+  commits on its own. "Single tap" now names the dedicated "Repeat last
+  set" control, offered only for a pre-filled row the user has not
+  touched.)_
 - **FR-009**: The system MUST let the user choose a load type per exercise
   (Weight, Band, Bodyweight, Free text, or None), remember it as that
   exercise's default, and allow overriding it per individual set. _(Amended
@@ -483,7 +495,10 @@ result — independently verifiable without blocks, load types, or effort.
   NOT count as "load present" for this rule — a set with `Load: None` and no
   volume MUST NOT be stored (per `docs/requirements.md` §3.3). Confirming
   such a set MUST store nothing: the confirm action is a silent no-op, or
-  the confirm control is unavailable, until the set is valid.
+  the confirm control is unavailable, until the set is valid. _(Amended by
+  ADR-0007: with no general confirm control, this means an edit that still
+  leaves the set invalid simply does not commit anything — same rule,
+  nothing left to tap.)_
 - **FR-020**: Renaming a catalogue exercise MUST NOT change what any past
   set refers to — references are by identifier, never by name.
 - **FR-021**: The system MUST allow more than one session per calendar day,
@@ -513,7 +528,9 @@ result — independently verifiable without blocks, load types, or effort.
 - **FR-025**: When the user confirms a set, the system MUST ignore an
   identical confirmation repeated within a short debounce window (~1
   second); a subsequent identical set confirmed after that window MUST be
-  recorded as a new set.
+  recorded as a new set. _(Amended by ADR-0007: "confirms" now covers
+  either the automatic commit on a valid edit or a tap on "Repeat last
+  set" — the debounce mechanism is unchanged and applies to both.)_
 - **FR-026**: A numeric Volume value MUST be greater than 0. A numeric Load
   value (Weight, or the added side of a Bodyweight component) MUST be
   greater than or equal to 0.

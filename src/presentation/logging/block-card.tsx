@@ -22,6 +22,18 @@
  * block the user simply hasn't renamed yet is never `bare` — FR-2
  * requires it to keep showing its position label and stay
  * renameable/deletable.
+ *
+ * Collapse/expand (`docs/requirements.md` FR-2) is local UI state, reset
+ * on remount — never persisted as part of the Session, and independent of
+ * the block's own 5-second delete-undo window. Collapsing hides the body
+ * with the `hidden` attribute rather than omitting it from the tree: a
+ * `SetRow` inside can have a commit debounced-but-not-yet-fired
+ * (ADR-0007), and that timer is deliberately not cancelled on unmount —
+ * unmounting it here by conditionally rendering the body would have
+ * discarded that in-flight `SetRow` instance's own local state (though not
+ * the pending commit itself) the moment a block collapses, which is a
+ * mere visual fold, not the "navigated away" case ADR-0007's guarantee is
+ * about.
  */
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -52,6 +64,7 @@ export function BlockCard({
 }: BlockCardProps) {
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState(hasName ? displayName : '');
+  const [collapsed, setCollapsed] = useState(false);
 
   if (bare) {
     return (
@@ -93,6 +106,17 @@ export function BlockCard({
           </form>
         ) : (
           <>
+            <button
+              type="button"
+              className="logging-button block-card__collapse-toggle"
+              aria-expanded={!collapsed}
+              aria-label={
+                collapsed ? `Expand ${displayName}` : `Collapse ${displayName}`
+              }
+              onClick={() => setCollapsed((current) => !current)}
+            >
+              <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} />
+            </button>
             <div className="block-card__title">
               <h2>{displayName}</h2>
               {subtitle && (
@@ -140,8 +164,10 @@ export function BlockCard({
           </>
         )}
       </div>
-      {children}
-      {footer}
+      <div className="block-card__body" hidden={collapsed}>
+        {children}
+        {footer}
+      </div>
     </section>
   );
 }

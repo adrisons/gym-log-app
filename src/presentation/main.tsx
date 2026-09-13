@@ -25,11 +25,14 @@
  *
  * Spec 004 (Diary, search and progression): adds `react-router-dom`
  * routes for the diary/history, search, and progression screens
- * (research.md §3) alongside the logging screen at `/`. Routing is
- * introduced only here, at the composition boundary — `LoggingScreen`
- * itself, and `configure()`'s call before the router renders, are
- * unchanged (constitution Principle II: no added latency/step on the
- * logging critical path).
+ * (research.md §3) alongside the logging screen. `/` redirects to
+ * `/diary` — the diary is the app's home; the logging form lives at
+ * `/log`, reached from a floating action there rather than a nav tab
+ * (`docs/requirements.md` FR-1's design-refinement update), in its own
+ * `LoggingShell` (no `BottomNav`). Routing is introduced only here, at
+ * the composition boundary — `LoggingScreen` itself, and `configure()`'s
+ * call before the router renders, are unchanged (constitution Principle
+ * II: no added latency/step on the logging critical path).
  *
  * `BrowserRouter`'s `basename` is `import.meta.env.BASE_URL` — Vite sets
  * this to whatever `vite.config.ts`'s `base` resolves to (`/` normally,
@@ -41,9 +44,9 @@
  */
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { registerSW } from 'virtual:pwa-register';
-import { AppShell } from './app-shell';
+import { AppShell, LoggingShell } from './app-shell';
 import { LoggingScreen } from './logging/logging-screen';
 import { DiaryScreen } from './diary/diary-screen';
 import { SessionDetailScreen } from './diary/session-detail-screen';
@@ -96,8 +99,8 @@ function mount(): void {
     <StrictMode>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
+          <Route path="/" element={<Navigate to="/diary" replace />} />
           <Route element={<AppShell />}>
-            <Route path="/" element={<LoggingScreen />} />
             <Route path="/diary" element={<DiaryScreen />} />
             <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
             <Route path="/search" element={<ExerciseSearchScreen />} />
@@ -107,6 +110,9 @@ function mount(): void {
             />
             <Route path="/insights" element={<InsightsScreen />} />
             <Route path="/exercises" element={<ExerciseCatalogueScreen />} />
+          </Route>
+          <Route element={<LoggingShell />}>
+            <Route path="/log" element={<LoggingScreen />} />
           </Route>
         </Routes>
       </BrowserRouter>

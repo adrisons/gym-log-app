@@ -12,9 +12,19 @@ import './logging.css';
 const LEVELS = [1, 2, 3, 4, 5] as const;
 type EffortLevel = (typeof LEVELS)[number];
 
+function toneForLevel(level: EffortLevel): 'success' | 'warning' | 'danger' {
+  if (level <= 2) return 'success';
+  if (level <= 4) return 'warning';
+  return 'danger';
+}
+
 const OPTIONS: WheelPickerOption<EffortLevel | undefined>[] = [
   { value: undefined, label: 'Not recorded' },
-  ...LEVELS.map((level) => ({ value: level, label: formatEffort(level)! })),
+  ...LEVELS.map((level) => ({
+    value: level,
+    label: formatEffort(level)!,
+    tone: toneForLevel(level),
+  })),
 ];
 
 export interface EffortPickerProps {

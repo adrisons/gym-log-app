@@ -84,7 +84,7 @@ describe('useLoggingSession undo stack (FR-004, FR-023)', () => {
     const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
     const entryId =
       useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
-    await useLoggingSession.getState().addSet(blockId, entryId, {
+    await useLoggingSession.getState().addSet(entryId, {
       volume: { kind: 'reps', count: 5 },
       load: { kind: 'none' },
       setKind: 'working',
@@ -102,6 +102,103 @@ describe('useLoggingSession undo stack (FR-004, FR-023)', () => {
       useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!;
     expect(restoredEntry.sets).toEqual([]);
     expect(useLoggingSession.getState().undoStack).toHaveLength(1);
+  });
+});
+
+describe('useLoggingSession.addSet (ADR-0007 debounce / stale-block-id regression)', () => {
+  it("resolves the entry's current block by id, not one the caller might have had in mind before a move", async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addBlock('A', 'straightSets');
+    await useLoggingSession.getState().addBlock('B', 'straightSets');
+    const blockA = useLoggingSession.getState().draft!.blocks[0]!.id;
+    const blockB = useLoggingSession.getState().draft!.blocks[1]!.id;
+    await useLoggingSession
+      .getState()
+      .addExerciseEntry('ex-1' as ExerciseId, blockA);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+
+    // Simulates a commit that was scheduled while the entry lived in
+    // block A, but only actually fires (this call) after the entry has
+    // since been moved to block B — the exact ADR-0007 debounce-vs-move
+    // race a fixed-at-schedule-time block id would get wrong.
+    await useLoggingSession
+      .getState()
+      .moveExerciseAcrossBlocks(blockA, entryId, blockB);
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+
+    const draft = useLoggingSession.getState().draft!;
+    expect(draft.blocks[0]!.exercises).toHaveLength(0);
+    expect(draft.blocks[1]!.exercises[0]!.sets).toHaveLength(1);
+  });
+
+  it('is a no-op when the entry no longer resolves to any block (deleted in the meantime)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+
+    await useLoggingSession.getState().deleteExerciseEntry(blockId, entryId);
+
+    await expect(
+      useLoggingSession.getState().addSet(entryId, {
+        volume: { kind: 'reps', count: 8 },
+        load: { kind: 'none' },
+        setKind: 'working',
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('sets justLoggedASet only once a set is actually recorded, and initialize() resets it', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    expect(useLoggingSession.getState().justLoggedASet).toBe(false);
+
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+
+    expect(useLoggingSession.getState().justLoggedASet).toBe(true);
+
+    await useLoggingSession.getState().initialize();
+    expect(useLoggingSession.getState().justLoggedASet).toBe(false);
+  });
+
+  it('clearJustLoggedASet resets the flag without touching anything else', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    expect(useLoggingSession.getState().justLoggedASet).toBe(true);
+
+    useLoggingSession.getState().clearJustLoggedASet();
+
+    expect(useLoggingSession.getState().justLoggedASet).toBe(false);
+    expect(
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets,
+    ).toHaveLength(1);
   });
 });
 
