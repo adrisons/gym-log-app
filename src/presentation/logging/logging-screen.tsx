@@ -134,7 +134,7 @@ export function LoggingScreen() {
   // replay the animation for a row left over from a previous visit.
   // Empty deps deliberately: this must run only on true unmount, reading
   // whatever is live in the store at that moment, never on every
-  // lastAddedSetId change (which would just been re-added a moment later).
+  // lastAddedSetId change (which would just be re-added a moment later).
   useEffect(() => {
     return () => {
       useLoggingSession.getState().clearLastAddedSetId();

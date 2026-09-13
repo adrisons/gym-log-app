@@ -20,15 +20,27 @@
   font-weight: 600;
   text-decoration: none;
   color: var(--color-foreground-muted);
-  transition: color var(--duration-short) var(--easing-standard);
+  transition:
+    color var(--duration-short) var(--easing-standard),
+    transform var(--duration-instant) var(--easing-standard);
 }
 
 .bottom-nav__tab:hover {
   color: var(--color-foreground);
 }
 
+/* Press feedback (docs/design.md §4.5 — every tappable control scales
+   down slightly on press); the background change alone didn't meet
+   that. */
 .bottom-nav__tab:active {
   background: var(--color-border);
+  transform: scale(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottom-nav__tab:active {
+    transform: none;
+  }
 }
 
 .bottom-nav__tab:focus-visible {

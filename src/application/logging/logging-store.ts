@@ -181,14 +181,27 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
   const applyDelete = async (
     operation: (draft: LoggingDraft) => DeleteResult,
   ): Promise<void> => {
-    const { storage, draft: current } = get();
+    const { storage, draft: current, lastAddedSetId } = get();
     if (!storage || !current) return;
     const { draft: updated, undo: undoEntry } = operation(current);
     if (updated === current) return; // id didn't resolve — noopUndo, nothing to push
     const touched = touch(updated);
+    // If the set this delete just removed was the one-shot "just added"
+    // marker, clear it here — otherwise undoing this same delete restores
+    // a set with that id and replays its entrance animation, even though
+    // it's no longer the set that was actually just logged (Copilot
+    // review, PR #22).
+    const markedSetStillPresent =
+      lastAddedSetId === undefined ||
+      touched.blocks.some((block) =>
+        block.exercises.some((entry) =>
+          entry.sets.some((s) => s.id === lastAddedSetId),
+        ),
+      );
     set((state) => ({
       draft: touched,
       undoStack: [...state.undoStack, undoEntry],
+      ...(markedSetStillPresent ? {} : { lastAddedSetId: undefined }),
     }));
     await storage.saveDraft(touched);
     setTimeout(
@@ -224,13 +237,24 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       // flight; resetting afterward would silently erase that signal
       // (Copilot review, PR #22).
       set({ justLoggedASet: false, lastAddedSetId: undefined });
+      const draftBeforeReads = get().draft;
       const [draft, catalogue, sessions, bandLabels] = await Promise.all([
         openLoggingForm(storage),
         storage.listExercises(),
         storage.listSessions(FULL_RANGE),
         storage.listBandLabels(),
       ]);
-      set({ draft, catalogue, sessions, bandLabels });
+      // A debounced commit (ADR-0007's timer outlives unmount) or another
+      // mutation can land on `draft` while the reads above are in flight;
+      // applying this now-stale read would silently discard it (Copilot
+      // review, PR #22) — only overwrite `draft` if nothing else already
+      // did while we were reading.
+      set((state) => ({
+        draft: state.draft === draftBeforeReads ? draft : state.draft,
+        catalogue,
+        sessions,
+        bandLabels,
+      }));
     },
 
     clearJustLoggedASet: () => set({ justLoggedASet: false }),

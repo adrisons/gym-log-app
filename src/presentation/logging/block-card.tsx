@@ -50,7 +50,7 @@
  * immediately on a valid change (FR-1's "no Save button" applies here
  * too); an empty field means "not specified", never `0`.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode, TransitionEvent } from 'react';
 import { Icon } from '@/presentation/design/icons';
 import { prefersReducedMotion } from '@/presentation/design/motion';
@@ -101,6 +101,23 @@ export function BlockCard({
   // reintroduce the very overflow-menu clipping bug this mechanism
   // replaced.
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // If the OS preference flips to reduced-motion mid-transition, the CSS
+  // transition `handleCollapseTransitionEnd` normally waits on stops
+  // firing at all — leaving `isTransitioning` (and the `inert` it drives)
+  // stuck true forever, permanently hiding this block's content from
+  // focus/assistive tech (Copilot review, PR #22).
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setIsTransitioning(false);
+      }
+    };
+    query.addEventListener('change', handleChange);
+    return () => query.removeEventListener('change', handleChange);
+  }, []);
 
   function toggleCollapsed() {
     setCollapsed((current) => !current);

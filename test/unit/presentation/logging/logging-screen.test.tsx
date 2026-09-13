@@ -102,8 +102,8 @@ describe('LoggingScreen (FR-001)', () => {
     await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
     await userEvent.keyboard('{ArrowDown}');
     // One `waitFor`, not two: the animation marker is intentionally
-    // consumed a short time after being set (`logging-screen.tsx`'s
-    // `SET_SUMMARY_ANIMATION_MS` effect), so asserting the DOM in a
+    // consumed once the marked row's own entrance animation ends (or
+    // immediately under reduced motion), so asserting the DOM in a
     // separate, later `waitFor` would race that cleanup. Checking both the
     // storage write and the marked row in the same callback means this
     // only "passes" at the earliest instant sets.length is 2 — the same

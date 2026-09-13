@@ -20,6 +20,47 @@ describe('useLoggingSession (research.md §5)', () => {
     expect(state.draft).toBeDefined();
     expect(state.draft?.blocks).toEqual([]);
   });
+
+  it('does not clobber a draft mutated by a debounced commit while initialize() is still reading (Copilot review, PR #22)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+
+    // Delay one of initialize()'s parallel reads so a concurrent commit —
+    // simulating ADR-0007's debounce timer, deliberately not cancelled on
+    // unmount — can land on `draft` while this (re-)initialize's own reads
+    // are still in flight, as on a route remount before the previous
+    // visit's pending commit has fired.
+    let releaseRead = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    const originalListExercises = storage.listExercises.bind(storage);
+    vi.spyOn(storage, 'listExercises').mockImplementation(async () => {
+      await gate;
+      return originalListExercises();
+    });
+
+    const initializePromise = useLoggingSession.getState().initialize();
+
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const committedSetId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+
+    releaseRead();
+    await initializePromise;
+
+    const finalSets =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets;
+    expect(finalSets.map((s) => s.id)).toContain(committedSetId);
+  });
 });
 
 describe('useLoggingSession undo stack (FR-004, FR-023)', () => {
@@ -233,6 +274,64 @@ describe('useLoggingSession.addSet (ADR-0007 debounce / stale-block-id regressio
     expect(
       useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets,
     ).toHaveLength(1);
+  });
+
+  it('deleting the marked set clears lastAddedSetId, so undoing that same delete does not replay its entrance animation (Copilot review, PR #22)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const setId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+    expect(useLoggingSession.getState().lastAddedSetId).toBe(setId);
+
+    await useLoggingSession.getState().deleteSet(blockId, entryId, setId);
+    expect(useLoggingSession.getState().lastAddedSetId).toBeUndefined();
+
+    await useLoggingSession.getState().undo(setId);
+    // The undo restores a set with the same id, but it is no longer the
+    // one that was actually just logged — the marker must stay cleared.
+    expect(
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets,
+    ).toHaveLength(1);
+    expect(useLoggingSession.getState().lastAddedSetId).toBeUndefined();
+  });
+
+  it('deleting an unrelated set leaves lastAddedSetId pointing at the still-present marked set', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const firstSetId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 5 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const secondSetId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[1]!.id;
+    expect(useLoggingSession.getState().lastAddedSetId).toBe(secondSetId);
+
+    await useLoggingSession.getState().deleteSet(blockId, entryId, firstSetId);
+
+    expect(useLoggingSession.getState().lastAddedSetId).toBe(secondSetId);
   });
 
   it('clearJustLoggedASet resets the flag without touching anything else', async () => {

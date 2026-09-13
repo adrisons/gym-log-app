@@ -26,11 +26,27 @@ export function SessionSavedToast({ onDismiss }: SessionSavedToastProps) {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
+    let dismissed = false;
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
+      onDismiss?.();
+    };
     const timeout = setTimeout(() => {
       setVisible(false);
-      onDismiss?.();
+      dismiss();
     }, VISIBLE_MS);
-    return () => clearTimeout(timeout);
+    return () => {
+      clearTimeout(timeout);
+      // Leaving before the timeout fires (e.g. navigating away) must still
+      // consume the one-shot flag this mount was conditioned on — otherwise
+      // it survives to a later remount of this same route and replays
+      // "Session saved" even though nothing new was logged since (Copilot
+      // review, PR #22). The `dismissed` guard keeps this from also firing
+      // a second time right after the timeout's own call above, once
+      // clearing the flag causes `DiaryScreen` to unmount this component.
+      dismiss();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

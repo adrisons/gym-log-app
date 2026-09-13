@@ -321,8 +321,8 @@
   min-height: 0;
 }
 
-/* `--transitioning` (`block-card.tsx`, cleared on a timeout matching the
-   transition above) keeps this clipped through an *expand* too, not just
+/* `--transitioning` (`block-card.tsx`, cleared on the wrapper's own
+   `onTransitionEnd`) keeps this clipped through an *expand* too, not just
    the collapsed steady state — dropping overflow:hidden the instant
    `--collapsed` is removed let full-height content paint outside the
    still-growing 0fr->1fr track and overlap the header for the transition's
