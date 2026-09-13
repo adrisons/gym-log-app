@@ -200,7 +200,7 @@ describe('DiaryScreen (FR-001..006)', () => {
     }
   });
 
-  it('"Select sessions" arms bulk-select without a long press, for keyboard/screen-reader use', async () => {
+  it("tapping a row's own icon arms bulk-select and selects that row in one tap (ADR-0009, Gmail pattern)", async () => {
     const storage = new InMemoryStorage();
     const exerciseId = 'ex-1' as ExerciseId;
     await storage.saveExercise({
@@ -222,32 +222,32 @@ describe('DiaryScreen (FR-001..006)', () => {
       </MemoryRouter>,
     );
 
-    let sessionLink: HTMLElement;
     await waitFor(() => {
-      sessionLink = screen.getByRole('link', { name: /squat/i });
-      expect(sessionLink).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /squat/i })).toBeInTheDocument();
     });
 
     expect(
       screen.queryByRole('toolbar', { name: /selected sessions/i }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /select sessions/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^select session/i }));
 
     expect(
       screen.getByRole('toolbar', { name: /selected sessions/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/0 sessions selected/i)).toBeInTheDocument();
+    // Unlike a separate "arm with nothing selected" control, tapping the
+    // icon both enters selection mode and selects that row in one action.
+    expect(screen.getByText(/1 session selected/i)).toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: /log session/i }),
     ).not.toBeInTheDocument();
 
-    // A plain click on the row (the same event a native <a>'s Enter/Space
-    // keypress dispatches) toggles it now that selection mode is active —
-    // the row itself is captured above, before it swapped to
-    // `role="button"` (which it exposes once selection mode is active).
-    fireEvent.click(sessionLink!);
-    expect(screen.getByText(/1 session selected/i)).toBeInTheDocument();
+    // Tapping the same icon again deselects it — the last row deselected
+    // exits selection mode automatically.
+    fireEvent.click(screen.getByRole('button', { name: /^deselect session/i }));
+    expect(
+      screen.queryByRole('toolbar', { name: /selected sessions/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('deleting a selection removes it and Undo restores it exactly (FR-6, FR-004)', async () => {
@@ -367,7 +367,7 @@ describe('DiaryScreen (FR-001..006)', () => {
     }
   });
 
-  it('exposes the selected row as a pressed toggle button, not a link, once selection mode is active (accessible-selection-state regression)', async () => {
+  it('exposes an unselected row as a pressed toggle button, not a link, once another row armed selection mode (accessible-selection-state regression)', async () => {
     const storage = new InMemoryStorage();
     const exerciseId = 'ex-1' as ExerciseId;
     await storage.saveExercise({
@@ -381,6 +381,7 @@ describe('DiaryScreen (FR-001..006)', () => {
       discipline: 'Strength',
     });
     await seedSession(storage, 's1', '2026-09-11T10:00:00.000Z', exerciseId);
+    await seedSession(storage, 's2', '2026-09-10T10:00:00.000Z', exerciseId);
     useStorageAccess.getState().configure(storage);
 
     render(
@@ -389,19 +390,25 @@ describe('DiaryScreen (FR-001..006)', () => {
       </MemoryRouter>,
     );
 
-    let link: HTMLElement;
     await waitFor(() => {
-      link = screen.getByRole('link', { name: /squat/i });
-      expect(link).toBeInTheDocument();
+      expect(screen.getAllByRole('link', { name: /squat/i })).toHaveLength(2);
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /select sessions/i }));
-    expect(screen.queryByRole('link', { name: /squat/i })).toBeNull();
-    const toggle = screen.getByRole('button', { name: /squat/i });
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    // Arming via s1's own icon both enters selection mode and selects it.
+    const [selectIcon1] = screen.getAllByRole('button', {
+      name: /^select session/i,
+    });
+    fireEvent.click(selectIcon1!);
 
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('link', { name: /squat/i })).toBeNull();
+    const [toggle1, toggle2] = screen.getAllByRole('button', {
+      name: /squat/i,
+    });
+    expect(toggle1).toHaveAttribute('aria-pressed', 'true');
+    expect(toggle2).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(toggle2!);
+    expect(toggle2).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('Space toggles a focused row while selection mode is active (native <a> dispatches click for Enter but not Space)', async () => {
@@ -418,6 +425,7 @@ describe('DiaryScreen (FR-001..006)', () => {
       discipline: 'Strength',
     });
     await seedSession(storage, 's1', '2026-09-11T10:00:00.000Z', exerciseId);
+    await seedSession(storage, 's2', '2026-09-10T10:00:00.000Z', exerciseId);
     useStorageAccess.getState().configure(storage);
 
     render(
@@ -427,15 +435,19 @@ describe('DiaryScreen (FR-001..006)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: /squat/i })).toBeInTheDocument();
+      expect(screen.getAllByRole('link', { name: /squat/i })).toHaveLength(2);
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /select sessions/i }));
-    const toggle = screen.getByRole('button', { name: /squat/i });
-
-    fireEvent.keyDown(toggle, { key: ' ' });
-
+    const [selectIcon1] = screen.getAllByRole('button', {
+      name: /^select session/i,
+    });
+    fireEvent.click(selectIcon1!);
     expect(screen.getByText(/1 session selected/i)).toBeInTheDocument();
+
+    const [, toggle2] = screen.getAllByRole('button', { name: /squat/i });
+    fireEvent.keyDown(toggle2!, { key: ' ' });
+
+    expect(screen.getByText(/2 sessions selected/i)).toBeInTheDocument();
   });
 
   it('shows the save-acknowledgement toast once when justRegisteredWorkout is set, and clears it so a remount does not replay it (ADR-0008/design.md §1.1 regression)', async () => {

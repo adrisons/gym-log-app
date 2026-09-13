@@ -319,20 +319,25 @@ Create a session and add blocks, exercises and sets.
   movement patterns or, once a second discipline exists per §1.4, their
   discipline — never a separately-entered field).
 - Session detail view, editable after the fact.
-- Jump to a specific date.
+- Search by exercise name (substring and typo-tolerant, the same matching
+  FR-7 uses) to filter the list to sessions that logged that exercise
+  (ADR-0009 — supersedes the original "jump to a specific date").
 - Sessions can be selected in bulk — entered by a sustained press on a
-  session row, or by an explicit "Select sessions" control for keyboard/
-  screen-reader use (a sustained press has no keyboard equivalent) — which
-  marks a row selected and replaces the primary logging action with a
-  floating bar offering Cancel and Delete for the current selection. A
+  session row, or by tapping a row's own leading icon (which both enters
+  selection mode and selects that row, Gmail's tap-the-avatar pattern,
+  ADR-0009 — supersedes the original explicit "Select sessions" control) —
+  which marks a row selected and replaces the primary logging action with
+  a floating bar offering Cancel and Delete for the current selection. A
   normal tap (or, once selection mode is active, Enter/Space on a focused
   row) toggles that row into or out of the selection instead of opening
-  it. Deleting a selection removes those sessions and is undoable for at
-  least 5 seconds (the same guarantee FR-004 makes for a set, exercise, or
-  block), restoring every deleted session exactly as it was — including
-  when a session's own delete failed to reach storage (the deletion never
-  actually happened; the row simply reappears once that's known) and
-  independently of any other delete/undo in progress at the same time.
+  it; deselecting the last selected row exits selection mode
+  automatically. Deleting a selection removes those sessions and is
+  undoable for at least 5 seconds (the same guarantee FR-004 makes for a
+  set, exercise, or block), restoring every deleted session exactly as it
+  was — including when a session's own delete failed to reach storage (the
+  deletion never actually happened; the row simply reappears once that's
+  known) and independently of any other delete/undo in progress at the
+  same time.
 
 ### FR-7 — Exercise search `[v1]`
 

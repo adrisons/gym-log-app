@@ -1,7 +1,15 @@
 .app-shell {
   display: flex;
   flex-direction: column;
+  /* `100dvh` (dynamic viewport height) after the `100vh` fallback for a
+     browser that doesn't understand it — plain `100vh` on mobile Safari
+     doesn't track the address bar collapsing/expanding as the page
+     scrolls, leaving a gap of unthemed default background below this
+     shell's own bottom edge once the toolbar collapses (most visible on a
+     short screen, e.g. one diary session). `dvh` tracks the actual visual
+     viewport instead. */
   height: 100vh;
+  height: 100dvh;
   background: var(--color-canvas);
 }
 

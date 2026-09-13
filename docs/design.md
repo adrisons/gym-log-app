@@ -315,10 +315,18 @@ than shrinking past a readable size.
 
 The logging form itself is reached from a floating action on the diary,
 not a permanent slot in the primary navigation (`docs/requirements.md`
-FR-1) — the primary navigation surfaces destinations the user returns to
-repeatedly (diary, search, insights, exercises); logging is instead the
-thing the user does *from* one of those, one prominent tap away, so the
-navigation never carries a tab that sits idle between sessions.
+FR-1) — logging is instead the thing the user does *from* the diary, one
+prominent tap away, so the navigation never carries a tab that sits idle
+between sessions.
+
+Primary navigation (ADR-0009, superseding an earlier always-visible bottom
+tab bar) is a hamburger menu, right-aligned in a slim header at the top of
+every screen, opening a short list of the destinations the user returns to
+repeatedly: Diary, Insights, Exercises. Exercise search-by-catalogue stays
+reachable (from a session's own logged exercises, and from Insights' cards)
+but no longer occupies its own primary-nav entry — the diary's own search
+(FR-6) now covers "find a session by exercise", which was that entry's most
+common use.
 
 Text wraps; it never scrolls sideways to be read.
 

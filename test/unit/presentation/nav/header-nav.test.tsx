@@ -1,0 +1,94 @@
+import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { HeaderNav } from '@/presentation/nav/header-nav';
+
+describe('HeaderNav', () => {
+  it('renders a closed menu behind a right-aligned hamburger button', () => {
+    render(
+      <MemoryRouter>
+        <HeaderNav />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Menu' })).toBeInTheDocument();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('opens the menu with exactly Diary, Insights, Exercises — no Search (ADR-0009)', () => {
+    render(
+      <MemoryRouter>
+        <HeaderNav />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+
+    const menu = screen.getByRole('menu', { name: 'Primary' });
+    const items = screen.getAllByRole('menuitem');
+    expect(items).toHaveLength(3);
+    for (const name of ['Diary', 'Insights', 'Exercises']) {
+      expect(
+        screen.getByRole('menuitem', { name: new RegExp(name) }),
+      ).toBeInTheDocument();
+    }
+    expect(
+      screen.queryByRole('menuitem', { name: /search/i }),
+    ).not.toBeInTheDocument();
+    expect(menu).toBeInTheDocument();
+  });
+
+  it('marks "Diary" active on a nested diary route', () => {
+    render(
+      <MemoryRouter initialEntries={['/diary/session-1']}>
+        <HeaderNav />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    expect(screen.getByRole('menuitem', { name: /diary/i })).toHaveClass(
+      'header-nav__item--active',
+    );
+  });
+
+  it('closes on Escape and returns focus to the toggle', () => {
+    render(
+      <MemoryRouter>
+        <HeaderNav />
+      </MemoryRouter>,
+    );
+    const toggle = screen.getByRole('button', { name: 'Menu' });
+    fireEvent.click(toggle);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(toggle).toHaveFocus();
+  });
+
+  it('closes when choosing a destination', () => {
+    render(
+      <MemoryRouter>
+        <HeaderNav />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /insights/i }));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('closes on an outside click', () => {
+    render(
+      <div>
+        <MemoryRouter>
+          <HeaderNav />
+        </MemoryRouter>
+        <button type="button">Elsewhere</button>
+      </div>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByRole('button', { name: 'Elsewhere' }));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+});

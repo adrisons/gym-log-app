@@ -29,7 +29,8 @@ export type IconName =
   | 'book'
   | 'search'
   | 'chart'
-  | 'list';
+  | 'list'
+  | 'menu';
 
 const PATHS: Record<IconName, string> = {
   plus: 'M10 4v12M4 10h12',
@@ -50,6 +51,7 @@ const PATHS: Record<IconName, string> = {
   search: 'M12.5 12.5 17 17 M9 14a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z',
   chart: 'M4 16V9 M9.5 16V4 M15 16v-6',
   list: 'M4 5.5h12 M4 10h12 M4 14.5h12',
+  menu: 'M4 6h12 M4 10h12 M4 14h12',
 };
 
 export interface IconProps extends SVGProps<SVGSVGElement> {

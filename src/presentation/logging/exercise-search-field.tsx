@@ -25,6 +25,18 @@
  * neither of which this control implements, and a half-implemented
  * combobox is worse for assistive tech than a correctly plain one — every
  * result is still a real, individually tab-reachable `<button>`.
+ *
+ * The results list has its own `onMouseDown` that calls
+ * `preventDefault()` — without it, tapping a result/create button first
+ * moves focus away from the input, firing this container's own `onBlur`
+ * *before* the click that follows ever reaches the button. On a platform
+ * where a tapped `<button>` doesn't reliably receive focus (notably iOS
+ * Safari), that blur's own `relatedTarget` ends up `null` rather than the
+ * button just tapped, so the containment check below reads it as focus
+ * having left the field entirely and closes the results — unmounting the
+ * very button the tap was headed for, so the tap silently does nothing.
+ * Preventing the mousedown's default keeps focus on the input the whole
+ * time, so no blur fires at all and the click lands normally.
  */
 import { useId, useRef, useState } from 'react';
 import { normalize } from '@/application/logging/use-cases';
@@ -105,6 +117,17 @@ export function ExerciseSearchField({
           }}
           onFocus={() => setOpen(true)}
           onClick={() => setOpen(true)}
+          onKeyDown={(event) => {
+            // Enter creates the exercise being typed, same as clicking
+            // "Create …" — only when that option is actually showing
+            // (an exact match already on screen has nothing to create).
+            if (event.key === 'Enter' && showCreate) {
+              event.preventDefault();
+              onCreateExercise(trimmed);
+              setQuery('');
+              setOpen(false);
+            }
+          }}
           placeholder={placeholder}
           autoFocus={autoFocus}
         />
@@ -114,6 +137,10 @@ export function ExerciseSearchField({
           id={resultsId}
           className="exercise-search-field__results"
           aria-label={`${label} results`}
+          // See the block comment above: prevents this list's own buttons
+          // from ever stealing focus (and firing this field's blur-close)
+          // before their click completes.
+          onMouseDown={(event) => event.preventDefault()}
         >
           {results.map((exercise) => (
             <li key={exercise.id}>

@@ -1,0 +1,91 @@
+.header-nav {
+  flex: none;
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+}
+
+.header-nav__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--color-foreground);
+  cursor: pointer;
+  transition:
+    background var(--duration-short) var(--easing-standard),
+    transform var(--duration-instant) var(--easing-standard);
+}
+
+.header-nav__toggle:hover {
+  background: var(--color-border);
+}
+
+.header-nav__toggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.header-nav__toggle:active {
+  transform: scale(0.92);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-nav__toggle:active {
+    transform: none;
+  }
+}
+
+.header-nav__menu {
+  position: absolute;
+  top: 100%;
+  right: var(--space-4);
+  margin-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  box-shadow: 0 4px 12px var(--color-border-strong);
+  z-index: 10;
+}
+
+.header-nav__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  min-height: 44px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  text-decoration: none;
+  color: var(--color-foreground-muted);
+  transition: background var(--duration-short) var(--easing-standard);
+}
+
+.header-nav__item:hover,
+.header-nav__item:focus-visible {
+  background: var(--color-border);
+  color: var(--color-foreground);
+}
+
+.header-nav__item:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.header-nav__item--active {
+  color: var(--color-accent);
+}
