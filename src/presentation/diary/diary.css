@@ -333,6 +333,13 @@
   );
   animation: diary-screen__saved-toast-glow var(--duration-reward)
     var(--easing-standard) forwards;
+  /* `position: fixed` on the toast itself already establishes a stacking
+     context, so this only needs to rank below its own siblings within it
+     — otherwise, as a positioned box, it paints above the in-flow "Session
+     saved" text regardless of DOM order, dimming it at the glow's peak
+     opacity (Copilot review, PR #24). Still paints above the toast's own
+     background, which is the floor of that same stacking context. */
+  z-index: -1;
 }
 
 .diary-screen__saved-toast-sparkle {
@@ -355,6 +362,10 @@
 }
 
 .diary-screen__saved-toast-emoji {
+  /* `transform` has no effect on a non-replaced inline box — without this,
+     the scale/rotate keyframe below is silently ignored by every browser
+     and the emoji never actually pops (Copilot review, PR #24). */
+  display: inline-block;
   position: relative;
   font-size: 1.25rem;
   animation: diary-screen__saved-toast-emoji var(--duration-reward)

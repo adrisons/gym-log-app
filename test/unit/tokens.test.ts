@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { token } from '../../src/presentation/design/tokens';
+import {
+  REWARD_ANIMATION_MS,
+  token,
+} from '../../src/presentation/design/tokens';
 import type { TokenName } from '../../src/presentation/design/tokens';
 
 // Spec 000 FR-019 / data-model.md §2: every token role listed there must be
@@ -193,5 +196,16 @@ describe('design tokens', () => {
       (n) => !ALL_EXPECTED_TOKENS.includes(n),
     );
     expect(extra).toEqual([]);
+  });
+
+  it("REWARD_ANIMATION_MS (tokens.ts) matches --duration-reward's own value in tokens.css", () => {
+    // SessionSavedToast can't read a CSS custom property from JS without
+    // an unreliable-under-jsdom getComputedStyle round-trip, so it mirrors
+    // this value as a plain number instead — this is what stops that
+    // mirror from silently drifting the moment either declaration is
+    // retuned (Copilot review, PR #24).
+    const match = /--duration-reward:\s*([\d.]+)ms/.exec(css);
+    expect(match).not.toBeNull();
+    expect(Number(match?.[1])).toBe(REWARD_ANIMATION_MS);
   });
 });

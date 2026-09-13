@@ -48,3 +48,14 @@ export type TokenName =
 export function token(name: TokenName): string {
   return `var(${name})`;
 }
+
+/**
+ * `--duration-reward`'s value (tokens.css), mirrored here as a plain
+ * number so `SessionSavedToast` can time its own dismissal off it. CSS
+ * custom properties aren't otherwise readable from JS without a runtime
+ * `getComputedStyle` round-trip (unreliable under jsdom, and irrelevant
+ * overhead in a real browser for a single fixed value) — `test/unit/
+ * tokens.test.ts` cross-checks this literal against tokens.css's own
+ * `--duration-reward` declaration, so the two can't silently drift apart.
+ */
+export const REWARD_ANIMATION_MS = 1800;

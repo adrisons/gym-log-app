@@ -218,7 +218,12 @@ not have attention to spend on it.
 A small, fixed set of duration and easing categories is defined once
 implementation begins (a quick category for press/hover feedback, a
 standard category for panels and transitions, a deliberate category for
-larger layout shifts) — never an ad hoc value chosen per component.
+larger layout shifts) — never an ad hoc value chosen per component. The
+one narrow exception is §1.1's own bounded save-toast acknowledgement:
+its "reward" animation gets its own named duration, since it times a
+one-shot component lifecycle rather than a reusable transition — adding
+another such category for anything else is exactly the ad-hoc-per-component
+drift this rule exists to prevent.
 
 ### 4.2 Feedback is immediate
 

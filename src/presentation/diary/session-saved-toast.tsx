@@ -2,8 +2,9 @@
  * `docs/design.md` §1.1's one bounded exception to "never editorializing"
  * — a brief, self-dismissing acknowledgement that a just-logged session
  * was saved (`docs/requirements.md` FR-1). The text is what actually
- * confirms the save; the emoji is the one deliberately-relaxed bit of
- * imagery §1.2 otherwise forbids, and its motion is decoration only — it
+ * confirms the save; the emoji (plus a purely decorative glow/sparkle
+ * flourish, `aria-hidden`) is the one deliberately-relaxed bit of imagery
+ * §1.2 otherwise forbids, and its motion is decoration only — it
  * disappears the same way with or without `prefers-reduced-motion`
  * (`docs/design.md` §4.3), it just doesn't animate getting there.
  *
@@ -14,9 +15,8 @@
  * logged since, renders nothing here at all).
  */
 import { useEffect, useState } from 'react';
+import { REWARD_ANIMATION_MS } from '@/presentation/design/tokens';
 import './diary.css';
-
-const VISIBLE_MS = 1800;
 
 export interface SessionSavedToastProps {
   onDismiss?: () => void;
@@ -29,7 +29,7 @@ export function SessionSavedToast({ onDismiss }: SessionSavedToastProps) {
     const timeout = setTimeout(() => {
       setVisible(false);
       onDismiss?.();
-    }, VISIBLE_MS);
+    }, REWARD_ANIMATION_MS);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
