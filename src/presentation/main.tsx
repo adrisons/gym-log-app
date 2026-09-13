@@ -29,7 +29,7 @@
  * `/diary` — the diary is the app's home; the logging form lives at
  * `/log`, reached from a floating action there rather than a nav tab
  * (`docs/requirements.md` FR-1's design-refinement update), in its own
- * `LoggingShell` (no `BottomNav`). Routing is introduced only here, at
+ * `LoggingShell` (no `HeaderNav`, ADR-0009). Routing is introduced only here, at
  * the composition boundary — `LoggingScreen` itself, and `configure()`'s
  * call before the router renders, are unchanged (constitution Principle
  * II: no added latency/step on the logging critical path).

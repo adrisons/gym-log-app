@@ -126,7 +126,16 @@
    (most noticeable in dark mode). Not a token itself, but belongs here:
    this file is the one stylesheet always loaded first (index.html), before
    any component styles. Sets the base typeface here too, since every piece
-   of UI text inherits it unless a component opts into --font-mono. */
+   of UI text inherits it unless a component opts into --font-mono.
+   `html`'s own background is set too (not just `body`'s) — `.app-shell`'s
+   `100dvh` height (app-shell.css) already tracks the visual viewport, but
+   this is the fallback of last resort: if anything is ever still visible
+   past its edge, it reads as this app's own canvas rather than the
+   browser's unthemed default. */
+html {
+  background: var(--color-canvas);
+}
+
 body {
   margin: 0;
   font-family: var(--font-ui);

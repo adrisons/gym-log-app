@@ -1,20 +1,21 @@
 /**
  * Layout route rendered around every tab destination (`main.tsx`): a
- * scrollable content region above the persistent `BottomNav`. Kept as a
- * thin flex wrapper rather than `position: fixed` so no per-screen bottom
- * padding is needed to avoid the nav covering content.
+ * persistent `HeaderNav` above a scrollable content region (ADR-0009 —
+ * supersedes an earlier persistent `BottomNav`). Kept as a thin flex
+ * wrapper rather than `position: fixed` so no per-screen top padding is
+ * needed to avoid the nav covering content.
  */
 import { Outlet } from 'react-router-dom';
-import { BottomNav } from './nav/bottom-nav';
+import { HeaderNav } from './nav/header-nav';
 import './app-shell.css';
 
 export function AppShell() {
   return (
     <div className="app-shell">
+      <HeaderNav />
       <div className="app-shell__content">
         <Outlet />
       </div>
-      <BottomNav />
     </div>
   );
 }
