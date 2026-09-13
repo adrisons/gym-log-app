@@ -16,7 +16,33 @@
 /* Every screen's own root element (`.logging-screen`, `.diary-screen`, …)
    keeps `min-height: 100%` rather than `100vh` now that it renders inside
    this flex column instead of directly under <body> — see each screen's
-   stylesheet. */
+   stylesheet. One rule here covers every route: each screen unmounts and
+   a fresh one mounts on navigation, so this animation plays automatically
+   on every "changed space" (`docs/design.md` §4.1 — answers "where did
+   that thing go" for the screen itself) without each screen repeating it. */
+/* Opacity-only, deliberately: a `transform` here would make the screen
+   root a containing block for every `position: fixed` descendant it
+   renders (DiaryScreen's FAB, bulk bar, and save toast all live inside
+   `.diary-screen`) — they'd jump to being positioned relative to this
+   animating root instead of the viewport for the animation's duration
+   (Copilot review, PR #22). Fading in has no such side effect. */
 .app-shell__content > * {
   flex: 1 0 auto;
+  animation: app-shell__screen-enter var(--duration-medium)
+    var(--easing-decelerate);
+}
+
+@keyframes app-shell__screen-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell__content > * {
+    animation: none;
+  }
 }

@@ -20,6 +20,131 @@ describe('useLoggingSession (research.md §5)', () => {
     expect(state.draft).toBeDefined();
     expect(state.draft?.blocks).toEqual([]);
   });
+
+  it('does not clobber a draft mutated by a debounced commit while initialize() is still reading (Copilot review, PR #22)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+
+    // Delay one of initialize()'s parallel reads so a concurrent commit —
+    // simulating ADR-0007's debounce timer, deliberately not cancelled on
+    // unmount — can land on `draft` while this (re-)initialize's own reads
+    // are still in flight, as on a route remount before the previous
+    // visit's pending commit has fired.
+    let releaseRead = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    const originalListExercises = storage.listExercises.bind(storage);
+    vi.spyOn(storage, 'listExercises').mockImplementation(async () => {
+      await gate;
+      return originalListExercises();
+    });
+
+    const initializePromise = useLoggingSession.getState().initialize();
+
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const committedSetId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+
+    releaseRead();
+    await initializePromise;
+
+    const finalSets =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets;
+    expect(finalSets.map((s) => s.id)).toContain(committedSetId);
+  });
+
+  it("waits out a draft write already in flight before trusting its own storage read, even when nothing further mutates draft during initialize()'s own reads (Copilot review, PR #22)", async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+
+    // Gate `saveDraft` itself (not a read) so the committed set is applied
+    // to Zustand's `draft` optimistically — before initialize() even
+    // starts — while its own persistence to storage is still pending, as
+    // ADR-0007's debounce timer firing just before a route remount would.
+    let releaseWrite = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    const originalSaveDraft = storage.saveDraft.bind(storage);
+    vi.spyOn(storage, 'saveDraft').mockImplementation(async (draft) => {
+      await gate;
+      return originalSaveDraft(draft);
+    });
+
+    const addSetPromise = useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const committedSetId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+
+    // initialize() starts while the write above is still gated — with no
+    // further mutation during its own reads, only waiting out that
+    // already-in-flight write (not the before/after identity check alone)
+    // keeps its `openLoggingForm` read from racing storage.saveDraft and
+    // returning the pre-write snapshot.
+    const initializePromise = useLoggingSession.getState().initialize();
+
+    releaseWrite();
+    await addSetPromise;
+    await initializePromise;
+
+    const finalSets =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets;
+    expect(finalSets.map((s) => s.id)).toContain(committedSetId);
+  });
+
+  it('a rejected draft write does not permanently break later initialize()/persistDraft calls (Copilot review, PR #22)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+
+    const saveDraftSpy = vi
+      .spyOn(storage, 'saveDraft')
+      .mockImplementationOnce(() =>
+        Promise.reject(new Error('simulated storage failure')),
+      );
+
+    // The failing call's own caller still sees the rejection...
+    await expect(
+      useLoggingSession.getState().addSet(entryId, {
+        volume: { kind: 'reps', count: 8 },
+        load: { kind: 'none' },
+        setKind: 'working',
+      }),
+    ).rejects.toThrow('simulated storage failure');
+
+    saveDraftSpy.mockRestore();
+
+    // ...but the shared write queue itself must not stay poisoned by it —
+    // otherwise every later persistDraft/initialize() call would await a
+    // permanently rejected promise instead of the app's own next action.
+    await expect(
+      useLoggingSession.getState().initialize(),
+    ).resolves.toBeUndefined();
+    expect(useLoggingSession.getState().draft).toBeDefined();
+
+    await expect(
+      useLoggingSession.getState().addExerciseEntry('ex-2' as ExerciseId),
+    ).resolves.toBeUndefined();
+  });
 });
 
 describe('useLoggingSession undo stack (FR-004, FR-023)', () => {
@@ -179,6 +304,120 @@ describe('useLoggingSession.addSet (ADR-0007 debounce / stale-block-id regressio
     expect(useLoggingSession.getState().justLoggedASet).toBe(false);
   });
 
+  it('lastAddedSetId tracks whichever set was most recently committed, and resets on initialize() (PR #22 Copilot review — set-summary-enter animation scope)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    expect(useLoggingSession.getState().lastAddedSetId).toBeUndefined();
+
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const firstSetId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+    expect(useLoggingSession.getState().lastAddedSetId).toBe(firstSetId);
+
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 5 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const sets =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets;
+    expect(sets).toHaveLength(2);
+    // The marker moves to the newest set, not the one committed earlier.
+    expect(useLoggingSession.getState().lastAddedSetId).toBe(sets[1]!.id);
+    expect(useLoggingSession.getState().lastAddedSetId).not.toBe(firstSetId);
+
+    await useLoggingSession.getState().initialize();
+    expect(useLoggingSession.getState().lastAddedSetId).toBeUndefined();
+  });
+
+  it('clearLastAddedSetId resets the marker without touching the draft (Copilot review, PR #22)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    expect(useLoggingSession.getState().lastAddedSetId).toBeDefined();
+
+    useLoggingSession.getState().clearLastAddedSetId();
+
+    expect(useLoggingSession.getState().lastAddedSetId).toBeUndefined();
+    expect(
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets,
+    ).toHaveLength(1);
+  });
+
+  it('deleting the marked set clears lastAddedSetId, so undoing that same delete does not replay its entrance animation (Copilot review, PR #22)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const setId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+    expect(useLoggingSession.getState().lastAddedSetId).toBe(setId);
+
+    await useLoggingSession.getState().deleteSet(blockId, entryId, setId);
+    expect(useLoggingSession.getState().lastAddedSetId).toBeUndefined();
+
+    await useLoggingSession.getState().undo(setId);
+    // The undo restores a set with the same id, but it is no longer the
+    // one that was actually just logged — the marker must stay cleared.
+    expect(
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets,
+    ).toHaveLength(1);
+    expect(useLoggingSession.getState().lastAddedSetId).toBeUndefined();
+  });
+
+  it('deleting an unrelated set leaves lastAddedSetId pointing at the still-present marked set', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const firstSetId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 5 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const secondSetId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[1]!.id;
+    expect(useLoggingSession.getState().lastAddedSetId).toBe(secondSetId);
+
+    await useLoggingSession.getState().deleteSet(blockId, entryId, firstSetId);
+
+    expect(useLoggingSession.getState().lastAddedSetId).toBe(secondSetId);
+  });
+
   it('clearJustLoggedASet resets the flag without touching anything else', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
@@ -293,5 +532,74 @@ describe('useLoggingSession.updateExerciseTemplate (docs/requirements.md §7.1)'
     const catalogue = useLoggingSession.getState().catalogue;
     expect(catalogue.some((e) => e.id === created.id)).toBe(true);
     expect(catalogue.find((e) => e.id === exerciseId)?.trackEffort).toBe(false);
+  });
+});
+
+describe('useLoggingSession.mergeExercises (Copilot review, PR #22)', () => {
+  it('queues a concurrent draft write behind an in-flight merge, instead of letting it land unordered against the merge’s own draft rewrite', async () => {
+    const storage = new InMemoryStorage();
+    const survivorId = 'ex-survivor' as ExerciseId;
+    const loserId = 'ex-loser' as ExerciseId;
+    await storage.saveExercise({
+      id: survivorId,
+      canonicalName: 'Back squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveExercise({
+      id: loserId,
+      canonicalName: 'Barbell squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+
+    let releaseMerge = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseMerge = resolve;
+    });
+    const originalMergeExercises = storage.mergeExercises.bind(storage);
+    vi.spyOn(storage, 'mergeExercises').mockImplementation(async (a, b) => {
+      await gate;
+      return originalMergeExercises(a, b);
+    });
+
+    const mergePromise = useLoggingSession
+      .getState()
+      .mergeExercises(survivorId, loserId);
+
+    let addExerciseEntryResolved = false;
+    const addExerciseEntryPromise = useLoggingSession
+      .getState()
+      .addExerciseEntry(survivorId)
+      .then(() => {
+        addExerciseEntryResolved = true;
+      });
+
+    // Give any not-actually-queued microtasks a chance to run — if
+    // `addExerciseEntry` weren't queued behind the gated merge, its own
+    // (ungated) storage write would have already resolved by now.
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(addExerciseEntryResolved).toBe(false);
+
+    releaseMerge();
+    await mergePromise;
+    await addExerciseEntryPromise;
+
+    expect(addExerciseEntryResolved).toBe(true);
+    expect(
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.exerciseId,
+    ).toBe(survivorId);
   });
 });

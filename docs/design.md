@@ -246,6 +246,34 @@ Recording a set never shows a blocking loading state — writes are
 optimistic (§4.2). Any place that genuinely waits on something slow (e.g. a
 large import) shows progress, not an indefinite spinner.
 
+### 4.5 Where motion is actually used
+
+A concrete register, not an exhaustive one — each entry is chosen because
+it answers one of §4.1's two questions, using the fixed duration/easing
+categories, never an ad hoc value:
+
+- **Press feedback** (*did my tap register*): every tappable control
+  scales down slightly on press, quick-category duration, before any
+  write confirms.
+- **A newly-recorded set** (*where did that thing go*): the set's own
+  summary line fades and settles into place on entry — plays once, for
+  that one freshly-committed row, never for rows already on screen.
+- **A block's collapse/expand** (*where did that content go*): animates to
+  zero height rather than snapping, and stays reachable to nothing but
+  sighted pointer/visual scanning while collapsed — a pending, not-yet-
+  saved edit inside it must survive a mere visual fold, not just a
+  navigation away.
+- **Changing screens** (*where did that thing go*, for the screen itself):
+  one rule, not one per screen — every screen's root fades and settles in
+  on entry, standard-to-deliberate category, since it's a bigger shift
+  than a button press.
+
+All of the above are reduced-motion-guarded (§4.3) — the information each
+one carries (a set was recorded, a block is collapsed, the route changed)
+is already present without the motion, so turning it off loses nothing.
+The concrete component/class mapping for each of these lives in the
+technical implementation, not here.
+
 ---
 
 ## 5. Interaction states

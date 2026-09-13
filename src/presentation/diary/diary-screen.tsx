@@ -108,6 +108,30 @@ export function DiaryScreen() {
   const pressOriginRef = useRef<{ x: number; y: number } | undefined>(
     undefined,
   );
+  // Tracked so the unmount cleanup below can tell whether this visit's
+  // async load ever actually finished — while it's still `true`, this
+  // screen is stuck on its own loading `<main>` (below) and never renders
+  // `SessionSavedToast` at all, however long the load takes.
+  const stillLoadingRef = useRef(true);
+  useEffect(() => {
+    stillLoadingRef.current = summaries === undefined || sessions === undefined;
+  });
+
+  // Leaving while still loading, with a set already logged this visit,
+  // means `SessionSavedToast` never mounted at all — its own unmount
+  // cleanup can't consume `justLoggedASet` if it was never rendered to
+  // begin with, leaving the flag to surface as a stale "Session saved" on
+  // a later, unrelated visit to this same route (Copilot review, PR #22).
+  useEffect(() => {
+    return () => {
+      if (
+        stillLoadingRef.current &&
+        useLoggingSession.getState().justLoggedASet
+      ) {
+        useLoggingSession.getState().clearJustLoggedASet();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -386,7 +410,13 @@ export function DiaryScreen() {
       </label>
       {nearestId && (
         <p>
-          Nearest session: <Link to={`/diary/${nearestId}`}>{nearestId}</Link>
+          Nearest session:{' '}
+          <Link
+            to={`/diary/${nearestId}`}
+            className="diary-screen__jump-nearest-link"
+          >
+            {nearestId}
+          </Link>
         </p>
       )}
       {!bulkActive && (

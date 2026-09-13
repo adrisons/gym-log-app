@@ -133,8 +133,13 @@ never a `blockId` baked in when the edit happened. A commit whose entry no
 longer resolves to any block (deleted in the meantime) is a no-op, the
 same as before.
 
-And `BlockCard`'s collapse toggle now hides its body with the `hidden`
-attribute rather than removing it from the tree — conditionally unmounting
-it would have discarded a `SetRow`'s own pending-commit state on a mere
-visual collapse, which is not the "navigated away" case this ADR's
-non-cancellation guarantee is about.
+And `BlockCard`'s collapse toggle keeps its body mounted rather than
+removing it from the tree — conditionally unmounting it would have
+discarded a `SetRow`'s own pending-commit state on a mere visual collapse,
+which is not the "navigated away" case this ADR's non-cancellation
+guarantee is about. It animates the collapse with a CSS grid-rows
+transition (`grid-template-rows: 1fr` ↔ `0fr`) rather than the `hidden`
+attribute, which can't be animated (its `display: none` applies
+instantly); `inert` takes over `hidden`'s other job of pulling the
+collapsed content out of the tab order and accessibility tree while it
+stays mounted and visually folded.
