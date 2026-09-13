@@ -116,13 +116,25 @@ covers this second case too, under the same "valid but untouched" gate,
 labelled **Log this set** instead of "Repeat last set" so it never implies
 a previous value that doesn't exist.
 
-Also addressed: the debounced commit is read through a ref refreshed every
-render (`onConfirmRef`), not the closure captured when the edit fired —
-without it, moving the exercise entry to a different block while a commit
-was still pending would fire against the block it *used* to be in, since
-`onConfirm` is a closure over `blockId`/`entryId` constructed at the call
-site (`logging-screen.tsx`). And `BlockCard`'s collapse toggle now hides
-its body with the `hidden` attribute rather than removing it from the
-tree — conditionally unmounting it would have discarded a `SetRow`'s own
-pending-commit state on a mere visual collapse, which is not the
-"navigated away" case this ADR's non-cancellation guarantee is about.
+Also addressed: a pending debounced commit used to fire against a stale
+`blockId` if the exercise entry moved to a different block
+(`moveExerciseAcrossBlocks`) before the timer went off — `onConfirm` was a
+closure over `blockId`/`entryId` built at the call site
+(`logging-screen.tsx`). The first fix attempted here refreshed that
+closure through a ref on every render; that turned out not to work, because
+a cross-block move unmounts the old `SetRow` entirely and mounts a new one
+under the new block — there is no surviving instance left to refresh a ref
+*on*, so the stale closure the old timer already captured would still fire
+unchanged. The real fix moves the resolution to where the commit actually
+lands: `logging-store.ts`'s `addSet` now takes only the entry's own id
+(globally unique — `newId()`) and looks up which block currently contains
+it at the moment the commit fires (`draft.ts`'s `findBlockIdForEntry`),
+never a `blockId` baked in when the edit happened. A commit whose entry no
+longer resolves to any block (deleted in the meantime) is a no-op, the
+same as before.
+
+And `BlockCard`'s collapse toggle now hides its body with the `hidden`
+attribute rather than removing it from the tree — conditionally unmounting
+it would have discarded a `SetRow`'s own pending-commit state on a mere
+visual collapse, which is not the "navigated away" case this ADR's
+non-cancellation guarantee is about.

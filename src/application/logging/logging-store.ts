@@ -49,6 +49,7 @@ import type {
 import {
   addExerciseEntry as addExerciseEntryToDraft,
   addSet as addSetToDraft,
+  findBlockIdForEntry,
   prefillNextSet as prefillNextSetFromDraft,
   addBlock as addBlockToDraft,
   renameBlock as renameBlockInDraft,
@@ -86,17 +87,30 @@ export interface LoggingSessionState {
   bandLabels: string[];
   /** entryId → ms epoch of the last confirmed set on that entry (FR-025). */
   lastConfirmedAt: Record<string, number>;
+  /** Set true the moment `addSet` actually appends a set (not a FR-025
+   * debounced no-op), reset on every `initialize()` — the one reliable
+   * signal for "did this visit to the logging form record a set", which
+   * `DiaryScreen`'s save-acknowledgement toast reads once and clears
+   * (`clearJustLoggedASet`). Deliberately not derived from the draft's
+   * total set count (`docs/design.md` §1.1's refinement note) — that would
+   * also read true for a same-day draft that already had sets before this
+   * visit even started. */
+  justLoggedASet: boolean;
 
   /** Called once by the composition root before the screen first renders. */
   configure: (storage: StoragePort) => void;
   initialize: () => Promise<void>;
   setSessionDateTime: (iso: string) => Promise<void>;
   addExerciseEntry: (exerciseId: ExerciseId, blockId?: string) => Promise<void>;
-  addSet: (
-    blockId: string,
-    entryId: string,
-    input: AddSetInput,
-  ) => Promise<void>;
+  /** Resolves the entry's *current* block itself (entry ids are globally
+   * unique — `findBlockIdForEntry`), rather than taking one from the
+   * caller: a caller that scheduled this call before the entry was moved
+   * to a different block (`moveExerciseAcrossBlocks`) would otherwise bake
+   * in a block id the entry no longer lives under by the time a debounced
+   * commit (ADR-0007) actually fires. A no-op if the entry no longer
+   * resolves to any block at all (deleted in the meantime). */
+  addSet: (entryId: string, input: AddSetInput) => Promise<void>;
+  clearJustLoggedASet: () => void;
   prefillNextSet: (blockId: string, entryId: string) => SetPrefill | undefined;
   searchExercises: (query: string) => Exercise[];
   createExercise: (input: CreateExerciseInput) => Promise<Exercise>;
@@ -179,6 +193,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     sessions: [],
     bandLabels: [],
     lastConfirmedAt: {},
+    justLoggedASet: false,
 
     configure: (storage) => set({ storage }),
 
@@ -191,8 +206,10 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
         storage.listSessions(FULL_RANGE),
         storage.listBandLabels(),
       ]);
-      set({ draft, catalogue, sessions, bandLabels });
+      set({ draft, catalogue, sessions, bandLabels, justLoggedASet: false });
     },
+
+    clearJustLoggedASet: () => set({ justLoggedASet: false }),
 
     setSessionDateTime: async (iso) => {
       const { storage, draft: current } = get();
@@ -212,9 +229,11 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       await storage.saveDraft(updated);
     },
 
-    addSet: async (blockId, entryId, input) => {
+    addSet: async (entryId, input) => {
       const { storage, draft: current, lastConfirmedAt } = get();
       if (!storage || !current) return;
+      const blockId = findBlockIdForEntry(current, entryId);
+      if (!blockId) return; // entry no longer exists — nothing to commit to
       const nowMs = Date.now();
       const lastConfirmedAtMs = lastConfirmedAt[entryId];
       const result = addSetToDraft(
@@ -231,6 +250,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       set((state) => ({
         draft: updated,
         lastConfirmedAt: { ...state.lastConfirmedAt, [entryId]: nowMs },
+        justLoggedASet: true,
       }));
       await storage.saveDraft(updated);
     },

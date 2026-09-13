@@ -270,40 +270,6 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     });
   });
 
-  it(
-    'a pending commit fires against the current onConfirm, not the one captured when the edit happened (stale-block-id-after-move regression)',
-    async () => {
-      const onConfirmA = vi.fn();
-      const onConfirmB = vi.fn();
-      const { rerender } = render(
-        <SetRow {...baseProps} prefill={undefined} onConfirm={onConfirmA} />,
-      );
-
-      await userEvent.type(
-        screen.getByRole('spinbutton', { name: /weight/i }),
-        '60',
-      );
-
-      // Simulates the exercise entry moving to another block while the
-      // commit is still pending: the parent re-renders `SetRow` with a new
-      // `onConfirm` closure bound to the new block, well before the
-      // debounce elapses.
-      rerender(
-        <SetRow {...baseProps} prefill={undefined} onConfirm={onConfirmB} />,
-      );
-
-      await waitForCommit(onConfirmB);
-
-      expect(onConfirmA).not.toHaveBeenCalled();
-      expect(onConfirmB).toHaveBeenCalledTimes(1);
-      expect(onConfirmB).toHaveBeenCalledWith({
-        load: { kind: 'weight', value: 60, unit: 'kg' },
-        setKind: 'working',
-      });
-    },
-    COMMIT_DEBOUNCE_MS + 2000,
-  );
-
   it('normalizes an out-of-range historical rep-count prefill instead of offering it under an "unset" wheel (out-of-range-prefill regression)', async () => {
     const onConfirm = vi.fn();
     render(
@@ -354,6 +320,34 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
       screen.queryByRole('spinbutton', { name: /weight/i }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Red' })).toBeInTheDocument();
+  });
+
+  it('labels the control "Log this set", not "Repeat last set", for a fresh Bodyweight row whose prefill is from a different, no-longer-matching load kind (mismatched-prefill regression)', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        loadKind="bodyweight"
+        prefill={{
+          load: { kind: 'weight', value: 100, unit: 'kg' },
+        }}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: /repeat last set/i }),
+    ).not.toBeInTheDocument();
+    const button = screen.getByRole('button', { name: /log this set/i });
+
+    await userEvent.click(button);
+
+    // Commits the current (plain Bodyweight) state, not the mismatched
+    // historical weight prefill — there is nothing to "repeat" here.
+    expect(onConfirm).toHaveBeenCalledWith({
+      load: { kind: 'bodyweight' },
+      setKind: 'working',
+    });
   });
 
   it('the weight field has no dedicated quick-increment buttons (numeric keypad only)', () => {

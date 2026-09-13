@@ -42,19 +42,23 @@
  * touched, and with nothing to edit there would otherwise be no way to
  * record it at all. The control's label tells the two apart.
  *
- * `onConfirm` is read through a ref that's refreshed on every render
- * (`onConfirmRef`), not captured directly in the debounce's closure: the
- * prop passed down here closes over this row's current `blockId`/`entryId`
- * at the call site (`logging-screen.tsx`), and if the exercise entry is
- * moved to another block while a commit is still pending, the timer must
- * call the *current* `onConfirm` (bound to the new block) when it fires,
- * not the one captured back when the edit happened.
+ * `onConfirm` identifies the entry only by its own id (`logging-screen.tsx`
+ * calls the store's `addSet(entry.id, input)`, never `block.id`) — a set's
+ * commit resolves which block the entry currently lives under fresh, at
+ * the moment it actually fires (`draft.ts`'s `findBlockIdForEntry`), not
+ * from whatever this row's props happened to close over when the edit was
+ * made. This matters because moving the exercise entry to a different
+ * block (`moveExerciseAcrossBlocks`) unmounts this component entirely and
+ * mounts a new one under the new block — a pending debounced commit is a
+ * plain `setTimeout` that outlives that unmount (deliberately, see above),
+ * so nothing about *this instance's own props* can be "kept fresh" for it;
+ * the fix has to live where the commit is finally applied, not here.
  *
  * Keyed by the parent on the entry's set count (`key={entryId}-${sets.length}`)
  * so this component remounts, and its local input state re-initializes
  * from a fresh `prefill`, every time a set is actually added.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { WeightLoadInput } from './weight-load-input';
 import { BandLoadInput } from './band-load-input';
 import { BodyweightLoadInput } from './bodyweight-load-input';
@@ -150,14 +154,6 @@ export function SetRow({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
-  // Kept current every render (not read via a captured closure) so a
-  // debounce timer already in flight calls whatever `onConfirm` is by the
-  // time it fires, not the one bound to this row's block at the moment the
-  // edit happened — see the stale-block-id note above.
-  const onConfirmRef = useRef(onConfirm);
-  useEffect(() => {
-    onConfirmRef.current = onConfirm;
-  }, [onConfirm]);
 
   const buildInput = (fields: FieldSnapshot): AddSetInput | undefined => {
     const load: { kind: Load['kind']; present: boolean } = (() => {
@@ -246,7 +242,7 @@ export function SetRow({
     if (input) {
       debounceRef.current = setTimeout(() => {
         debounceRef.current = undefined;
-        onConfirmRef.current(input);
+        onConfirm(input);
       }, COMMIT_DEBOUNCE_MS);
     }
   }
@@ -305,7 +301,7 @@ export function SetRow({
       {untouchedValidInput && (
         <RepeatLastSetControl
           onRepeat={() => onConfirm(untouchedValidInput)}
-          {...(prefill === undefined ? { label: 'Log this set' } : {})}
+          {...(prefillMatchesLoadKind ? {} : { label: 'Log this set' })}
         />
       )}
       {!liveInput && (

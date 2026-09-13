@@ -8,6 +8,7 @@ import {
   addSet,
   addBlock,
   renameBlock,
+  findBlockIdForEntry,
   reorderBlockExercise,
   moveExerciseAcrossBlocks,
   deleteBlock,
@@ -427,6 +428,37 @@ describe('reorderBlockExercise/moveExerciseAcrossBlocks (FR-006)', () => {
     expect(moved.blocks[1]?.exercises).toHaveLength(1);
     expect(moved.blocks[1]?.exercises[0]?.id).toBe(entryId);
     expect(moved.blocks[1]?.exercises[0]?.sets).toHaveLength(1);
+  });
+});
+
+describe('findBlockIdForEntry (stale-block-id-after-move regression)', () => {
+  it("finds the entry's current block, tracking a move rather than a block id captured earlier", () => {
+    let draft = addBlock(
+      createDraft('2026-09-11T18:00:00.000Z'),
+      'A',
+      'straightSets',
+    );
+    const fromBlockId = draft.blocks[0]!.id;
+    draft = addExerciseEntry(draft, 'ex-1' as ExerciseId, fromBlockId);
+    draft = addBlock(draft, 'B', 'straightSets');
+    const toBlockId = draft.blocks[1]!.id;
+    const entryId = draft.blocks[0]!.exercises[0]!.id;
+
+    expect(findBlockIdForEntry(draft, entryId)).toBe(fromBlockId);
+
+    const moved = moveExerciseAcrossBlocks(
+      draft,
+      fromBlockId,
+      entryId,
+      toBlockId,
+    );
+
+    expect(findBlockIdForEntry(moved, entryId)).toBe(toBlockId);
+  });
+
+  it('returns undefined for an id that resolves to no entry in any block', () => {
+    const draft = createDraft('2026-09-11T18:00:00.000Z');
+    expect(findBlockIdForEntry(draft, 'nonexistent')).toBeUndefined();
   });
 });
 

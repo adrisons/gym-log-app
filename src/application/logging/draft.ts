@@ -198,6 +198,28 @@ function findEntry(
 }
 
 /**
+ * Finds which block currently contains `entryId` — entry ids are minted by
+ * `newId()` (globally unique), so this never needs a `blockId` hint to
+ * disambiguate. Used to resolve a set's commit against the entry's
+ * *current* block rather than whichever block a caller last knew about
+ * (`logging-store.ts`'s `addSet`, ADR-0007's debounce: a `SetRow` can have
+ * a commit still pending when its exercise entry is moved to a different
+ * block via `moveExerciseAcrossBlocks` — that move unmounts the old
+ * `SetRow` and mounts a fresh one under the new block, so nothing in the
+ * old instance's own closures can be "kept fresh"; the fix is to never
+ * bake a `blockId` into the pending commit at all and resolve it here,
+ * fresh, when the commit actually fires).
+ */
+export function findBlockIdForEntry(
+  draft: LoggingDraft,
+  entryId: string,
+): string | undefined {
+  return draft.blocks.find((block) =>
+    block.exercises.some((entry) => entry.id === entryId),
+  )?.id;
+}
+
+/**
  * A prior set's volume/load, for pre-filling a new one (FR-008). Named so
  * `presentation/` components can import this one application-layer type
  * instead of `domain/volume`/`domain/load` directly — `docs/architecture.md`'s
