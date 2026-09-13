@@ -197,7 +197,7 @@ Create a session and add blocks, exercises and sets.
   open/closed session state and no auto-resume of a prior session — each new
   session is independent (D6).
 - If the user opens the logging form and leaves without registering the
-  workout, and has added at least one block, their in-progress input is
+  workout, and has added at least one exercise, their in-progress input is
   kept as a single pending draft (a state of the logging screen, not a
   stored Session) — so locking the phone mid-entry and coming back later
   loses nothing. A visit where nothing was added stores nothing. Reopening
@@ -206,7 +206,10 @@ Create a session and add blocks, exercises and sets.
   form with its data) or discard it; adding a block, exercise, or set is
   unavailable until one of the two is chosen, so an unresolved draft is
   never silently overwritten (D16, ADR-0009). Discarding removes the
-  draft and its data.
+  draft and its data. _(Amended by ADR-0011: the form opens with one block
+  already present, so "at least one block" stopped being a useful
+  threshold — every exercise now belongs to a block by construction, and
+  the gate is the exercise itself.)_
 - Adding an exercise opens the catalogue search with most-used and recent
   entries first; a new exercise can be created from the same field.
 - Every change persists automatically. There is no Save button.
@@ -235,10 +238,15 @@ Create a session and add blocks, exercises and sets.
 - Create, rename, reorder and delete blocks within a session.
 - Reorder exercises within a block and across blocks.
 - An unnamed block is shown by its position, not as "Untitled".
+- Every exercise entry belongs to a block; there is no blockless exercise.
+  The logging form opens with one empty block already present, each block
+  carries its own "add exercise" control, and an "Add block" control below
+  the last block adds further ones (ADR-0011).
 - A block can be collapsed to hide its exercises and sets while keeping its
-  name, position label, and summary counts (exercise/set totals) visible,
-  and expanded again. Purely a display state: never persisted as part of
-  the Session record, and never affects what FR-004's undo restores.
+  name, position label, and exercise count visible, and expanded again.
+  Purely a display state: never persisted as part of the Session record,
+  and never affects what FR-004's undo restores. _(Amended by ADR-0011:
+  the visible summary count is exercises only, not sets.)_
 - A block can optionally carry a target number of rounds (ADR-0008) — how
   many times the whole block is meant to be repeated, independent of how
   many sets each exercise entry in it actually has logged. Editing it is
@@ -334,10 +342,14 @@ Create a session and add blocks, exercises and sets.
 ### FR-6 — Diary / history `[v1]`
 
 - Reverse-chronological list of sessions, grouped by month.
-- Each session summarised in one line: date, main exercises, set count, and
-  what kind of work it was (derived from the exercises logged — e.g. their
-  movement patterns or, once a second discipline exists per §1.4, their
-  discipline — never a separately-entered field).
+- Each session summarised in one line: date, main exercises, and what kind
+  of work it was (derived from the exercises logged — e.g. their movement
+  patterns or, once a second discipline exists per §1.4, their discipline —
+  never a separately-entered field). **(ADR-0011)** Set count is dropped
+  from this line, and from a block's own summary line in the logging/
+  session-detail screens (FR-2) — a flatter, less numbers-heavy summary was
+  preferred; the actual sets themselves are still shown in full, just
+  never counted in a header line above them.
 - Session detail view, editable after the fact.
 - Search by exercise name (substring and typo-tolerant, the same matching
   FR-7 uses) to filter the list to sessions that logged that exercise
@@ -628,8 +640,9 @@ before code.
 | D13 | Whether generating a shareable image for external platforms (e.g. Instagram) falls under the constitution's "social network" non-goal | **Closed:** no — it is a one-way, on-device export (render an image locally, hand off via the platform's native share sheet or a saved file), not a multi-user or in-app social feature. No account, no backend, no peer visibility, no third-party posting API; consistent with Invariant 1 (nothing leaves the device without the user explicitly choosing to send it). Targeted at the "Later" phase (§9), not MVP/v1/v1.1. → FR-14 |
 | D14 | Whether adding a field to Settings (per-device preference state, not a canonical entity) requires the §6/Principle III schema-version-bump-and-migration treatment | **Closed:** no — that treatment applies only to the canonical entities in §3.1 (Session, Block, Exercise entry, Set, Exercise catalogue). A Settings field defaults silently when absent: no version bump, no ADR, no migration. Matches the precedent already set in `specs/006-settings-data/spec.md`; §6 amended below with this scope note so future specs don't re-litigate it. |
 | D15 | Whether a Block can carry a target round count, and what it means | **Closed:** yes — an optional integer field on `Block` naming how many times the whole block is meant to be repeated (e.g. "3 rounds" of a circuit), independent of and never inferred from how many sets each exercise entry in it has actually logged. Additive, optional, no default value backfilled for existing blocks. Schema v3. → ADR-0008 |
-| D16 | Whether a workout (the logging draft) becomes a Session automatically, or only when the user explicitly says so | **Closed:** explicitly — an explicit "Log workout" action is the only way a draft becomes a Session; the previous automatic day-rollover promotion is removed. Recording a *set* is unaffected — this decision is scoped to the session-level "commit to the diary" step only. A draft with no block at all is never persisted; a draft with at least one block persists and, if left unregistered, is offered (never auto-loaded) as a recovery banner the next time the logging form opens. No schema change: `LoggingDraft`'s shape and the storage port are unaffected. "One draft per training type" is not built by this decision — it collapses to the single existing draft, since only the Strength discipline is implemented today (D8). → ADR-0009 |
+| D16 | Whether a workout (the logging draft) becomes a Session automatically, or only when the user explicitly says so | **Closed:** explicitly — an explicit "Log workout" action is the only way a draft becomes a Session; the previous automatic day-rollover promotion is removed. Recording a *set* is unaffected — this decision is scoped to the session-level "commit to the diary" step only. A draft with no exercise at all is never persisted; a draft with at least one exercise persists and, if left unregistered, is offered (never auto-loaded) as a recovery banner the next time the logging form opens. No schema change: `LoggingDraft`'s shape and the storage port are unaffected. "One draft per training type" is not built by this decision — it collapses to the single existing draft, since only the Strength discipline is implemented today (D8). _(Threshold amended by ADR-0011 from "at least one block" to "at least one exercise": the form now always seeds one block, so a bare block is no longer a signal of intent.)_ → ADR-0009, ADR-0011 |
 | D17 | Whether recording a set requires an explicit confirm step (reopens D12); whether an already-recorded set can be edited in place; whether the per-exercise progression view (FR-013) stays reachable from a session detail view; whether the `/exercises` screen can create a new catalogue Exercise and edit an existing one's set-entry template | **Closed, all together (one design-refinement pass):** (1) Confirm is explicit again — a set commits only on an explicit "Add set"/"Save changes" tap, enabled only once every field the exercise's current template tracks is filled; the auto-commit-on-edit behavior and its "Repeat last set"/"Log this set" controls (D12/ADR-0007) are retired. (2) A `Set` can now be edited in place (load/volume/effort), not only added or deleted — new capability, still no schema change (`Set`'s shape is unaffected; only *how* one is produced changes). (3) A session detail view's per-exercise entries no longer link to the progression screen — for now, that stays reachable only from search results (spec 004 FR-013) and Insights (spec 005); FR-013 is amended accordingly, not removed (the progression screen itself, and its other two entry points, are unaffected). (4) The `/exercises` screen (spec 004 FR-5) gains "New exercise" (name + set-entry template together) alongside its existing rename/merge/delete, and its management panel gains "Edit tracked fields…" (ADR-0006) for an existing exercise — previously only reachable per-entry from the logging/session-detail screens. No schema change for (3) or (4) either — purely which screens link where, and use-cases (`createExercise`, `updateExerciseTemplate`) both already existed. → ADR-0010 |
+| D18 | Whether an exercise entry can exist without belonging to any block (the "loose" block) | **Closed:** no — every exercise entry always belongs to a real block; the draft-only "loose" flag that used to render a blockless exercise without block chrome is removed. It caused a real bug: the flag was never part of the persisted `Block` shape, so a blockless exercise silently gained block chrome the moment the session was saved and reopened. The logging form now opens with one empty block already present, and each block (including that first one) carries its own "add exercise" control; "Add block" below the last block still adds more. No schema change — `Block` never had a "loose" concept to begin with. → ADR-0011 |
 
 ---
 

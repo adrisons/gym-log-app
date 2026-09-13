@@ -4,13 +4,10 @@
  * `application/diary/session-editing.ts`'s doc comment for the exact
  * editable surface and why undo is out of scope here.
  *
- * Mirrors LoggingScreen's layout conventions: a `loose` block (an implicit,
- * presentation-only container for an exercise added outside any block —
- * `application/ports/logging-draft.ts`'s `DraftBlock.loose`, never part of
- * the persisted `Block`) renders `bare` (no header/menu), even while
- * empty; an explicitly created block that just hasn't been named yet is
- * never `loose` and always keeps its header (FR-2). "Add exercise"/"Add
- * block" sit at the bottom, and each exercise's set-entry template
+ * Mirrors LoggingScreen's layout conventions (ADR-0011): every exercise
+ * belongs to a real block — there is no implicit "loose" container any
+ * more. "Add block" sits at the bottom; each block has its own "Add
+ * exercise to …" footer control, and each exercise's set-entry template
  * (ADR-0006) is editable through its own menu.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -47,7 +44,6 @@ function withoutRounds(block: DraftBlock): DraftBlock {
   return {
     id: block.id,
     ...(block.name !== undefined ? { name: block.name } : {}),
-    ...(block.loose !== undefined ? { loose: block.loose } : {}),
     type: block.type,
     exercises: block.exercises,
   };
@@ -177,45 +173,6 @@ export function SessionDetailScreen() {
     }));
   };
 
-  // Attaches to the trailing block only if it's itself `loose` — an
-  // implicit container this same path created earlier — or creates a
-  // fresh `loose` one WITH the exercise already in it. An explicitly
-  // created block the user hasn't named yet is NOT `loose` and must stay
-  // its own block (FR-2: an unnamed block still shows its position and
-  // stays renameable/deletable), never silently absorb a loose add just
-  // because it currently has no name. Computed entirely inside the
-  // updater (see `persist`'s own doc comment) so both the "which block is
-  // trailing" decision and the append happen against the true latest
-  // state, never a stale render-time snapshot.
-  const addExerciseAtTopLevel = (exerciseId: Exercise['id']) => {
-    persist((current) => {
-      const lastBlock = current.blocks.at(-1);
-      const newEntry = {
-        id: newEditableItemId(),
-        exerciseId,
-        notes: '',
-        sets: [],
-      };
-      if (lastBlock && lastBlock.loose === true) {
-        return {
-          ...current,
-          blocks: current.blocks.map((b) =>
-            b.id === lastBlock.id
-              ? { ...b, exercises: [...b.exercises, newEntry] }
-              : b,
-          ),
-        };
-      }
-      const block = {
-        id: newEditableItemId(),
-        loose: true,
-        type: 'straightSets' as const,
-        exercises: [newEntry],
-      };
-      return { ...current, blocks: [...current.blocks, block] };
-    });
-  };
-
   if (!sessionId) {
     return null;
   }
@@ -223,14 +180,6 @@ export function SessionDetailScreen() {
   if (!editable || !original) {
     return <main className="session-detail-screen" aria-label="Session" />;
   }
-
-  // "Block N" position labels are computed from the ordinal among
-  // non-loose blocks, never the raw array index — a `loose` container
-  // renders with no label at all, so counting it would misnumber the
-  // first *visible* block (e.g. a loose exercise followed by the user's
-  // first "Add block" press would otherwise show that sole visible block
-  // as "Block 2").
-  const nonLooseBlocks = editable.blocks.filter((b) => b.loose !== true);
 
   return (
     <main className="session-detail-screen" aria-label="Session detail">
@@ -277,28 +226,15 @@ export function SessionDetailScreen() {
         />
       )}
 
-      {editable.blocks.map((block) => {
-        const blockVm = toBlockViewModel(
-          block,
-          nonLooseBlocks.findIndex((b) => b.id === block.id),
-          catalogue,
-        );
-        const totalSets = block.exercises.reduce(
-          (sum, entry) => sum + entry.sets.length,
-          0,
-        );
-        // No `exercises.length > 0` guard: a `loose` block stays bare even
-        // once emptied by deleting its last exercise — it's still an
-        // implicit container the user never asked to see as a block.
-        const isBare = block.loose === true;
+      {editable.blocks.map((block, blockIndex) => {
+        const blockVm = toBlockViewModel(block, blockIndex, catalogue);
 
         return (
           <BlockCard
             key={block.id}
             displayName={blockVm.displayName}
             hasName={block.name !== undefined}
-            bare={isBare}
-            subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'} logged`}
+            subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'}`}
             rounds={block.rounds}
             onRename={(name) =>
               persist((editable) => ({
@@ -329,25 +265,23 @@ export function SessionDetailScreen() {
               }))
             }
             footer={
-              isBare ? undefined : (
-                <AddExerciseControl
-                  buttonLabel={`Add exercise to ${blockVm.displayName}`}
-                  fieldLabel={`Add exercise to ${blockVm.displayName}`}
-                  search={(query) => searchExercises(query, catalogue)}
-                  onSelectExercise={(exercise) =>
-                    addExerciseToBlock(block.id, exercise.id)
-                  }
-                  onCreateExercise={(name) => {
-                    void (async () => {
-                      const exercise = await createExerciseInSession({
-                        canonicalName: name,
-                      });
-                      setCatalogue((current) => [...current, exercise]);
-                      addExerciseToBlock(block.id, exercise.id);
-                    })();
-                  }}
-                />
-              )
+              <AddExerciseControl
+                buttonLabel={`Add exercise to ${blockVm.displayName}`}
+                fieldLabel={`Add exercise to ${blockVm.displayName}`}
+                search={(query) => searchExercises(query, catalogue)}
+                onSelectExercise={(exercise) =>
+                  addExerciseToBlock(block.id, exercise.id)
+                }
+                onCreateExercise={(name) => {
+                  void (async () => {
+                    const exercise = await createExerciseInSession({
+                      canonicalName: name,
+                    });
+                    setCatalogue((current) => [...current, exercise]);
+                    addExerciseToBlock(block.id, exercise.id);
+                  })();
+                }}
+              />
             }
           >
             {block.exercises.map((entry, entryIndex) => {
@@ -503,21 +437,6 @@ export function SessionDetailScreen() {
         );
       })}
 
-      <AddExerciseControl
-        buttonLabel="Add exercise"
-        fieldLabel="Exercise"
-        search={(query) => searchExercises(query, catalogue)}
-        onSelectExercise={(exercise) => addExerciseAtTopLevel(exercise.id)}
-        onCreateExercise={(name) => {
-          void (async () => {
-            const exercise = await createExerciseInSession({
-              canonicalName: name,
-            });
-            setCatalogue((current) => [...current, exercise]);
-            addExerciseAtTopLevel(exercise.id);
-          })();
-        }}
-      />
       <button
         type="button"
         className="logging-button logging-button--icon-label"

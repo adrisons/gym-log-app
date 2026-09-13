@@ -8,7 +8,6 @@ function summary(id: string, exerciseNames: string[]): DiarySessionSummary {
     sessionId: id as SessionId,
     dateTime: '2026-09-11T10:00:00.000Z',
     mainExerciseNames: exerciseNames,
-    setCount: 1,
     kindOfWork: undefined,
   };
 }

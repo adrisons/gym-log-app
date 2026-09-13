@@ -289,6 +289,10 @@ marked as personal records.
   referenced by its ExerciseEntries), its total Set count, and a kind-of-
   work label derived from the exercises logged (e.g. their movement
   patterns) — never a field entered separately when logging.
+  **(ADR-0011, supersedes "its total Set count")** The set count is
+  dropped from this line — a flatter, less numbers-heavy summary was
+  preferred. The rest of the line (date, main exercises, kind-of-work) is
+  unchanged.
 - **FR-003** _(superseded by ADR-0009, `docs/requirements.md` FR-6)_: The
   diary screen MUST let the user search by exercise name (substring and
   typo-tolerant, per FR-009's own matching rules), filtering the list to

@@ -102,7 +102,12 @@ interface follows these:
   actions, the floating action); structural cards stay at the base radius.
   Superseded: the original identity's opposite convention (square
   structural surfaces, small radius reserved for interactive elements) —
-  see the refinement note below.
+  see the refinement note below. Scoped exception (ADR-0011): the
+  logging/session-detail block card (`.block-card--collapsible`) spans the
+  full screen width with square corners, to reclaim horizontal space on a
+  surface that repeats once per block — a narrow, single-surface departure,
+  not a reopening of the rounded identity; every other structural card
+  keeps the base radius.
 
 **Visual identity, decided**: the concrete values realizing the criteria
 above (palette, the two type roles, the corner-radius system) were chosen

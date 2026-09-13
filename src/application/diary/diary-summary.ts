@@ -13,7 +13,6 @@ export interface DiarySessionSummary {
   sessionId: SessionId;
   dateTime: string;
   mainExerciseNames: string[];
-  setCount: number;
   kindOfWork: string | undefined;
 }
 
@@ -24,11 +23,9 @@ export function buildDiarySessionSummary(
   const seenExerciseIds = new Set<ExerciseId>();
   const mainExerciseNames: string[] = [];
   const movementPatterns = new Set<string>();
-  let setCount = 0;
 
   for (const block of session.blocks) {
     for (const entry of block.exercises) {
-      setCount += entry.sets.length;
       if (!seenExerciseIds.has(entry.exerciseId)) {
         seenExerciseIds.add(entry.exerciseId);
         const exercise = exercisesById.get(entry.exerciseId);
@@ -46,7 +43,6 @@ export function buildDiarySessionSummary(
     sessionId: session.id,
     dateTime: session.dateTime,
     mainExerciseNames,
-    setCount,
     kindOfWork:
       movementPatterns.size > 0 ? [...movementPatterns].join(', ') : undefined,
   };

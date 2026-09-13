@@ -16,16 +16,13 @@
  * delete) lives on its own `/exercises` screen so this one stays focused
  * on the single primary action of recording a set (docs/design.md §2).
  *
- * A `loose` block (`DraftBlock.loose`, presentation-only — never part of
- * the persisted `Block`) renders `bare` — no header, no menu, its
- * exercises shown directly, even while empty — so an exercise added
- * without ever tapping "Add block" never looks like it's sitting inside a
- * block the user didn't ask for. `loose` is distinct from having no name:
- * an explicitly created block that hasn't been named yet is never `loose`
- * and always keeps its header (position label, rename, delete — FR-2).
- * "Add exercise"/"Add block" sit at the bottom of the screen, after
- * whatever's already there, matching the natural order of adding to
- * something you can already see.
+ * ADR-0011: every exercise now always belongs to a real block — the
+ * earlier `loose` container for an exercise added without ever tapping
+ * "Add block" is retired. `createDraft` seeds a fresh draft with one
+ * unnamed block already in it, so there is always at least one block to
+ * add an exercise to; the only way to add one is each block's own "Add
+ * exercise to …" footer control, and "Add block" (bottom of the screen)
+ * is how a second one gets created.
  *
  * `docs/requirements.md` FR-1 (design-refinement pass): reached from a
  * floating action on the diary rather than a nav tab, so a "‹ Diary" link
@@ -178,15 +175,6 @@ export function LoggingScreen() {
     return <main className="logging-screen" aria-label="Log a session" />;
   }
 
-  // Position labels ("Block N") and "Move to block" targets are both
-  // computed from the ordinal among non-loose blocks, never the raw array
-  // index — a `loose` container renders with no label at all, so counting
-  // it would misnumber the first *visible* block (e.g. a loose exercise
-  // followed by the user's first "Add block" press would otherwise show
-  // that sole visible block as "Block 2") and would also offer it as a
-  // synthetic, headerless move target.
-  const nonLooseBlocks = draft.blocks.filter((b) => b.loose !== true);
-
   return (
     <main className="logging-screen" aria-label="Log a session">
       <Link to="/diary" className="logging-button logging-button--icon-label">
@@ -247,44 +235,36 @@ export function LoggingScreen() {
         />
       )}
 
-      {draft.blocks.map((block) => {
-        const blockVm = toBlockViewModel(
-          block,
-          nonLooseBlocks.findIndex((b) => b.id === block.id),
-          catalogue,
-        );
-        const otherBlocks = nonLooseBlocks
+      {draft.blocks.map((block, blockIndex) => {
+        const blockVm = toBlockViewModel(block, blockIndex, catalogue);
+        const otherBlocks = draft.blocks
           .filter((b) => b.id !== block.id)
           .map((b) =>
             toBlockViewModel(
               b,
-              nonLooseBlocks.findIndex((x) => x.id === b.id),
+              draft.blocks.findIndex((x) => x.id === b.id),
               catalogue,
             ),
           )
           .map((vm) => ({ id: vm.id, displayName: vm.displayName }));
-        const totalSets = block.exercises.reduce(
-          (sum, entry) => sum + entry.sets.length,
-          0,
-        );
-        // No `exercises.length > 0` guard: a `loose` block stays bare even
-        // once emptied by deleting its last exercise — it's still an
-        // implicit container the user never asked to see as a block.
-        const isBare = block.loose === true;
 
         return (
           <BlockCard
             key={block.id}
             displayName={blockVm.displayName}
             hasName={block.name !== undefined}
-            bare={isBare}
-            subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'} logged`}
+            subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'}`}
             rounds={block.rounds}
             onRename={(name) => void renameBlock(block.id, name)}
             onSetRounds={(rounds) => void setBlockRounds(block.id, rounds)}
             onDelete={() => void deleteBlock(block.id)}
             footer={
-              isBare ? undefined : (
+              // FR-028: adding an exercise to the active form must stay
+              // unavailable while a pendingDraft is unresolved — the
+              // default seeded block (ADR-0011) always exists and renders
+              // regardless, so its own footer control needs this same
+              // gate the bottom-of-screen controls already have.
+              !pendingDraft ? (
                 <AddExerciseControl
                   buttonLabel={`Add exercise to ${blockVm.displayName}`}
                   fieldLabel={`Add exercise to ${blockVm.displayName}`}
@@ -301,7 +281,7 @@ export function LoggingScreen() {
                     })();
                   }}
                 />
-              )
+              ) : undefined
             }
           >
             {block.exercises.map((entry, entryIndex) => {
@@ -387,28 +367,14 @@ export function LoggingScreen() {
       </div>
 
       {!pendingDraft && (
-        <>
-          <AddExerciseControl
-            buttonLabel="Add exercise"
-            fieldLabel="Exercise"
-            search={searchExercises}
-            onSelectExercise={(exercise) => void addExerciseEntry(exercise.id)}
-            onCreateExercise={(name) => {
-              void (async () => {
-                const exercise = await createExercise({ canonicalName: name });
-                await addExerciseEntry(exercise.id);
-              })();
-            }}
-          />
-          <button
-            type="button"
-            className="logging-button logging-button--icon-label"
-            onClick={() => void addBlock(undefined, 'straightSets')}
-          >
-            <Icon name="plus" />
-            Add block
-          </button>
-        </>
+        <button
+          type="button"
+          className="logging-button logging-button--icon-label"
+          onClick={() => void addBlock(undefined, 'straightSets')}
+        >
+          <Icon name="plus" />
+          Add block
+        </button>
       )}
 
       {!pendingDraft && draftHasContent(draft) && (

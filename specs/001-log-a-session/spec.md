@@ -205,11 +205,14 @@ core value on its own.
    only one set is recorded; a deliberate second identical set after that
    window records normally. _(Amended by ADR-0007: "the confirm control" is
    now "Repeat last set"; the debounce guarantee is otherwise unchanged.)_
-10. **Given** the active draft has at least one block, **When** the user
+10. **Given** the active draft has at least one exercise, **When** the user
     presses "Log workout", **Then** the draft becomes a permanent Session in
     the diary, the stored draft (if any) is cleared, and the active form
     resets to a fresh, empty, unsaved state; there is no such control while
-    the active draft has no block at all. _(Added by ADR-0008.)_
+    the active draft has no exercise at all. _(Added by ADR-0008. Threshold
+    amended by ADR-0011: the form always seeds one empty block, so "at
+    least one block" stopped distinguishing an untouched draft from one
+    worth registering — the gate is the exercise itself.)_
 11. **Given** the user opens the logging form and leaves without entering
     any data, **When** they close or navigate away, **Then** nothing is
     stored — there is no draft to recover on a later visit. _(Added by
@@ -567,12 +570,13 @@ result — independently verifiable without blocks, load types, or effort.
   resurrect that set — the two undo timers are independent.
 - **FR-024**: If the user opens the logging form and leaves without
   registering the workout (FR-027), and the *active* form (the one they
-  are directly editing — FR-028) has at least one block (the same
+  are directly editing — FR-028) has at least one exercise (the same
   threshold FR-027 uses), the system MUST retain that input as a single
   pending draft — a state of the logging screen, not a stored Session, but
   still held in durable on-device storage so it survives an app close,
-  background, or kill. Editing only the session's date-time, with no block
-  ever added, MUST NOT by itself cause anything to be stored. Opening the
+  background, or kill. Editing only the session's date-time, with no
+  exercise ever added, MUST NOT by itself cause anything to be stored —
+  nor does the block the form seeds by default (ADR-0011). Opening the
   logging form MUST offer, but MUST NOT silently apply, recovery of an
   existing pending draft (FR-028). Discarding the draft MUST remove it and
   its data. At most one pending draft exists at a time. A catalogue merge
@@ -587,22 +591,27 @@ result — independently verifiable without blocks, load types, or effort.
   loads whatever the draft currently is). _(Amended by ADR-0008: the
   "no data ⇒ nothing stored" and "opt-in, not automatic, recovery" clauses
   are new; the day-rollover auto-promotion this FR previously implied via
-  FR-001 is removed — see FR-027.)_
+  FR-001 is removed — see FR-027. Threshold amended by ADR-0011 from "at
+  least one block" to "at least one exercise", since the form now always
+  seeds one empty block.)_
 - **FR-027**: The system MUST offer an explicit "Log workout" action once
-  the active draft has at least one block. Activating it MUST convert the
-  active draft into a permanent Session (visible in the diary), clear the
-  pending draft in storage, reset the active form to a fresh, empty,
+  the active draft has at least one exercise. Activating it MUST convert
+  the active draft into a permanent Session (visible in the diary), clear
+  the pending draft in storage, reset the active form to a fresh, empty,
   unsaved state, and return the user to the diary with the save
   acknowledgement (`docs/design.md` §1.1's bounded exception) — the same
   acknowledgement spec.md previously showed on leaving the form after any
   set, now tied to this explicit action instead. There MUST be no such
-  action while the active draft has no block at all (FR-019's "unavailable
-  rather than rejected" convention, applied one level up: an empty draft
-  has nothing worth registering, the same threshold FR-024 already uses to
-  decide whether there is "at least one change" to persist). This is the
-  only way a Session is created from the logging screen — there is no
-  time- or day-based automatic promotion.
-  _(Added by ADR-0008.)_
+  action while the active draft has no exercise at all (FR-019's
+  "unavailable rather than rejected" convention, applied one level up: an
+  empty draft has nothing worth registering, the same threshold FR-024
+  already uses to decide whether there is "at least one change" to
+  persist). This is the only way a Session is created from the logging
+  screen — there is no time- or day-based automatic promotion.
+  _(Added by ADR-0008. Threshold amended by ADR-0011: the form always
+  seeds one empty block, so "at least one block" is true from the moment
+  the form opens and can no longer serve as the gate — the exercise
+  itself is.)_
 - **FR-028**: When the logging form is opened and a pending draft (FR-024)
   exists, the system MUST show it as a dismissible option at the top of
   the screen — not a modal dialog — offering "Recover" (loads the pending

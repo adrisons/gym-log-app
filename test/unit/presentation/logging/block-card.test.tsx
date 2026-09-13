@@ -274,30 +274,4 @@ describe('BlockCard (FR-006, FR-007)', () => {
 
     expect(screen.getByRole('spinbutton', { name: /rounds/i })).toBeVisible();
   });
-
-  it('bare mode renders only children/footer, no header chrome', () => {
-    render(
-      <BlockCard
-        displayName="Block 1"
-        hasName={false}
-        bare
-        onRename={() => {}}
-        onSetRounds={() => {}}
-        onDelete={() => {}}
-        footer={<p>footer content</p>}
-      >
-        <p>exercise content</p>
-      </BlockCard>,
-    );
-
-    expect(screen.getByText('exercise content')).toBeInTheDocument();
-    expect(screen.getByText('footer content')).toBeInTheDocument();
-    expect(screen.queryByText('Block 1')).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /rename/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /actions/i }),
-    ).not.toBeInTheDocument();
-  });
 });

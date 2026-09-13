@@ -508,10 +508,11 @@ export function DiaryScreen() {
                         <span className="diary-screen__session-link-detail">
                           {session.mainExerciseNames.join(', ')}
                         </span>
-                        <span className="diary-screen__session-link-detail">
-                          {session.setCount} sets
-                          {session.kindOfWork && ` · ${session.kindOfWork}`}
-                        </span>
+                        {session.kindOfWork && (
+                          <span className="diary-screen__session-link-detail">
+                            {session.kindOfWork}
+                          </span>
+                        )}
                       </span>
                       <Icon name="chevron-right" />
                     </Link>

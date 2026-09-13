@@ -8,7 +8,6 @@ function summary(id: string, dateTime: string): DiarySessionSummary {
     sessionId: id as SessionId,
     dateTime,
     mainExerciseNames: [],
-    setCount: 0,
     kindOfWork: undefined,
   };
 }

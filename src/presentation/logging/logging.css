@@ -330,8 +330,19 @@
   background: var(--color-surface);
 }
 
+/* Flatter, edge-to-edge treatment for the actual collapsible block (never
+   the shared `.block-card` shell above, which stays a normal floating
+   dialog card for `ExerciseTemplatePanel`/`ExerciseCataloguePanel`/
+   `CreateExercisePanel`/the rename popup): square corners, and negative
+   inline margins exactly cancelling `.logging-screen`'s own side padding
+   so the card's background spans the full viewport width instead of
+   sitting in a gutter — reclaiming that space was the point, so its own
+   `padding` (inherited from `.block-card`) keeps the content readably
+   inset regardless. */
 .block-card--collapsible {
   gap: 0;
+  border-radius: 0;
+  margin-inline: calc(-1 * var(--space-4));
 }
 
 .block-card__header {
@@ -340,8 +351,12 @@
   gap: var(--space-3);
 }
 
+/* Flatter treatment (design refinement): no border, unlike the generic
+   `.logging-button` it's still built from — its background against the
+   block's own is enough to read as tappable. */
 .block-card__collapse-toggle {
   flex: none;
+  border-color: transparent;
 }
 
 /* The CSS-grid "animate to auto height" trick: `grid-template-rows`
@@ -487,6 +502,8 @@
   position: relative;
 }
 
+/* Flatter treatment (design refinement) — same reasoning as
+   `.block-card__collapse-toggle` above: no visible border. */
 .overflow-menu__trigger {
   display: inline-flex;
   align-items: center;
@@ -494,6 +511,7 @@
   min-height: 44px;
   min-width: 44px;
   padding: var(--space-2);
+  border-color: transparent;
 }
 
 .overflow-menu__list {

@@ -18,7 +18,12 @@ describe('useLoggingSession (research.md §5)', () => {
     await useLoggingSession.getState().initialize();
     const state = useLoggingSession.getState();
     expect(state.draft).toBeDefined();
-    expect(state.draft?.blocks).toEqual([]);
+    // ADR-0011: a brand-new draft always starts with one empty block.
+    expect(state.draft?.blocks).toHaveLength(1);
+    expect(state.draft?.blocks[0]).toMatchObject({
+      type: 'straightSets',
+      exercises: [],
+    });
   });
 
   it('does not clobber a draft mutated by a debounced commit while initialize() is still reading (Copilot review, PR #22)', async () => {
@@ -167,7 +172,9 @@ describe('useLoggingSession undo stack (FR-004, FR-023)', () => {
     useLoggingSession.getState().configure(storage);
     await useLoggingSession.getState().initialize();
     await useLoggingSession.getState().addBlock('A', 'straightSets');
-    const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
+    // ADR-0011: `initialize()` already seeded one block, so the block just
+    // added ('A') is the trailing one, not index 0.
+    const blockId = useLoggingSession.getState().draft!.blocks.at(-1)!.id;
 
     await useLoggingSession.getState().deleteBlock(blockId);
     expect(useLoggingSession.getState().undoStack).toHaveLength(1);
@@ -181,14 +188,15 @@ describe('useLoggingSession undo stack (FR-004, FR-023)', () => {
     useLoggingSession.getState().configure(storage);
     await useLoggingSession.getState().initialize();
     await useLoggingSession.getState().addBlock('A', 'straightSets');
-    const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
+    const blockId = useLoggingSession.getState().draft!.blocks.at(-1)!.id;
 
     await useLoggingSession.getState().deleteBlock(blockId);
-    expect(useLoggingSession.getState().draft!.blocks).toHaveLength(0);
+    // The seeded block (ADR-0011) remains — only 'A' was deleted.
+    expect(useLoggingSession.getState().draft!.blocks).toHaveLength(1);
 
     await useLoggingSession.getState().undo(blockId);
 
-    expect(useLoggingSession.getState().draft!.blocks).toHaveLength(1);
+    expect(useLoggingSession.getState().draft!.blocks).toHaveLength(2);
     expect(useLoggingSession.getState().undoStack).toEqual([]);
   });
 
@@ -197,14 +205,16 @@ describe('useLoggingSession undo stack (FR-004, FR-023)', () => {
     useLoggingSession.getState().configure(storage);
     await useLoggingSession.getState().initialize();
     await useLoggingSession.getState().addBlock('A', 'straightSets');
-    const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
+    const blockId = useLoggingSession.getState().draft!.blocks.at(-1)!.id;
 
     await useLoggingSession.getState().deleteBlock(blockId);
     await vi.advanceTimersByTimeAsync(5000);
 
     await useLoggingSession.getState().undo(blockId);
 
-    expect(useLoggingSession.getState().draft!.blocks).toHaveLength(0);
+    // Only the seeded block (ADR-0011) remains — the expired undo never
+    // brought 'A' back.
+    expect(useLoggingSession.getState().draft!.blocks).toHaveLength(1);
   });
 
   it('two independent undo entries coexist: restoring the block does not resurrect an already-deleted set inside it', async () => {
@@ -579,33 +589,39 @@ describe('useLoggingSession pending draft (FR-024, FR-027, FR-028; ADR-0008)', (
     expect(await storage.getDraft()).toBeUndefined(); // date-only edit persists nothing
   });
 
-  it('persists the draft once it gains a block, and offers it as pendingDraft on the next initialize()', async () => {
+  it('an empty block alone is not content (ADR-0011) — persists only once the draft gains an exercise, then offers it as pendingDraft on the next initialize()', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
     await useLoggingSession.getState().initialize();
 
     await useLoggingSession.getState().addBlock(undefined, 'straightSets');
+    expect(await storage.getDraft()).toBeUndefined();
+
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
     expect(await storage.getDraft()).toBeDefined();
 
     await useLoggingSession.getState().initialize();
-    expect(useLoggingSession.getState().draft!.blocks).toEqual([]);
-    expect(useLoggingSession.getState().pendingDraft?.blocks).toHaveLength(1);
+    // ADR-0011: the fresh active draft still starts with its own seeded
+    // block — the offered pendingDraft is the one with real content.
+    expect(useLoggingSession.getState().draft!.blocks).toHaveLength(1);
+    expect(useLoggingSession.getState().pendingDraft?.blocks).toHaveLength(2);
   });
 
   it('addBlock/addExerciseEntry/addSet are no-ops while a pendingDraft is unresolved', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
     await useLoggingSession.getState().initialize();
-    await useLoggingSession.getState().addBlock(undefined, 'straightSets');
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
     await useLoggingSession.getState().initialize(); // re-open: now offers a pendingDraft
 
     expect(useLoggingSession.getState().pendingDraft).toBeDefined();
+    const before = useLoggingSession.getState().draft!.blocks;
 
     await useLoggingSession.getState().addBlock('New', 'straightSets');
-    expect(useLoggingSession.getState().draft!.blocks).toEqual([]);
+    expect(useLoggingSession.getState().draft!.blocks).toBe(before);
 
-    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
-    expect(useLoggingSession.getState().draft!.blocks).toEqual([]);
+    await useLoggingSession.getState().addExerciseEntry('ex-2' as ExerciseId);
+    expect(useLoggingSession.getState().draft!.blocks).toBe(before);
   });
 
   it('recoverPendingDraft loads the pending draft as the active one and clears the banner', async () => {
@@ -613,6 +629,9 @@ describe('useLoggingSession pending draft (FR-024, FR-027, FR-028; ADR-0008)', (
     useLoggingSession.getState().configure(storage);
     await useLoggingSession.getState().initialize();
     await useLoggingSession.getState().addBlock('Legs', 'straightSets');
+    // Appends to the trailing ('Legs') block — the exercise this draft
+    // needs to count as content worth persisting (ADR-0011).
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
     const savedId = useLoggingSession.getState().draft!.id;
     await useLoggingSession.getState().initialize();
 
@@ -620,7 +639,9 @@ describe('useLoggingSession pending draft (FR-024, FR-027, FR-028; ADR-0008)', (
 
     expect(useLoggingSession.getState().pendingDraft).toBeUndefined();
     expect(useLoggingSession.getState().draft!.id).toBe(savedId);
-    expect(useLoggingSession.getState().draft!.blocks[0]?.name).toBe('Legs');
+    expect(useLoggingSession.getState().draft!.blocks.at(-1)?.name).toBe(
+      'Legs',
+    );
   });
 
   it('discardPendingDraft removes it from storage and leaves the active draft untouched', async () => {
@@ -628,6 +649,7 @@ describe('useLoggingSession pending draft (FR-024, FR-027, FR-028; ADR-0008)', (
     useLoggingSession.getState().configure(storage);
     await useLoggingSession.getState().initialize();
     await useLoggingSession.getState().addBlock('Legs', 'straightSets');
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
     await useLoggingSession.getState().initialize();
     const activeId = useLoggingSession.getState().draft!.id;
 
@@ -636,7 +658,8 @@ describe('useLoggingSession pending draft (FR-024, FR-027, FR-028; ADR-0008)', (
     expect(useLoggingSession.getState().pendingDraft).toBeUndefined();
     expect(await storage.getDraft()).toBeUndefined();
     expect(useLoggingSession.getState().draft!.id).toBe(activeId);
-    expect(useLoggingSession.getState().draft!.blocks).toEqual([]);
+    // ADR-0011: the fresh active draft still starts with its own seeded block.
+    expect(useLoggingSession.getState().draft!.blocks).toHaveLength(1);
   });
 });
 
@@ -655,17 +678,24 @@ describe('useLoggingSession registerWorkout (FR-027; ADR-0008)', () => {
     ).toEqual([]);
   });
 
-  it('converts the draft to a Session and resets the active draft to a fresh, empty, unpersisted one', async () => {
+  it('converts the draft to a Session and resets the active draft to a fresh, unpersisted one', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
     await useLoggingSession.getState().initialize();
-    await useLoggingSession.getState().addBlock(undefined, 'straightSets');
+    // ADR-0011: an empty block alone is not content — registerWorkout is a
+    // no-op without an exercise entry (draftHasContent).
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
     const draftId = useLoggingSession.getState().draft!.id;
 
     await useLoggingSession.getState().registerWorkout();
 
     expect(useLoggingSession.getState().draft!.id).not.toBe(draftId);
-    expect(useLoggingSession.getState().draft!.blocks).toEqual([]);
+    // The fresh draft still starts with its own seeded block.
+    expect(useLoggingSession.getState().draft!.blocks).toHaveLength(1);
+    expect(useLoggingSession.getState().draft!.blocks[0]).toMatchObject({
+      type: 'straightSets',
+      exercises: [],
+    });
     expect(await storage.getDraft()).toBeUndefined();
     const sessions = await storage.listSessions({
       from: '2000-01-01',
