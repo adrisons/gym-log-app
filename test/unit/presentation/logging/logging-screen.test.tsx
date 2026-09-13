@@ -101,12 +101,17 @@ describe('LoggingScreen (FR-001)', () => {
     // not any particular rep count.)
     await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
     await userEvent.keyboard('{ArrowDown}');
+    // One `waitFor`, not two: the animation marker is intentionally
+    // consumed a short time after being set (`logging-screen.tsx`'s
+    // `SET_SUMMARY_ANIMATION_MS` effect), so asserting the DOM in a
+    // separate, later `waitFor` would race that cleanup. Checking both the
+    // storage write and the marked row in the same callback means this
+    // only "passes" at the earliest instant sets.length is 2 — the same
+    // synchronous update that sets the marker in the first place.
     await waitFor(async () => {
       const draft = await storage.getDraft();
       expect(draft?.blocks[0]?.exercises[0]?.sets).toHaveLength(2);
-    });
 
-    await waitFor(() => {
       const summaries = container.querySelectorAll('.set-summary');
       const marked = container.querySelectorAll('.set-summary--new');
       expect(summaries).toHaveLength(2);

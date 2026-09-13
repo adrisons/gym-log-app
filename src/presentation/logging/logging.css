@@ -321,7 +321,14 @@
   min-height: 0;
 }
 
-.block-card__collapse--collapsed .block-card__body {
+/* `--transitioning` (`block-card.tsx`, cleared on a timeout matching the
+   transition above) keeps this clipped through an *expand* too, not just
+   the collapsed steady state — dropping overflow:hidden the instant
+   `--collapsed` is removed let full-height content paint outside the
+   still-growing 0fr->1fr track and overlap the header for the transition's
+   duration (Copilot review, PR #22). */
+.block-card__collapse--collapsed .block-card__body,
+.block-card__collapse--transitioning .block-card__body {
   overflow: hidden;
 }
 

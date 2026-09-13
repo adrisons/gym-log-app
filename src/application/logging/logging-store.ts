@@ -99,7 +99,12 @@ export interface LoggingSessionState {
   /** The id of the set `addSet` most recently appended — `undefined` once
    * consumed or before any set has been added this visit. `LoggingScreen`
    * reads this once per commit to mark only that one `.set-summary` row
-   * for the entrance animation, not every row already on screen. */
+   * for the entrance animation, not every row already on screen, and
+   * clears it itself (`clearLastAddedSetId`) once that one animation has
+   * had time to play — left set indefinitely, a later, unrelated remount
+   * of the same route (or a delete-then-undo restoring a set under its
+   * original id) would replay the animation for a row that isn't actually
+   * new anymore (Copilot review, PR #22). */
   lastAddedSetId: string | undefined;
 
   /** Called once by the composition root before the screen first renders. */
@@ -116,6 +121,7 @@ export interface LoggingSessionState {
    * resolves to any block at all (deleted in the meantime). */
   addSet: (entryId: string, input: AddSetInput) => Promise<void>;
   clearJustLoggedASet: () => void;
+  clearLastAddedSetId: () => void;
   prefillNextSet: (blockId: string, entryId: string) => SetPrefill | undefined;
   searchExercises: (query: string) => Exercise[];
   createExercise: (input: CreateExerciseInput) => Promise<Exercise>;
@@ -223,6 +229,8 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     },
 
     clearJustLoggedASet: () => set({ justLoggedASet: false }),
+
+    clearLastAddedSetId: () => set({ lastAddedSetId: undefined }),
 
     setSessionDateTime: async (iso) => {
       const { storage, draft: current } = get();

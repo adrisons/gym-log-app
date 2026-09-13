@@ -42,11 +42,16 @@
  * two together are what a collapsed-but-still-technically-present region
  * actually needs.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Icon } from '@/presentation/design/icons';
 import { OverflowMenu } from './overflow-menu';
 import './logging.css';
+
+/** Must match logging.css's `--duration-medium` (the collapse's own
+ * `grid-template-rows` transition duration) — see `isTransitioning`
+ * below for why. */
+const COLLAPSE_TRANSITION_MS = 260;
 
 export interface BlockCardProps {
   displayName: string;
@@ -72,6 +77,34 @@ export function BlockCard({
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState(hasName ? displayName : '');
   const [collapsed, setCollapsed] = useState(false);
+  // Keeps `.block-card__body` clipped for the duration of the collapse's
+  // own grid-template-rows transition, expanding included — toggling
+  // `collapsed` alone drops overflow:hidden the instant `--collapsed` is
+  // removed, while the row is still animating open over
+  // COLLAPSE_TRANSITION_MS, so an exercise/set's full-height content can
+  // briefly paint outside the still-growing track and overlap the header
+  // (Copilot review, PR #22). A timeout, not a `transitionend` listener,
+  // so this still clears under `prefers-reduced-motion` (no transition
+  // ever fires there, which would otherwise leave this stuck permanently
+  // true and reintroduce the very overflow-menu clipping bug this
+  // mechanism replaced).
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(transitionTimeoutRef.current);
+    };
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((current) => !current);
+    setIsTransitioning(true);
+    clearTimeout(transitionTimeoutRef.current);
+    transitionTimeoutRef.current = setTimeout(() => {
+      setIsTransitioning(false);
+    }, COLLAPSE_TRANSITION_MS);
+  }
 
   if (bare) {
     return (
@@ -120,7 +153,7 @@ export function BlockCard({
               aria-label={
                 collapsed ? `Expand ${displayName}` : `Collapse ${displayName}`
               }
-              onClick={() => setCollapsed((current) => !current)}
+              onClick={toggleCollapsed}
             >
               <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} />
             </button>
@@ -172,7 +205,7 @@ export function BlockCard({
         )}
       </div>
       <div
-        className={`block-card__collapse${collapsed ? ' block-card__collapse--collapsed' : ''}`}
+        className={`block-card__collapse${collapsed ? ' block-card__collapse--collapsed' : ''}${isTransitioning ? ' block-card__collapse--transitioning' : ''}`}
         inert={collapsed}
       >
         <div className="block-card__body">

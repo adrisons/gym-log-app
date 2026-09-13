@@ -69,6 +69,11 @@ const UNDO_MESSAGES = {
   set: 'Set deleted',
 } as const;
 
+/** Must match logging.css's `--duration-medium` (the `set-summary-enter`
+ * animation's own duration) — see the `lastAddedSetId` consumption effect
+ * below for why. */
+const SET_SUMMARY_ANIMATION_MS = 260;
+
 export function LoggingScreen() {
   const draft = useLoggingSession((s) => s.draft);
   const catalogue = useLoggingSession((s) => s.catalogue);
@@ -78,6 +83,7 @@ export function LoggingScreen() {
   const addExerciseEntry = useLoggingSession((s) => s.addExerciseEntry);
   const addSet = useLoggingSession((s) => s.addSet);
   const lastAddedSetId = useLoggingSession((s) => s.lastAddedSetId);
+  const clearLastAddedSetId = useLoggingSession((s) => s.clearLastAddedSetId);
   const prefillNextSet = useLoggingSession((s) => s.prefillNextSet);
   const searchExercises = useLoggingSession((s) => s.searchExercises);
   const createExercise = useLoggingSession((s) => s.createExercise);
@@ -107,6 +113,24 @@ export function LoggingScreen() {
     // initialize is a stable Zustand action reference; run once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // One-shot consumption: `lastAddedSetId` marks exactly one `.set-summary`
+  // row (`set-summary--new` below) for the entrance animation. Left set
+  // indefinitely, an unrelated remount of this same route — or a
+  // delete-then-undo that restores a set under its original id — would
+  // reapply that animation to a row that isn't actually new anymore
+  // (Copilot review, PR #22). SET_SUMMARY_ANIMATION_MS matches
+  // logging.css's `set-summary-enter` duration (--duration-medium) so the
+  // marker outlives the animation it drives, not the other way round —
+  // clearing it earlier would cut the animation short by removing the
+  // class that declares it mid-flight.
+  useEffect(() => {
+    if (lastAddedSetId === undefined) return;
+    const timeout = setTimeout(() => {
+      clearLastAddedSetId();
+    }, SET_SUMMARY_ANIMATION_MS);
+    return () => clearTimeout(timeout);
+  }, [lastAddedSetId, clearLastAddedSetId]);
 
   if (!draft) {
     return <main className="logging-screen" aria-label="Log a session" />;

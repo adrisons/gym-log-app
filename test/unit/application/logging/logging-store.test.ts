@@ -213,6 +213,28 @@ describe('useLoggingSession.addSet (ADR-0007 debounce / stale-block-id regressio
     expect(useLoggingSession.getState().lastAddedSetId).toBeUndefined();
   });
 
+  it('clearLastAddedSetId resets the marker without touching the draft (Copilot review, PR #22)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    expect(useLoggingSession.getState().lastAddedSetId).toBeDefined();
+
+    useLoggingSession.getState().clearLastAddedSetId();
+
+    expect(useLoggingSession.getState().lastAddedSetId).toBeUndefined();
+    expect(
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets,
+    ).toHaveLength(1);
+  });
+
   it('clearJustLoggedASet resets the flag without touching anything else', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
