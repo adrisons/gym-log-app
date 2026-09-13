@@ -10,6 +10,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { DiaryScreen } from '@/presentation/diary/diary-screen';
 import { useStorageAccess } from '@/application/storage-access';
 import { useLoggingSession } from '@/application/logging/logging-store';
+import { REWARD_ANIMATION_MS } from '@/presentation/design/tokens';
 import { createSession } from '@/domain/session';
 import { createBlock } from '@/domain/block';
 import { createSet } from '@/domain/set';
@@ -472,7 +473,7 @@ describe('DiaryScreen (FR-001..006)', () => {
       // could plausibly still appear.
       expect(useLoggingSession.getState().justLoggedASet).toBe(true);
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(1800);
+        await vi.advanceTimersByTimeAsync(REWARD_ANIMATION_MS);
       });
       // Consumed once — the store no longer thinks a fresh visit just
       // recorded a set, so a later remount of this same route won't

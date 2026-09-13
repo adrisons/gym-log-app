@@ -2,8 +2,9 @@
  * `docs/design.md` §1.1's one bounded exception to "never editorializing"
  * — a brief, self-dismissing acknowledgement that a just-logged session
  * was saved (`docs/requirements.md` FR-1). The text is what actually
- * confirms the save; the emoji is the one deliberately-relaxed bit of
- * imagery §1.2 otherwise forbids, and its motion is decoration only — it
+ * confirms the save; the emoji (plus a purely decorative glow/sparkle
+ * flourish, `aria-hidden`) is the one deliberately-relaxed bit of imagery
+ * §1.2 otherwise forbids, and its motion is decoration only — it
  * disappears the same way with or without `prefers-reduced-motion`
  * (`docs/design.md` §4.3), it just doesn't animate getting there.
  *
@@ -14,9 +15,8 @@
  * logged since, renders nothing here at all).
  */
 import { useEffect, useRef, useState } from 'react';
+import { REWARD_ANIMATION_MS } from '@/presentation/design/tokens';
 import './diary.css';
-
-const VISIBLE_MS = 1800;
 
 export interface SessionSavedToastProps {
   onDismiss?: () => void;
@@ -41,7 +41,7 @@ export function SessionSavedToast({ onDismiss }: SessionSavedToastProps) {
     const timeout = setTimeout(() => {
       setVisible(false);
       dismiss();
-    }, VISIBLE_MS);
+    }, REWARD_ANIMATION_MS);
     return () => {
       clearTimeout(timeout);
       // Leaving before the timeout fires (e.g. navigating away) must still
@@ -73,6 +73,19 @@ export function SessionSavedToast({ onDismiss }: SessionSavedToastProps) {
 
   return (
     <div className="diary-screen__saved-toast" role="status">
+      <span aria-hidden="true" className="diary-screen__saved-toast-glow" />
+      <span
+        aria-hidden="true"
+        className="diary-screen__saved-toast-sparkle diary-screen__saved-toast-sparkle--1"
+      >
+        ✦
+      </span>
+      <span
+        aria-hidden="true"
+        className="diary-screen__saved-toast-sparkle diary-screen__saved-toast-sparkle--2"
+      >
+        ✦
+      </span>
       <span aria-hidden="true" className="diary-screen__saved-toast-emoji">
         💪
       </span>
