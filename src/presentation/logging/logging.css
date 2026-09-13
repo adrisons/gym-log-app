@@ -134,6 +134,29 @@
   opacity: 0.7;
 }
 
+/* FR-028 (ADR-0008): the pending-draft recovery banner, always at the top
+   of the screen — a status region, never a modal (docs/design.md's own
+   "no dialogs on the logging path"). */
+.logging-screen__draft-banner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.logging-screen__draft-banner-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.logging-screen__draft-banner-actions .logging-button {
+  flex: 1;
+  text-align: center;
+}
+
 .set-row {
   display: flex;
   flex-direction: column;

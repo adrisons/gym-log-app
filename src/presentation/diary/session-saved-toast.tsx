@@ -8,7 +8,7 @@
  * (`docs/design.md` §4.3), it just doesn't animate getting there.
  *
  * `onDismiss`, when given, fires once self-dismissal actually happens —
- * `DiaryScreen` uses it to clear the logging store's `justLoggedASet` flag
+ * `DiaryScreen` uses it to clear the logging store's `justRegisteredWorkout` flag
  * this component's mount was conditioned on, so the one-shot acknowledgement
  * stays one-shot (a later remount of that same route, with nothing new
  * logged since, renders nothing here at all).

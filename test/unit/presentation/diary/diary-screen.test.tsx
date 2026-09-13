@@ -437,7 +437,7 @@ describe('DiaryScreen (FR-001..006)', () => {
     expect(screen.getByText(/1 session selected/i)).toBeInTheDocument();
   });
 
-  it('shows the save-acknowledgement toast once when justLoggedASet is set, and clears it so a remount does not replay it (ADR/design.md §1.1 regression)', async () => {
+  it('shows the save-acknowledgement toast once when justRegisteredWorkout is set, and clears it so a remount does not replay it (ADR-0008/design.md §1.1 regression)', async () => {
     const storage = new InMemoryStorage();
     useStorageAccess.getState().configure(storage);
     useLoggingSession.getState().configure(storage);
@@ -450,7 +450,8 @@ describe('DiaryScreen (FR-001..006)', () => {
       load: { kind: 'none' },
       setKind: 'working',
     });
-    expect(useLoggingSession.getState().justLoggedASet).toBe(true);
+    await useLoggingSession.getState().registerWorkout();
+    expect(useLoggingSession.getState().justRegisteredWorkout).toBe(true);
 
     vi.useFakeTimers();
     let unmount: () => void;
@@ -470,14 +471,14 @@ describe('DiaryScreen (FR-001..006)', () => {
       // (ADR-0007) can still be pending when this screen first mounts, so
       // the flag must stay reactive/live for as long as the toast itself
       // could plausibly still appear.
-      expect(useLoggingSession.getState().justLoggedASet).toBe(true);
+      expect(useLoggingSession.getState().justRegisteredWorkout).toBe(true);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1800);
       });
       // Consumed once — the store no longer thinks a fresh visit just
-      // recorded a set, so a later remount of this same route won't
+      // registered a workout, so a later remount of this same route won't
       // replay the toast for a visit that never happened.
-      expect(useLoggingSession.getState().justLoggedASet).toBe(false);
+      expect(useLoggingSession.getState().justRegisteredWorkout).toBe(false);
     } finally {
       vi.useRealTimers();
     }
@@ -488,8 +489,13 @@ describe('DiaryScreen (FR-001..006)', () => {
         <DiaryScreen />
       </MemoryRouter>,
     );
+    // registerWorkout() above did create a Session, so this remount lists
+    // it — the acknowledgement toast is what must not replay, not the
+    // session itself.
     await waitFor(() => {
-      expect(screen.getByText(/no sessions logged yet/i)).toBeInTheDocument();
+      expect(
+        screen.queryByText(/no sessions logged yet/i),
+      ).not.toBeInTheDocument();
     });
     expect(screen.queryByText(/session saved/i)).not.toBeInTheDocument();
   });

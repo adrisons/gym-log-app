@@ -41,48 +41,50 @@ export type { SessionId };
 /** Re-exported so `ExerciseSearchField` can check for an exact name/alias match the same accent/case-insensitive way `matchExercise` itself does, instead of a narrower ad hoc comparison. */
 export { normalize };
 
-function isSameLocalDay(isoA: string, isoB: string): boolean {
-  const a = new Date(isoA);
-  const b = new Date(isoB);
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+/**
+ * FR-001, FR-028 (ADR-0008). Opening the logging form never creates or
+ * persists anything by itself: `draft` is always a brand-new, in-memory-
+ * only `LoggingDraft` — the caller (the logging store) only writes it to
+ * storage once the user's own first edit changes it. `pendingDraft` is
+ * whatever draft is currently stored, if any — surfaced as the FR-028
+ * recovery banner, never auto-loaded into `draft`. There is deliberately
+ * no day-rollover auto-promotion any more: a `Session` is only ever
+ * created by `registerWorkout`, below.
+ */
+export interface OpenLoggingFormResult {
+  draft: LoggingDraft;
+  pendingDraft: LoggingDraft | undefined;
+}
+
+export async function openLoggingForm(
+  storage: StoragePort,
+): Promise<OpenLoggingFormResult> {
+  const now = new Date().toISOString();
+  const pendingDraft = await storage.getDraft();
+  return { draft: createDraft(now), pendingDraft };
+}
+
+/** FR-024, FR-028: discards the pending draft and its data. */
+export async function discardDraft(storage: StoragePort): Promise<void> {
+  await storage.discardDraft();
 }
 
 /**
- * FR-001/FR-024; research.md §4. No stored draft → creates and persists a
- * fresh one. A stored draft still on today's local calendar day →
- * restored unchanged. A stored draft from an earlier local calendar day →
- * promoted to a real `Session` (`saveSession` + `discardDraft`), then a
- * brand-new draft is created and returned — this is what makes "opening
- * the logging form" always end in exactly one open draft.
+ * FR-027 (ADR-0008): the one and only way a `Session` is created from the
+ * logging screen. Converts `draft` to a real `Session` (`draftToSession`),
+ * saves it, clears whatever draft is stored (there is at most one), and
+ * returns a brand-new, in-memory-only draft for the caller to make its new
+ * active one — the same "fresh, unpersisted" contract `openLoggingForm`
+ * itself returns, so the screen is immediately ready for the next workout.
  */
-export async function openLoggingForm(
+export async function registerWorkout(
   storage: StoragePort,
-): Promise<LoggingDraft> {
-  const now = new Date().toISOString();
-  const existing = await storage.getDraft();
-
-  if (existing && isSameLocalDay(existing.lastEditedAt, now)) {
-    return existing;
-  }
-
-  if (existing) {
-    const session = draftToSession(existing, newSessionId());
-    await storage.saveSession(session);
-    await storage.discardDraft();
-  }
-
-  const draft = createDraft(now);
-  await storage.saveDraft(draft);
-  return draft;
-}
-
-/** FR-024, Acceptance Scenario 3: discards the draft and its data. */
-export async function discardDraft(storage: StoragePort): Promise<void> {
+  draft: LoggingDraft,
+): Promise<{ session: Session; draft: LoggingDraft }> {
+  const session = draftToSession(draft, newSessionId());
+  await storage.saveSession(session);
   await storage.discardDraft();
+  return { session, draft: createDraft(new Date().toISOString()) };
 }
 
 interface ExerciseUsage {
