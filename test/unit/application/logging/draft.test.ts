@@ -436,6 +436,35 @@ describe('updateSet (ADR-0010: editing an already-recorded set in place)', () =>
     expect(sets?.[0]?.effort).toBe(4);
   });
 
+  it("preserves the existing set's setKind and completed — not input's always-'working'/true values (Copilot review, PR #27: FR-029's editable surface is load/volume/effort only)", () => {
+    const { draft, blockId, entryId, setId } = seed();
+    const withWarmup: LoggingDraft = {
+      ...draft,
+      blocks: draft.blocks.map((b) => ({
+        ...b,
+        exercises: b.exercises.map((e) => ({
+          ...e,
+          sets: e.sets.map((s) =>
+            s.id === setId
+              ? { ...s, setKind: 'warmUp' as const, completed: false }
+              : s,
+          ),
+        })),
+      })),
+    };
+
+    const updated = updateSet(withWarmup, blockId, entryId, setId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'weight', value: 110, unit: 'kg' },
+      setKind: 'working',
+    });
+
+    const set = updated.blocks[0]?.exercises[0]?.sets[0];
+    expect(set?.setKind).toBe('warmUp');
+    expect(set?.completed).toBe(false);
+    expect(set?.load).toEqual({ kind: 'weight', value: 110, unit: 'kg' });
+  });
+
   it('leaves every other set in the entry untouched', () => {
     const { draft, blockId, entryId } = seed();
     const withSecond = addSet(

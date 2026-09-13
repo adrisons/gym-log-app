@@ -572,7 +572,27 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       const { storage } = get();
       if (!storage) return;
       const before = get().catalogue.find((e) => e.id === exerciseId);
-      if (!before) return;
+      // A cold cache (e.g. a direct `/exercises` visit — ADR-0010 —
+      // reaching this before this store's own `initialize()` has ever
+      // populated `catalogue`, which `ExerciseCatalogueScreen` doesn't
+      // call) has nothing to optimistically update yet, but the write
+      // itself doesn't depend on the local cache
+      // (`updateExerciseTemplateUseCase` re-fetches from storage) — it
+      // must still happen, not silently no-op. Skip the optimistic
+      // update/rollback dance below and adopt the fresh exercise into the
+      // cache once the write lands instead.
+      if (!before) {
+        await updateExerciseTemplateUseCase(storage, exerciseId, template);
+        const updated = await storage.getExercise(exerciseId);
+        if (updated) {
+          set((state) => ({
+            catalogue: state.catalogue.some((e) => e.id === exerciseId)
+              ? state.catalogue.map((e) => (e.id === exerciseId ? updated : e))
+              : [...state.catalogue, updated],
+          }));
+        }
+        return;
+      }
       const optimistic = { ...before, ...template };
       set((state) => ({
         catalogue: state.catalogue.map((exercise) =>

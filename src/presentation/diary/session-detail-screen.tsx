@@ -437,6 +437,16 @@ export function SessionDetailScreen() {
                                     e.id === entry.id
                                       ? {
                                           ...e,
+                                          // FR-029's editable surface is
+                                          // load/volume/effort only —
+                                          // `setKind`/`completed` are kept
+                                          // from `s` itself, not taken
+                                          // from `input` (which always
+                                          // carries the add-form's fixed
+                                          // `setKind: 'working'`), so
+                                          // correcting e.g. a warm-up set's
+                                          // weight doesn't silently turn it
+                                          // into a completed working set.
                                           sets: e.sets.map((s) =>
                                             s.id === setId
                                               ? {
@@ -448,8 +458,8 @@ export function SessionDetailScreen() {
                                                   ...(input.effort !== undefined
                                                     ? { effort: input.effort }
                                                     : {}),
-                                                  setKind: input.setKind,
-                                                  completed: true,
+                                                  setKind: s.setKind,
+                                                  completed: s.completed,
                                                 }
                                               : s,
                                           ),

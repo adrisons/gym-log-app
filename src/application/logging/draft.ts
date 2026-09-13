@@ -420,15 +420,23 @@ export function updateSet(
   input: AddSetInput,
 ): LoggingDraft {
   const entry = findEntry(draft, blockId, entryId);
-  const index = entry ? entry.sets.findIndex((s) => s.id === setId) : -1;
-  if (!entry || index === -1) return draft;
+  const existing = entry?.sets.find((s) => s.id === setId);
+  if (!entry || !existing) return draft;
 
+  // FR-029's editable surface is load/volume/effort only — `setKind`
+  // (warm-up/working/to-failure, which feeds progression computations,
+  // §5) and `completed` are not part of what this edits, so they're kept
+  // from the set actually being edited, not taken from `input` (`SetRow`
+  // always builds an `AddSetInput` with `setKind: 'working'`, since that's
+  // the only kind the *add* form ever offers — blindly applying it here
+  // would silently turn an edited warm-up or incomplete set into a
+  // completed working one).
   const validated = createSet({
     ...(input.volume !== undefined ? { volume: input.volume } : {}),
     load: input.load,
     ...(input.effort !== undefined ? { effort: input.effort } : {}),
-    setKind: input.setKind,
-    completed: true,
+    setKind: existing.setKind,
+    completed: existing.completed,
   });
   const updatedSet: DraftSet = { id: setId, ...validated };
 

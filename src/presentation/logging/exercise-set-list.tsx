@@ -75,20 +75,38 @@ export function ExerciseSetList({
     undefined,
   );
 
-  // Deleting the last remaining set puts the entry back in "no data
-  // entered" state — the add form should reopen on its own rather than
-  // leaving a "+ Add set" button as the only way back in. Adjusted during
-  // render (React's documented pattern for "state that depends on a prop
-  // change", https://react.dev/learn/you-might-not-need-an-effect) rather
-  // than in a `useEffect`, which would cascade an extra render after the
-  // one that already shows the stale, about-to-be-corrected state.
+  // Two invariants enforced here, both by adjusting state during render
+  // (React's documented pattern for "state that depends on a prop change",
+  // https://react.dev/learn/you-might-not-need-an-effect) rather than in a
+  // `useEffect`, which would cascade an extra render after the one that
+  // already shows the stale, about-to-be-corrected state:
+  //
+  //  1. Deleting an entry's last remaining set reopens the add form
+  //     automatically ("no data entered" again). Gated on `sets.length`
+  //     actually *transitioning* to 0 (`prevSetsLength`), not merely being
+  //     0 on this render — `onConfirm` below already calls `closeForm()`
+  //     itself in the same event as `onAddSet`/`onUpdateSet`, and a caller
+  //     whose own state update hasn't reached this component's `sets` prop
+  //     yet (e.g. still `[]` right after the very first add) must not have
+  //     that deliberate close immediately fought and reopened here.
+  //  2. The set currently open for editing must still exist. It can stop
+  //     existing without the entry itself becoming empty: the summary list
+  //     stays visible, with its own per-set Delete, while a *different*
+  //     row is being edited — deleting the very set being edited must not
+  //     leave this component rendering neither a form nor a "+ Add set"
+  //     button (Copilot review, PR #27). Not transition-gated: nothing
+  //     else in this component reacts to a delete, so there is no
+  //     competing intent for this check to fight.
   const [prevSetsLength, setPrevSetsLength] = useState(sets.length);
-  if (sets.length !== prevSetsLength) {
-    setPrevSetsLength(sets.length);
-    if (sets.length === 0) {
-      setForm('add');
-      setEditingSetId(undefined);
-    }
+  const lengthChanged = sets.length !== prevSetsLength;
+  if (lengthChanged) setPrevSetsLength(sets.length);
+
+  if (lengthChanged && sets.length === 0) {
+    setForm('add');
+    setEditingSetId(undefined);
+  } else if (form === 'edit' && !sets.some((s) => s.id === editingSetId)) {
+    setForm('closed');
+    setEditingSetId(undefined);
   }
 
   function closeForm() {
@@ -158,7 +176,17 @@ export function ExerciseSetList({
 
       {showForm && (
         <SetRow
-          key={form === 'edit' ? `edit-${editingSetId}` : 'add'}
+          // Add mode's key includes the template fields, not just `'add'`
+          // — otherwise editing the exercise's template (e.g. Reps →
+          // Duration) mid-session doesn't remount this row, and a value
+          // already typed under the old kind (e.g. "5" reps) gets silently
+          // reinterpreted as the new one (5 seconds) instead of being
+          // cleared (Copilot review, PR #27).
+          key={
+            form === 'edit'
+              ? `edit-${editingSetId}`
+              : `add-${loadKind}-${volumeKind}-${trackEffort}`
+          }
           prefill={form === 'add' ? prefill : undefined}
           editingSet={
             editingSet

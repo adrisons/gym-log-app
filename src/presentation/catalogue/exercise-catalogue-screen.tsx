@@ -120,11 +120,11 @@ export function ExerciseCatalogueScreen() {
 
       {creating && (
         <CreateExercisePanel
-          onCreate={(input) => {
-            void createExerciseInSession(input).then(() => {
-              setCreating(false);
-              void refresh();
-            });
+          catalogue={catalogue}
+          onCreate={async (input) => {
+            await createExerciseInSession(input);
+            setCreating(false);
+            await refresh();
           }}
           onClose={() => setCreating(false)}
         />

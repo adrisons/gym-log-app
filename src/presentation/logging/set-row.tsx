@@ -90,6 +90,25 @@ const LOAD_KIND_WORDS: Partial<Record<Load['kind'], string>> = {
 };
 
 /**
+ * Builds the edit-mode status message for a row that isn't yet
+ * confirmable — the domain-minimum OR rule (FR-019), described in terms of
+ * the set actually being edited: `effectiveVolumeKind` (which can be
+ * Duration or Distance, not just Reps) and no "or a load" alternative at
+ * all when `effectiveLoadKind` is `none` (there is no load control shown
+ * to fill in that case).
+ */
+function editRequirementMessage(
+  loadKind: Load['kind'],
+  volumeKind: VolumeKind,
+): string {
+  const loadWord = LOAD_KIND_WORDS[loadKind];
+  const volumeWord = VOLUME_KIND_WORDS[volumeKind];
+  return loadWord
+    ? `Enter ${loadWord} or ${volumeWord} to record this set.`
+    : `Enter ${volumeWord} to record this set.`;
+}
+
+/**
  * Builds the add-mode status message for a row that isn't yet confirmable,
  * naming exactly what the exercise's current template still needs (ADR-
  * 0010) — never the old blanket "a load or a rep count", which was untrue
@@ -112,17 +131,26 @@ function missingFieldsMessage(
 function initialVolumeValue(
   volume: Volume | undefined,
   volumeKind: VolumeKind,
+  preserveOutOfRange: boolean,
 ): number | undefined {
   if (!volume || volume.kind !== volumeKind) return undefined;
   if (volume.kind === 'reps') {
     // A legal historical `Set` can hold a rep count the reps wheel
     // doesn't offer (it only goes to `MAX_REPS` — domain `createVolume`
-    // has no upper bound). Left as-is, `WheelPicker` would silently fall
-    // back to its "unset" position while this out-of-range value stayed
-    // held here, letting an edit elsewhere confirm it despite the wheel
-    // visibly showing nothing selected. Normalizing to `undefined` here
-    // keeps what's held in sync with what's shown.
-    return volume.count <= MAX_REPS ? volume.count : undefined;
+    // has no upper bound). In add mode (a stale FR-008 prefill),
+    // normalizing to `undefined` keeps what's held in sync with what's
+    // shown — `WheelPicker` would otherwise silently fall back to its
+    // "unset" position while this out-of-range value stayed held here,
+    // letting a further edit confirm it despite the wheel visibly showing
+    // nothing selected. In edit mode (`preserveOutOfRange`), the opposite
+    // matters more: this is the set's own already-recorded count, and
+    // discarding it here would let "Save changes" with reps left untouched
+    // silently delete a real, valid value just because the wheel can't
+    // visually represent it — so it's kept exactly as recorded until the
+    // user explicitly changes the wheel themselves.
+    return volume.count <= MAX_REPS || preserveOutOfRange
+      ? volume.count
+      : undefined;
   }
   if (volume.kind === 'duration') return volume.seconds;
   return volume.metres;
@@ -185,6 +213,7 @@ export function SetRow({
     initialVolumeValue(
       editingSet?.volume ?? prefill?.volume,
       effectiveVolumeKind,
+      editingSet !== undefined,
     ),
   );
   const [effort, setEffort] = useState<1 | 2 | 3 | 4 | 5 | undefined>(
@@ -291,7 +320,7 @@ export function SetRow({
   const requirementMessage = canConfirm
     ? undefined
     : editingSet
-      ? 'Enter a load or a rep count to record this set.'
+      ? editRequirementMessage(effectiveLoadKind, effectiveVolumeKind)
       : missingFieldsMessage(
           effectiveLoadKind,
           effectiveVolumeKind,

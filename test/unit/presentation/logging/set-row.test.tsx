@@ -266,7 +266,7 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     });
   });
 
-  it('Bodyweight with no component is confirmable once the volume is filled (US3, Acceptance Scenario 3.5)', async () => {
+  it('Bodyweight with an added component is confirmable once the volume is filled too (US3, Acceptance Scenario 3.5)', async () => {
     const onConfirm = vi.fn();
     render(
       <SetRow
@@ -430,5 +430,60 @@ describe('SetRow editing an existing set in place (ADR-0010)', () => {
     expect(onConfirm).toHaveBeenCalledWith(
       expect.objectContaining({ effort: 5 }),
     );
+  });
+
+  it('preserves an out-of-range historical rep count on Save when reps is left untouched (Copilot review, PR #27: the wheel only offers 1..100, but must not silently drop a legal higher value)', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        prefill={undefined}
+        editingSet={{
+          load: { kind: 'weight', value: 100, unit: 'kg' },
+          volume: { kind: 'reps', count: 150 },
+        }}
+        onConfirm={onConfirm}
+        onCancel={() => {}}
+      />,
+    );
+
+    // The wheel can't represent 150 (it only offers 1..100), so it shows
+    // "—" selected...
+    expect(screen.getByRole('option', { name: '—' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    // ...but the true held value is still 150 until the user explicitly
+    // changes it, so saving without touching reps must not delete it.
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    expect(onConfirm).toHaveBeenCalledWith({
+      volume: { kind: 'reps', count: 150 },
+      load: { kind: 'weight', value: 100, unit: 'kg' },
+      setKind: 'working',
+    });
+  });
+
+  it('describes the controls actually shown in the disabled-state message — Duration, not "a rep count" (Copilot review, PR #27)', () => {
+    render(
+      <SetRow
+        {...baseProps}
+        volumeKind="duration"
+        prefill={undefined}
+        editingSet={{ load: { kind: 'none' } }}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+
+    // `loadKind: 'none'` has no load control to fill, so the message
+    // never offers an impossible "a load" alternative either.
+    expect(
+      screen.getByText(/^enter a duration to record this set\.$/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/a load/i)).not.toBeInTheDocument();
   });
 });
