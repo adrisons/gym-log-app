@@ -152,9 +152,14 @@
   min-width: 44px;
 }
 
-/* An accent-tinted badge behind the icon (canvas reference: `.chip`) — a
-   plain unfilled icon read as far quieter than the mockup's colour-tinted
-   square, one of the concrete visual gaps against that reference. */
+/* A tinted badge behind the icon (canvas reference: `.chip`) — a plain
+   unfilled icon read as far quieter than the mockup's colour-tinted
+   square, one of the concrete visual gaps against that reference. Neutral
+   by default: Accent is reserved for primary actions/current selection
+   (docs/design.md §1.2/§3.1), so every row getting an accent-tinted badge
+   would both misuse that reservation and weaken the selected-row signal
+   below, which already relies on Accent meaning "selected" and nothing
+   else (Copilot review, PR #24). */
 .diary-screen__session-icon {
   position: relative;
   flex: none;
@@ -164,6 +169,15 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
+  background: color-mix(
+    in oklab,
+    var(--color-foreground) 8%,
+    var(--color-surface)
+  );
+  color: var(--color-foreground-muted);
+}
+
+.diary-screen__session-link--selected .diary-screen__session-icon {
   background: color-mix(
     in oklab,
     var(--color-accent) 13%,
@@ -298,12 +312,17 @@
   box-shadow: 0 4px 12px var(--color-border-strong);
   font-weight: 600;
   overflow: visible;
+  /* Purely a status announcement, never a control — and the glow below
+     deliberately extends past this box's own bounds, which would
+     otherwise sit over (and intercept taps on) whatever's underneath for
+     the animation's duration (Copilot review, PR #24). */
+  pointer-events: none;
   animation: diary-screen__saved-toast-in 1.8s var(--easing-decelerate) forwards;
 }
 
 .diary-screen__saved-toast-glow {
   position: absolute;
-  inset: -16px;
+  inset: calc(-1 * var(--space-4));
   border-radius: var(--radius-pill);
   background: radial-gradient(
     circle,
@@ -322,14 +341,14 @@
 }
 
 .diary-screen__saved-toast-sparkle--1 {
-  top: -6px;
+  top: calc(-1 * var(--space-2));
   left: var(--space-4);
 }
 
 .diary-screen__saved-toast-sparkle--2 {
-  bottom: -6px;
+  bottom: calc(-1 * var(--space-2));
   right: var(--space-4);
-  animation-delay: 0.2s;
+  animation-delay: var(--duration-medium);
 }
 
 .diary-screen__saved-toast-emoji {
@@ -341,10 +360,21 @@
 
 @media (prefers-reduced-motion: reduce) {
   .diary-screen__saved-toast,
-  .diary-screen__saved-toast-glow,
-  .diary-screen__saved-toast-sparkle,
   .diary-screen__saved-toast-emoji {
     animation: none;
+  }
+
+  /* Freezing their animation (like the toast/emoji above) would leave
+     these two at their un-animated default — fully opaque — instead of
+     the momentary burst they're meant to be, so a reduced-motion viewer
+     would see a static glow+sparkles hanging on the toast for its whole
+     1.8s lifetime. They're decoration only (`aria-hidden`), so hiding
+     them outright is the one bounded exception's actual boundary: text
+     and emoji still acknowledge the save, the fireworks just don't run
+     (Copilot review, PR #24). */
+  .diary-screen__saved-toast-glow,
+  .diary-screen__saved-toast-sparkle {
+    display: none;
   }
 }
 

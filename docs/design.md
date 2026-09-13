@@ -62,8 +62,13 @@ interface follows these:
   is this specific and this small on purpose — it does not open the door
   to praise or streaks elsewhere. This is also the one place §1.2's
   "no imagery" is knowingly relaxed: the acknowledgement may carry a small
-  emoji as its one visual expression (motion respects reduced-motion,
-  §4.3 — the content, not just the animation, is what confirms the save).
+  emoji, plus a brief, purely decorative glow/sparkle flourish around it
+  (matching the reference canvas's own toast — never on any other toast in
+  the app, and always `aria-hidden` since the text is what actually
+  confirms the save), as its one visual expression. Motion respects
+  reduced-motion (§4.3): with it on, the flourish is hidden outright
+  rather than left as a static, permanently-visible glow — the content is
+  still what confirms the save either way.
 - **Errors state the fact, then the fix**, and never blame the user: "That
   set wasn't saved. Your other sets are safe," followed by what to try next.
   No technical codes in the sentence.
