@@ -38,6 +38,19 @@ export function SessionSavedToast({ onDismiss }: SessionSavedToastProps) {
 
   return (
     <div className="diary-screen__saved-toast" role="status">
+      <span aria-hidden="true" className="diary-screen__saved-toast-glow" />
+      <span
+        aria-hidden="true"
+        className="diary-screen__saved-toast-sparkle diary-screen__saved-toast-sparkle--1"
+      >
+        ✦
+      </span>
+      <span
+        aria-hidden="true"
+        className="diary-screen__saved-toast-sparkle diary-screen__saved-toast-sparkle--2"
+      >
+        ✦
+      </span>
       <span aria-hidden="true" className="diary-screen__saved-toast-emoji">
         💪
       </span>

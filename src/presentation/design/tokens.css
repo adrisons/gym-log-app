@@ -44,10 +44,12 @@
 
   /* Radii — one rounded system (docs/design.md §1.2 refinement note,
      confirmed by the project owner via a Claude Design canvas exploration).
-     Superseded: the previous square-structural/small-interactive split. */
+     Superseded: the previous square-structural/small-interactive split.
+     --radius-lg matches the canvas's own block-card/session-row radius
+     (22px) — its largest surfaces get the most rounding. */
   --radius-sm: 10px;
   --radius-md: 14px;
-  --radius-lg: 20px;
+  --radius-lg: 22px;
   --radius-pill: 999px;
 
   /* Durations — named categories, not magic numbers (docs/design.md rule 2) */
