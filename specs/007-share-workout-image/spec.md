@@ -71,9 +71,13 @@ what settings persistence already has."
 > hook the post-logging prompt to (spec 001 has none); (2) FR-8's own chart
 > carries no data-sufficiency threshold — this feature borrows FR-9/§5.7's
 > per-exercise-progress threshold instead; (3) the new Settings field does
-> **not** require a schema version bump, ADR, or migration (D13) — Settings
+> **not** require a schema version bump, ADR, or migration (D14) — Settings
 > is not a canonical entity under §3.1/Principle III, matching the
-> precedent already set in spec 006.
+> precedent already set in spec 006. Decision numbering was also shifted
+> (D12→D13, the old D13→D14) when merging with `main`, which had already
+> taken D12 for an unrelated decision (ADR-0007, no set confirm step) —
+> the Input above still shows the original D12/D13 numbering used before
+> that merge.
 
 ## Clarifications
 
@@ -87,14 +91,14 @@ what settings persistence already has."
 Every prior spec builds evidence the user can see inside the app: a diary
 (spec 004), a progression chart (spec 004), and insight cards (spec 005).
 None of that evidence can leave the device except as a data file (spec
-006's export). `docs/requirements.md` FR-14 (D12) closes that gap for one
+006's export). `docs/requirements.md` FR-14 (D13) closes that gap for one
 specific case — a single, shareable image summarising a slice of training
 data, meant to be posted outside the app (e.g. Instagram), the same way
 Strava produces its workout cards. This is explicitly not the "social
 network" non-goal the constitution refuses (profiles, followers, in-app
 peer visibility): the image is rendered on-device and handed to the
 platform's own native share sheet or saved as a file, never posted through
-an authenticated API this app holds. D12 records that reading. The feature
+an authenticated API this app holds. D13 records that reading. The feature
 targets the "Later" phase (§9) — it is specified now so the decision and
 its shape are recorded, not because it is scheduled ahead of v1/v1.1. It
 reuses computations and definitions that already exist (personal records
@@ -242,7 +246,7 @@ elsewhere for that same data.
   platform on the user's behalf — the only hand-off is the operating
   system's native share sheet or saving a file (Invariant 1, Principle IV).
 - Any in-app social feature: no followers, likes, comments, profiles, or
-  visibility of one user's shared content to another. D12 records that this
+  visibility of one user's shared content to another. D13 records that this
   export is not the constitution's "social network" non-goal precisely
   because none of that exists here.
 - Aspect ratios other than 1:1 (e.g. a 9:16 story format). A later
@@ -367,7 +371,7 @@ elsewhere for that same data.
   progression/personal-record and insight computations already defined for
   them) and adds one new field to the existing Settings data: a boolean
   preference recording whether the post-logging share prompt (FR-001) is
-  suppressed. Settings is not a canonical entity under §3.1, so per D13
+  suppressed. Settings is not a canonical entity under §3.1, so per D14
   this addition does not require a schema version bump, an ADR, or a
   migration — a missing field simply defaults to "prompt enabled", the same
   way spec 006's own Settings fields already do.
@@ -416,7 +420,7 @@ elsewhere for that same data.
   personal record by name when the default happens to be one.
 - The new Settings field for the post-logging prompt's suppressed state
   defaults to "prompt enabled" for both existing installs and fresh
-  installs — the field is simply absent until set, per D13, with no
+  installs — the field is simply absent until set, per D14, with no
   migration involved.
 - "Distinct exercises" for FR-006 counts catalogue exercises referenced by
   the session's exercise entries, not the number of sets.

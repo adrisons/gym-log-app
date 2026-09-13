@@ -26,8 +26,26 @@
  * "Add exercise"/"Add block" sit at the bottom of the screen, after
  * whatever's already there, matching the natural order of adding to
  * something you can already see.
+ *
+ * `docs/requirements.md` FR-1 (design-refinement pass): reached from a
+ * floating action on the diary rather than a nav tab, so a "‹ Diary" link
+ * replaces what used to be implicit (the logging screen no longer lives
+ * at the app's root). `DiaryScreen`'s one-shot save acknowledgement
+ * (`docs/design.md` §1.1's bounded exception) reads
+ * `useLoggingSession`'s own `justLoggedASet` flag rather than router state
+ * handed off by this link — a plain "‹ Diary" `Link` with no `state` at
+ * all works for every way of leaving this screen (this link, a browser
+ * back/swipe gesture, …), where router state only ever covered the one
+ * explicit link. `justLoggedASet` is set the moment `addSet` actually
+ * records a set (not merely whether the draft *currently has* any — a
+ * same-day draft reopened with sets already in it must not falsely claim
+ * this visit saved something) and reset on the next `initialize()`. This
+ * is presentation-only signaling between two screens, not a change to
+ * D6/FR-024's draft lifecycle: the draft itself is already saved
+ * continuously and keeps no open/closed state.
  */
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useLoggingSession } from '@/application/logging/logging-store';
 import {
   toBlockViewModel,
@@ -41,6 +59,7 @@ import { SetRow } from './set-row';
 import { BlockCard } from './block-card';
 import { ExerciseEntryCard } from './exercise-entry-card';
 import { ExerciseTemplatePanel } from './exercise-template-panel';
+import { OverflowMenu } from './overflow-menu';
 import { UndoToast } from './undo-toast';
 import './logging.css';
 
@@ -103,6 +122,10 @@ export function LoggingScreen() {
 
   return (
     <main className="logging-screen" aria-label="Log a session">
+      <Link to="/diary" className="logging-button logging-button--icon-label">
+        <Icon name="chevron-right" style={{ transform: 'rotate(180deg)' }} />
+        Diary
+      </Link>
       <h1>Log a session</h1>
       <SessionDateTimeField
         value={draft.dateTime}
@@ -224,16 +247,20 @@ export function LoggingScreen() {
                         <li key={vm.id} className="set-summary">
                           <span>{vm.loadLabel}</span>
                           <span>{vm.volumeLabel}</span>
-                          <button
-                            type="button"
-                            className="logging-button logging-button--icon-label"
-                            onClick={() =>
-                              void deleteSet(block.id, entry.id, vm.id)
-                            }
+                          <OverflowMenu
+                            label={`${vm.loadLabel} ${vm.volumeLabel} actions`}
                           >
-                            <Icon name="trash" />
-                            Delete set
-                          </button>
+                            <button
+                              type="button"
+                              className="logging-button logging-button--icon-label"
+                              onClick={() =>
+                                void deleteSet(block.id, entry.id, vm.id)
+                              }
+                            >
+                              <Icon name="trash" />
+                              Delete set
+                            </button>
+                          </OverflowMenu>
                         </li>
                       );
                     })}
@@ -246,9 +273,7 @@ export function LoggingScreen() {
                     trackEffort={exercise?.trackEffort ?? false}
                     bandLabels={bandLabels}
                     freeTextSuggestions={suggestFreeTextLoads(entry.exerciseId)}
-                    onConfirm={(input) =>
-                      void addSet(block.id, entry.id, input)
-                    }
+                    onConfirm={(input) => void addSet(entry.id, input)}
                     onSaveBandLabels={(labels) => void saveBandLabels(labels)}
                   />
                 </ExerciseEntryCard>

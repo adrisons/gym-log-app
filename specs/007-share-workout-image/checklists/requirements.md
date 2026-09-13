@@ -39,7 +39,7 @@
   the user to answer here — none of them met the bar (scope/security/UX
   impact with no reasonable default) that would justify blocking on a
   question.
-- This feature targets the "Later" phase (docs/requirements.md §9, D12),
+- This feature targets the "Later" phase (docs/requirements.md §9, D13),
   not MVP/v1/v1.1 — recorded so the decision and its shape exist even
   though implementation is not scheduled yet.
 - **Reviewed by `spec-reviewer` and `schema-guardian`; findings applied.**
@@ -51,7 +51,7 @@
   004 explicitly says the in-app chart has none); the borrowed threshold is
   now FR-9/§5.7's per-exercise-progress rule, named explicitly.
   (3) The Settings field addition no longer claims a schema-version bump/
-  ADR/migration — `docs/requirements.md` D13 closes that ambiguity against
+  ADR/migration — `docs/requirements.md` D14 closes that ambiguity against
   Principle III's literal "canonical entity" scope, matching spec 006's own
   precedent; the project owner confirmed this reading. (4) FR-008 now
   states an explicit cross-exercise tie-break rule for "single highlight"
@@ -69,3 +69,9 @@
   manual override for "single highlight" only offers exercise entries with
   at least one working set, matching FR-015's exclusion of warm-up-only
   sessions from this content type. See `## Clarifications` in spec.md.
+- **Merge conflict with `main` resolved (2026-09-13)**: `main` had already
+  taken decision ID D12 for an unrelated change (ADR-0007, no set confirm
+  step) while this branch was open. This feature's decisions were
+  renumbered D12→D13 (share-as-image / social-network reading) and the old
+  D13→D14 (Settings schema-exemption); every cross-reference in spec.md and
+  docs/requirements.md was updated to match. No content changed, only IDs.

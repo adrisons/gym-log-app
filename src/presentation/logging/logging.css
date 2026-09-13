@@ -226,13 +226,31 @@
 
 .block-card__header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
   gap: var(--space-3);
+}
+
+.block-card__collapse-toggle {
+  flex: none;
+}
+
+/* Matches `.block-card`'s own flex/gap so wrapping the body in this one
+   element (needed for a single `hidden` toggle) doesn't change the visible
+   spacing between the exercise cards and the block's footer control. */
+.block-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.block-card__body[hidden] {
+  display: none;
 }
 
 .block-card__title {
   display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
   flex-direction: column;
   gap: var(--space-1);
 }
@@ -333,6 +351,34 @@
 .wheel-picker__item--selected {
   color: var(--color-foreground);
   font-weight: 700;
+}
+
+/* Effort's graduated intensity (docs/design.md §1.2 refinement note): a
+   resting tick in the level's status role, becoming a filled tint once
+   that level is selected — decoration only, the word label next to it is
+   still what states the meaning (§3.3). */
+.wheel-picker__item--success {
+  border-left: 3px solid var(--color-success);
+}
+
+.wheel-picker__item--warning {
+  border-left: 3px solid var(--color-warning);
+}
+
+.wheel-picker__item--danger {
+  border-left: 3px solid var(--color-danger);
+}
+
+.wheel-picker__item--success.wheel-picker__item--selected {
+  background: color-mix(in oklab, var(--color-success) 14%, transparent);
+}
+
+.wheel-picker__item--warning.wheel-picker__item--selected {
+  background: color-mix(in oklab, var(--color-warning) 14%, transparent);
+}
+
+.wheel-picker__item--danger.wheel-picker__item--selected {
+  background: color-mix(in oklab, var(--color-danger) 14%, transparent);
 }
 
 .wheel-picker--numeric .wheel-picker__item {

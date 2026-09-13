@@ -94,8 +94,9 @@ test('the app renders (not a blank page) when served from a GitHub Pages-style s
 
   await page.goto(`http://localhost:${PORT}${BASE_PATH}/`);
 
-  await expect(
-    page.getByRole('heading', { name: 'Log a session' }),
-  ).toBeVisible();
+  // "/" redirects to "/diary" (docs/requirements.md FR-1) — the redirect
+  // itself is good evidence the router resolved under the subpath basename
+  // correctly, which is what this regression test exists to catch.
+  await expect(page.getByRole('heading', { name: 'Diary' })).toBeVisible();
   expect(consoleErrors).toEqual([]);
 });

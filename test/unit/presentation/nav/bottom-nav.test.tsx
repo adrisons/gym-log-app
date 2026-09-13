@@ -10,7 +10,7 @@ function activeTabName(container: HTMLElement): string | undefined {
 }
 
 describe('BottomNav', () => {
-  it('renders all five destinations as links, each with an icon and a label', () => {
+  it('renders all four destinations as links, each with an icon and a label (logging is reached via a FAB, not a tab — FR-1)', () => {
     render(
       <MemoryRouter>
         <BottomNav />
@@ -19,24 +19,25 @@ describe('BottomNav', () => {
 
     const nav = screen.getByRole('navigation', { name: 'Primary' });
     const links = screen.getAllByRole('link');
-    expect(links).toHaveLength(5);
-    for (const name of ['Log', 'Diary', 'Search', 'Insights', 'Exercises']) {
+    expect(links).toHaveLength(4);
+    for (const name of ['Diary', 'Search', 'Insights', 'Exercises']) {
       const link = screen.getByRole('link', { name });
       expect(nav).toContainElement(link);
       expect(link.querySelector('svg')).toBeInTheDocument();
     }
+    expect(screen.queryByRole('link', { name: 'Log' })).not.toBeInTheDocument();
   });
 
-  it('marks "Log" active on the exact root path', () => {
+  it('marks "Diary" active on the diary route', () => {
     const { container } = render(
-      <MemoryRouter initialEntries={['/']}>
+      <MemoryRouter initialEntries={['/diary']}>
         <BottomNav />
       </MemoryRouter>,
     );
-    expect(activeTabName(container)).toBe('Log');
+    expect(activeTabName(container)).toBe('Diary');
   });
 
-  it('marks "Diary" active on a nested diary route, not "Log"', () => {
+  it('marks "Diary" active on a nested diary route', () => {
     const { container } = render(
       <MemoryRouter initialEntries={['/diary/session-1']}>
         <BottomNav />

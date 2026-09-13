@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { LoggingScreen } from '@/presentation/logging/logging-screen';
 import { useLoggingSession } from '@/application/logging/logging-store';
@@ -9,7 +10,11 @@ describe('LoggingScreen (FR-001)', () => {
   it('calls initialize on mount and renders the restored/created draft with no loading spinner', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
-    render(<LoggingScreen />);
+    render(
+      <MemoryRouter>
+        <LoggingScreen />
+      </MemoryRouter>,
+    );
 
     await waitFor(() => {
       expect(screen.getByLabelText(/session date & time/i)).toBeInTheDocument();
@@ -22,7 +27,11 @@ describe('LoggingScreen (FR-001)', () => {
   it('lets a user find/create an exercise and log a set end to end', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
-    render(<LoggingScreen />);
+    render(
+      <MemoryRouter>
+        <LoggingScreen />
+      </MemoryRouter>,
+    );
 
     await waitFor(() => {
       expect(
@@ -45,7 +54,6 @@ describe('LoggingScreen (FR-001)', () => {
 
     await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
     await userEvent.keyboard('{ArrowDown}'.repeat(5));
-    await userEvent.click(screen.getByRole('button', { name: /add set/i }));
 
     await waitFor(async () => {
       const draft = await storage.getDraft();
@@ -56,7 +64,11 @@ describe('LoggingScreen (FR-001)', () => {
   it('a block created via "Add block" keeps its header/controls after an exercise is added to it (FR-2 regression)', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
-    render(<LoggingScreen />);
+    render(
+      <MemoryRouter>
+        <LoggingScreen />
+      </MemoryRouter>,
+    );
 
     await waitFor(() => {
       expect(
@@ -103,7 +115,11 @@ describe('LoggingScreen (FR-001)', () => {
   it('numbers the first explicit block "Block 1" even after a loose exercise already exists (loose-block-numbering regression)', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
-    render(<LoggingScreen />);
+    render(
+      <MemoryRouter>
+        <LoggingScreen />
+      </MemoryRouter>,
+    );
 
     // Add a loose exercise first — it renders bare, with no "Block N"
     // label of its own, but it still occupies index 0 in `draft.blocks`.
@@ -137,7 +153,11 @@ describe('LoggingScreen (FR-001)', () => {
   it('a loose block stays chrome-less even after its last exercise is deleted (empty-loose-block regression)', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
-    render(<LoggingScreen />);
+    render(
+      <MemoryRouter>
+        <LoggingScreen />
+      </MemoryRouter>,
+    );
 
     await waitFor(() => {
       expect(
