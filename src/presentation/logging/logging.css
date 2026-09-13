@@ -345,6 +345,11 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  /* `.block-card` dropped its own flex `gap` in favor of the collapse
+     wrapper's collapsible `margin-top` (above) — this row sits between the
+     header and that wrapper and needs its own top margin, or it renders
+     flush against the header (Copilot review, PR #22). */
+  margin-top: var(--space-4);
   font-size: 0.875rem;
   color: var(--color-foreground-muted);
 }
