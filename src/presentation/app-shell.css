@@ -20,6 +20,12 @@
    a fresh one mounts on navigation, so this animation plays automatically
    on every "changed space" (`docs/design.md` §4.1 — answers "where did
    that thing go" for the screen itself) without each screen repeating it. */
+/* Opacity-only, deliberately: a `transform` here would make the screen
+   root a containing block for every `position: fixed` descendant it
+   renders (DiaryScreen's FAB, bulk bar, and save toast all live inside
+   `.diary-screen`) — they'd jump to being positioned relative to this
+   animating root instead of the viewport for the animation's duration
+   (Copilot review, PR #22). Fading in has no such side effect. */
 .app-shell__content > * {
   flex: 1 0 auto;
   animation: app-shell__screen-enter var(--duration-medium)
@@ -29,11 +35,9 @@
 @keyframes app-shell__screen-enter {
   from {
     opacity: 0;
-    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 

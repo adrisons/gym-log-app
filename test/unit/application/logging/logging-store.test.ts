@@ -179,6 +179,40 @@ describe('useLoggingSession.addSet (ADR-0007 debounce / stale-block-id regressio
     expect(useLoggingSession.getState().justLoggedASet).toBe(false);
   });
 
+  it('lastAddedSetId tracks whichever set was most recently committed, and resets on initialize() (PR #22 Copilot review — set-summary-enter animation scope)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    expect(useLoggingSession.getState().lastAddedSetId).toBeUndefined();
+
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const firstSetId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+    expect(useLoggingSession.getState().lastAddedSetId).toBe(firstSetId);
+
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 5 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    const sets =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets;
+    expect(sets).toHaveLength(2);
+    // The marker moves to the newest set, not the one committed earlier.
+    expect(useLoggingSession.getState().lastAddedSetId).toBe(sets[1]!.id);
+    expect(useLoggingSession.getState().lastAddedSetId).not.toBe(firstSetId);
+
+    await useLoggingSession.getState().initialize();
+    expect(useLoggingSession.getState().lastAddedSetId).toBeUndefined();
+  });
+
   it('clearJustLoggedASet resets the flag without touching anything else', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);

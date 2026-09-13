@@ -96,6 +96,11 @@ export interface LoggingSessionState {
    * also read true for a same-day draft that already had sets before this
    * visit even started. */
   justLoggedASet: boolean;
+  /** The id of the set `addSet` most recently appended — `undefined` once
+   * consumed or before any set has been added this visit. `LoggingScreen`
+   * reads this once per commit to mark only that one `.set-summary` row
+   * for the entrance animation, not every row already on screen. */
+  lastAddedSetId: string | undefined;
 
   /** Called once by the composition root before the screen first renders. */
   configure: (storage: StoragePort) => void;
@@ -194,6 +199,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     bandLabels: [],
     lastConfirmedAt: {},
     justLoggedASet: false,
+    lastAddedSetId: undefined,
 
     configure: (storage) => set({ storage }),
 
@@ -206,7 +212,14 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
         storage.listSessions(FULL_RANGE),
         storage.listBandLabels(),
       ]);
-      set({ draft, catalogue, sessions, bandLabels, justLoggedASet: false });
+      set({
+        draft,
+        catalogue,
+        sessions,
+        bandLabels,
+        justLoggedASet: false,
+        lastAddedSetId: undefined,
+      });
     },
 
     clearJustLoggedASet: () => set({ justLoggedASet: false }),
@@ -246,11 +259,21 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       );
       if (result === current) return; // FR-025: debounced no-op
 
+      // `addSetToDraft` always appends, so the new set is whichever one is
+      // now last on this entry — used to animate only the set that was
+      // actually just added (`logging.css`'s `.set-summary--new`), not
+      // every historical row `LoggingScreen` happens to remount alongside it.
+      const committedEntry = result.blocks
+        .find((b) => b.id === blockId)
+        ?.exercises.find((e) => e.id === entryId);
+      const newSetId = committedEntry?.sets.at(-1)?.id;
+
       const updated = touch(result);
       set((state) => ({
         draft: updated,
         lastConfirmedAt: { ...state.lastConfirmedAt, [entryId]: nowMs },
         justLoggedASet: true,
+        lastAddedSetId: newSetId,
       }));
       await storage.saveDraft(updated);
     },

@@ -191,10 +191,6 @@
   gap: var(--space-2);
 }
 
-/* Plays once, on mount, for the one freshly-committed set — existing rows
-   keep the same key (`vm.id`) and never remount, so this never replays
-   for them. Answers "where did that thing go" (docs/design.md §4.1) for
-   the set ADR-0007 just auto-committed with no confirm tap to anchor to. */
 .set-summary {
   display: flex;
   gap: var(--space-3);
@@ -203,6 +199,17 @@
   border-radius: var(--radius-sm);
   background: var(--color-surface-raised);
   font-family: var(--font-mono);
+}
+
+/* Plays once, only for the one row `LoggingScreen` marks as the set
+   `addSet` most recently committed (`lastAddedSetId`) — not the base
+   `.set-summary` class every row shares, which would replay for every
+   already-logged set the moment the whole list first mounts (e.g. opening
+   a same-day draft with sets already in it, or `SessionDetailScreen`'s
+   read of past sets, which never applies this modifier at all). Answers
+   "where did that thing go" (docs/design.md §4.1) for the set ADR-0007
+   just auto-committed with no confirm tap to anchor to. */
+.set-summary--new {
   animation: set-summary-enter var(--duration-medium) var(--easing-decelerate);
 }
 
@@ -218,7 +225,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .set-summary {
+  .set-summary--new {
     animation: none;
   }
 }
@@ -251,7 +258,6 @@
 .block-card {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
   padding: var(--space-5);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -270,28 +276,41 @@
 
 /* The CSS-grid "animate to auto height" trick: `grid-template-rows`
    between 1fr and 0fr transitions smoothly (unlike `height: auto`, which
-   can't be animated), and the single row's own content — `.block-card__body`
-   — controls the actual layout underneath. `overflow: hidden` on the row
-   is what makes 0fr actually clip instead of just being ignored. */
+   can't be animated). `margin-top` (replacing `.block-card`'s own `gap`,
+   which a 0fr row can't shrink through) transitions alongside it so a
+   collapsed card hugs its header instead of keeping a blank gap where the
+   body used to be. */
 .block-card__collapse {
   display: grid;
   grid-template-rows: 1fr;
-  transition: grid-template-rows var(--duration-medium) var(--easing-standard);
+  margin-top: var(--space-4);
+  transition:
+    grid-template-rows var(--duration-medium) var(--easing-standard),
+    margin-top var(--duration-medium) var(--easing-standard);
 }
 
 .block-card__collapse--collapsed {
   grid-template-rows: 0fr;
+  margin-top: 0;
 }
 
-/* Matches `.block-card`'s own flex/gap so wrapping the body in this one
+/* Matches `.block-card`'s own flex gap so wrapping the body in this one
    element (needed for a single collapse toggle) doesn't change the visible
-   spacing between the exercise cards and the block's footer control. */
+   spacing between the exercise cards and the block's footer control.
+   `overflow: hidden` only while collapsed — not permanently — since
+   `min-height: 0` needs it to let the 0fr row actually shrink past its
+   content's natural height, but applying it whenever the block is merely
+   expanded clipped every exercise/set `OverflowMenu` popover inside this
+   element instead of letting it escape normally (Copilot review, PR #22). */
 .block-card__body {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  overflow: hidden;
   min-height: 0;
+}
+
+.block-card__collapse--collapsed .block-card__body {
+  overflow: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {

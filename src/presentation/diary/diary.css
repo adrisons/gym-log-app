@@ -63,6 +63,7 @@
   padding: var(--space-2) 0;
   min-height: 44px;
   cursor: pointer;
+  transition: transform var(--duration-instant) var(--easing-standard);
 }
 
 .diary-screen__select-button:hover,
@@ -73,6 +74,18 @@
 .diary-screen__select-button:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
+}
+
+/* Press feedback (docs/design.md §4.2 — every tappable control gets this,
+   not just the ones with their own dedicated button class). */
+.diary-screen__select-button:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diary-screen__select-button:active {
+    transform: none;
+  }
 }
 
 .diary-screen__session-list {

@@ -77,6 +77,7 @@ export function LoggingScreen() {
   const setSessionDateTime = useLoggingSession((s) => s.setSessionDateTime);
   const addExerciseEntry = useLoggingSession((s) => s.addExerciseEntry);
   const addSet = useLoggingSession((s) => s.addSet);
+  const lastAddedSetId = useLoggingSession((s) => s.lastAddedSetId);
   const prefillNextSet = useLoggingSession((s) => s.prefillNextSet);
   const searchExercises = useLoggingSession((s) => s.searchExercises);
   const createExercise = useLoggingSession((s) => s.createExercise);
@@ -243,8 +244,16 @@ export function LoggingScreen() {
                   <ul className="set-list">
                     {entry.sets.map((set) => {
                       const vm = toSetSummaryViewModel(set);
+                      const isNewest = vm.id === lastAddedSetId;
                       return (
-                        <li key={vm.id} className="set-summary">
+                        <li
+                          key={vm.id}
+                          className={
+                            isNewest
+                              ? 'set-summary set-summary--new'
+                              : 'set-summary'
+                          }
+                        >
                           <span>{vm.loadLabel}</span>
                           <span>{vm.volumeLabel}</span>
                           <OverflowMenu
