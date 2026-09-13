@@ -59,11 +59,14 @@ that regenerated this spec, and are reflected in `docs/requirements.md`
   session — starting a session always creates a new, independent one.
 - Q: What happens to input if the user opens the logging form and leaves
   without submitting? → A: It is kept as a single pending draft — a state
-  of the logging screen, not a persisted Session. There is one way to open
-  the logging form and it always restores the pending draft if one exists;
-  to start from scratch the user first discards the draft from the form.
-  Discarding the draft discards its data. The draft must survive an app
-  close/background even though it is not a Session.
+  of the logging screen, not a persisted Session. Discarding the draft
+  discards its data. The draft must survive an app close/background even
+  though it is not a Session. _(Amended by ADR-0008: opening the form no
+  longer always restores the draft automatically — see FR-024/FR-027/
+  FR-028. Recovering it, or discarding it to start from scratch, are now
+  the two explicit choices offered by a banner; adding new content is
+  unavailable until one is chosen, so the draft is never silently dropped
+  either way.)_
 - Q: Effort scale? → A: An integer 1–5 level (ADR-0003, revised), one tap,
   optional, always shown with its meaning in words. No RIR input mode.
 - Q: Is there a kg/lb unit picker in this slice? → A: No. Weight loads are
@@ -149,19 +152,31 @@ core value on its own.
 1. **Given** the user has no pending draft, **When** they open the logging
    form, **Then** a new session is created with a date-time of that moment
    (which they can edit) and is ready to accept blocks and exercises — no
-   picker, no "continue?" dialog.
+   picker, no "continue?" dialog. _(Amended by ADR-0008: opening the form no
+   longer creates or persists anything by itself — the active form starts
+   empty and unsaved; a session is only ever persisted once the user
+   presses "Log workout".)_
 2. **Given** the user opened the logging form earlier, entered some data,
    and left without submitting, **When** they open the logging form again,
    **Then** their earlier input is restored as the pending draft — no data
    was lost by leaving — and this is the only thing that opening the form
    does when a draft exists (it does not start a competing new session).
+   _(Amended by ADR-0008: restoring is no longer automatic — a banner at
+   the top of the screen offers "Recover"/"Discard" for the pending draft,
+   and adding a block, exercise, or set is unavailable until one of the two
+   is chosen, so a pending draft can never be silently overwritten by
+   unrelated new input.)_
 3. **Given** a pending draft exists, **When** the user discards it from the
    logging form, **Then** the draft and all its data are gone and are not
    recoverable, and the next time the form is opened a fresh session starts.
+   _(Amended by ADR-0008: this is now one of the banner's two explicit
+   actions, alongside "Recover"; it no longer requires loading the draft
+   into the form first.)_
 4. **Given** the user already submitted a session earlier today, **When**
    they open the logging form again (with no pending draft), **Then** a
    second, fully independent session is created — the earlier one is
-   untouched.
+   untouched. _(Amended by ADR-0008: "submitted" now means the user pressed
+   "Log workout" on that earlier visit, not merely that a draft existed.)_
 5. **Given** the user is adding an exercise, **When** they open the exercise
    field, **Then** they see their most-used and most-recently-used exercises
    first (seeded common exercises included on a fresh install), and can
@@ -186,6 +201,15 @@ core value on its own.
    only one set is recorded; a deliberate second identical set after that
    window records normally. _(Amended by ADR-0007: "the confirm control" is
    now "Repeat last set"; the debounce guarantee is otherwise unchanged.)_
+10. **Given** the active draft has at least one block, **When** the user
+    presses "Log workout", **Then** the draft becomes a permanent Session in
+    the diary, the stored draft (if any) is cleared, and the active form
+    resets to a fresh, empty, unsaved state; there is no such control while
+    the active draft has no block at all. _(Added by ADR-0008.)_
+11. **Given** the user opens the logging form and leaves without entering
+    any data, **When** they close or navigate away, **Then** nothing is
+    stored — there is no draft to recover on a later visit. _(Added by
+    ADR-0008.)_
 
 ---
 
@@ -340,11 +364,15 @@ result — independently verifiable without blocks, load types, or effort.
   returns much later: the pending draft is restored intact. (Forward-looking
   note, not testable in this slice: once a history view exists in a later
   spec, an un-submitted draft must not appear in it — it is not a Session.)
-- Two pending drafts cannot exist: there is a single draft slot. Opening the
-  logging form while a draft exists always restores that draft; there is no
-  separate "start fresh" action that competes with it. To begin a new,
-  empty session the user discards the draft first — the app never silently
-  drops draft data.
+- Two pending drafts cannot exist: there is a single draft slot. The app
+  never silently drops draft data. _(Amended by ADR-0008: opening the form
+  while a draft exists no longer restores it automatically — the active
+  form starts fresh and empty, with the stored draft offered via a banner
+  (FR-028) instead. This does introduce a "start fresh" path that
+  competes with recovering the draft, but not a silent one: adding new
+  content is unavailable until the user explicitly recovers or discards
+  the pending draft first, so nothing is dropped without the user having
+  chosen to drop it.)_
 - Confirming a set that is still invalid per FR-019 (no volume, and Load is
   None or unset) stores nothing: the confirm action is a silent no-op, or
   the confirm control is unavailable, until the set has a volume or a
@@ -384,9 +412,13 @@ result — independently verifiable without blocks, load types, or effort.
 
 ## Non-Goals *(mandatory)*
 
-- **Session lifecycle / "finish a session".** There is no explicit
-  end-of-session step, no "in progress" vs "finished" state, and no
-  auto-resume. A session is a dated record the user stops adding to.
+- **Session lifecycle / "finish a session".** A persisted `Session` itself
+  still has no "in progress" vs "finished" state and no auto-resume; it is
+  a dated record the user stops adding to. _(Narrowed by ADR-0008: "Log
+  workout" (FR-027) is an explicit step, but it ends the *drafting* phase
+  by turning the draft into a Session — it is not a state the Session
+  itself carries, and there is still no way to reopen a registered Session
+  for further logging as if it were still a draft.)_
 - **kg/lb unit selection.** Weight loads are kg only in this slice. The
   kg/lb default lives in Settings (FR-11), out of scope here.
 - **Effort as RIR.** Only the 1–5 integer effort level exists; no RIR input
@@ -416,12 +448,13 @@ result — independently verifiable without blocks, load types, or effort.
 
 ### Functional Requirements
 
-- **FR-001**: There is a single "open the logging form" action. When no
-  pending draft exists it MUST create a new session with a date-time of that
-  moment; when a pending draft exists it MUST restore that draft (FR-024)
-  and MUST NOT also start a competing session. The user MUST be able to edit
-  the session's date-time. There is no open/closed session state and no
-  auto-resume of a previously submitted session.
+- **FR-001**: There is a single "open the logging form" action. It MUST
+  start the user in an empty, unsaved form dated at that moment (editable).
+  The user MUST be able to edit the session's date-time. There is no
+  open/closed session state and no auto-resume of a previously submitted
+  session. _(Amended by ADR-0008: opening the form no longer auto-restores
+  a pending draft into the active form or auto-creates a session; see the
+  revised FR-024 and FR-027 below.)_
 - **FR-002**: The system MUST let the user add an exercise via a catalogue
   search that surfaces the most-used and most-recently-used exercises first,
   and MUST let the user create a new exercise from that same search field.
@@ -517,14 +550,55 @@ result — independently verifiable without blocks, load types, or effort.
   already within its own pending-delete undo window, block-undo MUST NOT
   resurrect that set — the two undo timers are independent.
 - **FR-024**: If the user opens the logging form and leaves without
-  submitting, the system MUST retain their input as a single pending draft
-  — a state of the logging screen, not a stored Session, but still held in
-  durable on-device storage so it survives an app close, background, or
-  kill. Opening the logging form MUST restore that draft. Discarding the
-  draft MUST remove it and its data. At most one pending draft exists at a
-  time. A catalogue merge or cascade-delete (FR-017, FR-018) that affects
-  an exercise referenced by the draft MUST rewrite the draft in place
-  (repoint on merge; remove the entry and its in-progress sets on delete).
+  registering the workout (FR-027), and the *active* form (the one they
+  are directly editing — FR-028) has at least one block (the same
+  threshold FR-027 uses), the system MUST retain that input as a single
+  pending draft — a state of the logging screen, not a stored Session, but
+  still held in durable on-device storage so it survives an app close,
+  background, or kill. Editing only the session's date-time, with no block
+  ever added, MUST NOT by itself cause anything to be stored. Opening the
+  logging form MUST offer, but MUST NOT silently apply, recovery of an
+  existing pending draft (FR-028). Discarding the draft MUST remove it and
+  its data. At most one pending draft exists at a time. A catalogue merge
+  or cascade-delete (FR-017, FR-018) that affects an exercise referenced by
+  the *stored* pending draft MUST rewrite it in place (repoint on merge;
+  remove the entry and its in-progress sets on delete); if that draft is
+  currently shown as an unresolved recovery banner (FR-028), the banner
+  MUST reflect the rewritten draft the next time the user acts on it (an
+  already-rendered banner is not required to update itself instantly for a
+  merge/delete that happens while it is on screen — a known, accepted
+  limitation, not a silent-data-loss risk, since choosing "Recover" always
+  loads whatever the draft currently is). _(Amended by ADR-0008: the
+  "no data ⇒ nothing stored" and "opt-in, not automatic, recovery" clauses
+  are new; the day-rollover auto-promotion this FR previously implied via
+  FR-001 is removed — see FR-027.)_
+- **FR-027**: The system MUST offer an explicit "Log workout" action once
+  the active draft has at least one block. Activating it MUST convert the
+  active draft into a permanent Session (visible in the diary), clear the
+  pending draft in storage, reset the active form to a fresh, empty,
+  unsaved state, and return the user to the diary with the save
+  acknowledgement (`docs/design.md` §1.1's bounded exception) — the same
+  acknowledgement spec.md previously showed on leaving the form after any
+  set, now tied to this explicit action instead. There MUST be no such
+  action while the active draft has no block at all (FR-019's "unavailable
+  rather than rejected" convention, applied one level up: an empty draft
+  has nothing worth registering, the same threshold FR-024 already uses to
+  decide whether there is "at least one change" to persist). This is the
+  only way a Session is created from the logging screen — there is no
+  time- or day-based automatic promotion.
+  _(Added by ADR-0008.)_
+- **FR-028**: When the logging form is opened and a pending draft (FR-024)
+  exists, the system MUST show it as a dismissible option at the top of
+  the screen — not a modal dialog — offering "Recover" (loads the pending
+  draft into the active form, replacing it, after which further edits are
+  exactly like editing any other active draft) and "Discard" (removes the
+  pending draft; the active form is unaffected). Adding a block, exercise,
+  or set to the active form MUST be unavailable until the user chooses one
+  of the two — there is exactly one stored-draft slot, so an unresolved
+  pending draft is never at risk of being silently overwritten by
+  unrelated new input. Editing the session date-time alone remains
+  available regardless (FR-024: it is not, by itself, something that gets
+  persisted, so it cannot overwrite anything). _(Added by ADR-0008.)_
 - **FR-025**: When the user confirms a set, the system MUST ignore an
   identical confirmation repeated within a short debounce window (~1
   second); a subsequent identical set confirmed after that window MUST be

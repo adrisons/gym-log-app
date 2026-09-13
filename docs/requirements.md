@@ -194,11 +194,17 @@ Create a session and add blocks, exercises and sets.
   logging form is opened; the user can edit that date-time. There is no
   open/closed session state and no auto-resume of a prior session — each new
   session is independent (D6).
-- If the user opens the logging form and leaves without submitting, their
-  in-progress input is kept as a single pending draft (a state of the
-  logging screen, not a stored Session). Reopening the form restores that
-  draft — so locking the phone mid-entry and coming back later works.
-  Cancelling the session discards the draft and its data.
+- If the user opens the logging form and leaves without registering the
+  workout, and has added at least one block, their in-progress input is
+  kept as a single pending draft (a state of the logging screen, not a
+  stored Session) — so locking the phone mid-entry and coming back later
+  loses nothing. A visit where nothing was added stores nothing. Reopening
+  the form offers, but does not silently apply, recovery of that draft: a
+  banner at the top of the screen lets the user recover it (filling the
+  form with its data) or discard it; adding a block, exercise, or set is
+  unavailable until one of the two is chosen, so an unresolved draft is
+  never silently overwritten (D15, ADR-0008). Discarding removes the
+  draft and its data.
 - Adding an exercise opens the catalogue search with most-used and recent
   entries first; a new exercise can be created from the same field.
 - Every change persists automatically. There is no Save button.
@@ -210,13 +216,14 @@ Create a session and add blocks, exercises and sets.
   still the app's primary purpose (§1.1), so it stays one tap from the
   screen the user opens the app to, without occupying a permanent slot in
   the primary navigation that would otherwise sit idle between sessions.
-  Leaving the logging form after entering at least one set returns to the
-  diary with a brief, self-dismissing acknowledgement that what was
-  entered has been saved (`docs/design.md` §1.1's bounded exception). This
-  does not change D6/FR-024: the draft it just saved keeps no open/closed
-  state and is promoted to a listed Session on the existing schedule (the
-  next time the form opens on a later calendar day) — the acknowledgement
-  confirms the data is safe, not that a new diary row has appeared.
+  An explicit "Log workout" action is the only way a draft becomes a
+  listed Session (D15, ADR-0008); registering it returns to the diary with
+  a brief, self-dismissing acknowledgement that the workout was saved
+  (`docs/design.md` §1.1's bounded exception). Leaving the form without
+  registering — even after recording several sets — shows no such
+  acknowledgement: the sets are safe (kept in the pending draft above),
+  but nothing has yet joined the diary, and the app never implies
+  otherwise.
 - Logging is selective by design (§3.3): the user adds only the exercises
   they want a record of. Nothing in the flow requires accounting for every
   exercise physically performed in the session.
@@ -587,6 +594,7 @@ before code.
 | D12 | Whether recording a set requires an explicit confirm step | **Closed:** no — a set commits automatically the moment the user's own edit makes it valid (FR-3); the previous generic confirm control is retired, with a narrow "Repeat last set" control kept for the one case (an untouched, pre-filled row) an automatic trigger has nothing to anchor to. No schema change. → ADR-0007 |
 | D13 | Whether generating a shareable image for external platforms (e.g. Instagram) falls under the constitution's "social network" non-goal | **Closed:** no — it is a one-way, on-device export (render an image locally, hand off via the platform's native share sheet or a saved file), not a multi-user or in-app social feature. No account, no backend, no peer visibility, no third-party posting API; consistent with Invariant 1 (nothing leaves the device without the user explicitly choosing to send it). Targeted at the "Later" phase (§9), not MVP/v1/v1.1. → FR-14 |
 | D14 | Whether adding a field to Settings (per-device preference state, not a canonical entity) requires the §6/Principle III schema-version-bump-and-migration treatment | **Closed:** no — that treatment applies only to the canonical entities in §3.1 (Session, Block, Exercise entry, Set, Exercise catalogue). A Settings field defaults silently when absent: no version bump, no ADR, no migration. Matches the precedent already set in `specs/006-settings-data/spec.md`; §6 amended below with this scope note so future specs don't re-litigate it. |
+| D15 | Whether a workout (the logging draft) becomes a Session automatically, or only when the user explicitly says so | **Closed:** explicitly — an explicit "Log workout" action is the only way a draft becomes a Session; the previous automatic day-rollover promotion is removed. Recording a *set* is unaffected and stays exactly as immediate as D12 already made it (no confirm step, no waiting) — this decision is scoped to the session-level "commit to the diary" step only. A draft with no block at all is never persisted; a draft with at least one block persists and, if left unregistered, is offered (never auto-loaded) as a recovery banner the next time the logging form opens. No schema change: `LoggingDraft`'s shape and the storage port are unaffected. "One draft per training type" is not built by this decision — it collapses to the single existing draft, since only the Strength discipline is implemented today (D8). → ADR-0008 |
 
 ---
 
