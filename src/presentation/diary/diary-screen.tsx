@@ -80,18 +80,14 @@ interface PendingDeleteBatch {
 }
 
 export function DiaryScreen() {
-  // Captured once, at mount, from the logging store's own flag — set the
-  // moment `addSet` actually records a set (not merely whether the draft
-  // currently has any), reset on the store's next `initialize()`. Reading
-  // it via a lazy initializer, then clearing it in the mount effect below,
-  // means a later remount of this same route (browser back/forward, or any
-  // other way of arriving here) sees it already cleared instead of
-  // replaying a visit that already showed it (docs/design.md §1.1's
-  // exception is "immediately after logging a session", not "any time this
-  // route is entered").
-  const [justLogged] = useState(
-    () => useLoggingSession.getState().justLoggedASet,
-  );
+  // Read reactively, not just once at mount: `SetRow`'s debounced commit
+  // (ADR-0007) can still be pending when the user navigates here, so the
+  // flag may only flip true *after* this screen has already rendered — a
+  // one-time mount check would miss that and never show the acknowledgement
+  // at all. `SessionSavedToast`'s own `onDismiss` clears it once shown, so a
+  // later remount of this same route (browser back/forward, or any other
+  // way of arriving here) with nothing new logged since renders nothing.
+  const justLoggedASet = useLoggingSession((s) => s.justLoggedASet);
   const [sessions, setSessions] = useState<SessionListItem[] | undefined>(
     undefined,
   );
@@ -131,13 +127,6 @@ export function DiaryScreen() {
         ),
       );
     })();
-  }, []);
-
-  useEffect(() => {
-    if (justLogged) {
-      useLoggingSession.getState().clearJustLoggedASet();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const bulkActive = selectionActive;
@@ -349,7 +338,11 @@ export function DiaryScreen() {
           Log session
         </Link>
         {undoToasts}
-        {justLogged && <SessionSavedToast />}
+        {justLoggedASet && (
+          <SessionSavedToast
+            onDismiss={() => useLoggingSession.getState().clearJustLoggedASet()}
+          />
+        )}
       </main>
     );
   }
@@ -496,7 +489,11 @@ export function DiaryScreen() {
       )}
 
       {undoToasts}
-      {justLogged && <SessionSavedToast />}
+      {justLoggedASet && (
+        <SessionSavedToast
+          onDismiss={() => useLoggingSession.getState().clearJustLoggedASet()}
+        />
+      )}
     </main>
   );
 }

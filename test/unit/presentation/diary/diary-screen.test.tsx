@@ -452,20 +452,36 @@ describe('DiaryScreen (FR-001..006)', () => {
     });
     expect(useLoggingSession.getState().justLoggedASet).toBe(true);
 
-    const { unmount } = render(
-      <MemoryRouter>
-        <DiaryScreen />
-      </MemoryRouter>,
-    );
+    vi.useFakeTimers();
+    let unmount: () => void;
+    try {
+      ({ unmount } = render(
+        <MemoryRouter>
+          <DiaryScreen />
+        </MemoryRouter>,
+      ));
 
-    await waitFor(() => {
-      expect(screen.getByText(/session saved/i)).toBeInTheDocument();
-    });
-    // Consumed once — the store no longer thinks a fresh visit just
-    // recorded a set, so a later remount of this same route won't
-    // replay the toast for a visit that never happened.
-    expect(useLoggingSession.getState().justLoggedASet).toBe(false);
-    unmount();
+      await vi.waitFor(() => {
+        expect(screen.getByText(/session saved/i)).toBeInTheDocument();
+      });
+
+      // The toast clears the flag only once it actually self-dismisses
+      // (`onDismiss`), not the instant it renders — a debounced commit
+      // (ADR-0007) can still be pending when this screen first mounts, so
+      // the flag must stay reactive/live for as long as the toast itself
+      // could plausibly still appear.
+      expect(useLoggingSession.getState().justLoggedASet).toBe(true);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1800);
+      });
+      // Consumed once — the store no longer thinks a fresh visit just
+      // recorded a set, so a later remount of this same route won't
+      // replay the toast for a visit that never happened.
+      expect(useLoggingSession.getState().justLoggedASet).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+    unmount!();
 
     render(
       <MemoryRouter>
