@@ -385,6 +385,31 @@
   color: var(--color-foreground-muted);
 }
 
+/* Rename popup (ADR-0009) — a real modal, unlike `ExerciseTemplatePanel`/
+   `ExerciseCataloguePanel`'s own inline "dialog"s: the whole point here is
+   blocking interaction with the rest of the block/screen while the name
+   edit is pending, not just a styled inline card. */
+.block-card__rename-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: color-mix(in oklab, var(--color-foreground) 40%, transparent);
+  z-index: 100;
+}
+
+.block-card__rename-dialog {
+  width: 100%;
+  max-width: 360px;
+}
+
+.block-card__rename-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
 .exercise-entry-card {
   display: flex;
   flex-direction: column;

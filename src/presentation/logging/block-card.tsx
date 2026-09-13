@@ -49,8 +49,18 @@
  * number input doesn't compete with the title for space. Commits
  * immediately on a valid change (FR-1's "no Save button" applies here
  * too); an empty field means "not specified", never `0`.
+ *
+ * Rename (ADR-0009) opens as a small popup dialog — a backdrop over the
+ * rest of the screen, not an inline field swapped into the header — so
+ * the edit can't be left half-open while the user goes on to edit
+ * something else in this same block (add an exercise, change rounds) with
+ * the rename still pending in the background. Enter submits (the input
+ * sits in a `<form>`); Escape, an explicit Cancel button, or a click on
+ * the backdrop all discard the edit instead. Reuses `.block-card`'s own
+ * shell class for the dialog surface, the same reuse
+ * `ExerciseTemplatePanel` already relies on for its own inline dialog.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode, TransitionEvent } from 'react';
 import { Icon } from '@/presentation/design/icons';
 import { prefersReducedMotion } from '@/presentation/design/motion';
@@ -126,6 +136,27 @@ export function BlockCard({
     }
   }
 
+  // Rename has two triggers in the DOM at once (the inline button and the
+  // OverflowMenu's copy — CSS picks which is visible per viewport width,
+  // see the class doc comment above), so which one to return focus to on
+  // close is whichever was actually activated, captured here rather than
+  // assumed.
+  const renameTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  /** Resets `nameInput` from the current committed name every time the
+   * popup opens — without this, a value typed and then Cancelled would
+   * still be sitting there the next time Rename is opened. */
+  function openRename(trigger: HTMLButtonElement) {
+    renameTriggerRef.current = trigger;
+    setNameInput(hasName ? displayName : '');
+    setEditing(true);
+  }
+
+  function closeRename() {
+    setEditing(false);
+    renameTriggerRef.current?.focus();
+  }
+
   function handleCollapseTransitionEnd(event: TransitionEvent<HTMLDivElement>) {
     // `.block-card__collapse` transitions both `grid-template-rows` and
     // `margin-top` in parallel (see logging.css) — react to just one so
@@ -150,12 +181,76 @@ export function BlockCard({
       aria-label={displayName}
     >
       <div className="block-card__header">
-        {editing ? (
+        <button
+          type="button"
+          className="logging-button block-card__collapse-toggle"
+          aria-expanded={!collapsed}
+          aria-label={
+            collapsed ? `Expand ${displayName}` : `Collapse ${displayName}`
+          }
+          onClick={toggleCollapsed}
+        >
+          <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} />
+        </button>
+        <div className="block-card__title">
+          <h2>{displayName}</h2>
+          {subtitle && <span className="block-card__subtitle">{subtitle}</span>}
+        </div>
+        <div className="block-card__actions--inline">
+          <button
+            type="button"
+            className="logging-button logging-button--icon-label"
+            onClick={(event) => openRename(event.currentTarget)}
+          >
+            <Icon name="pencil" />
+            Rename
+          </button>
+          <button
+            type="button"
+            className="logging-button logging-button--icon-label"
+            onClick={onDelete}
+          >
+            <Icon name="trash" />
+            Delete block
+          </button>
+        </div>
+        <div className="block-card__actions--menu">
+          <OverflowMenu label={`${displayName} actions`}>
+            <button
+              type="button"
+              className="logging-button logging-button--icon-label"
+              onClick={(event) => openRename(event.currentTarget)}
+            >
+              <Icon name="pencil" />
+              Rename
+            </button>
+            <button
+              type="button"
+              className="logging-button logging-button--icon-label"
+              onClick={onDelete}
+            >
+              <Icon name="trash" />
+              Delete block
+            </button>
+          </OverflowMenu>
+        </div>
+      </div>
+      {editing && (
+        <div
+          className="block-card__rename-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeRename();
+          }}
+        >
           <form
+            className="block-card block-card__rename-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Rename ${displayName}`}
             onSubmit={(event) => {
               event.preventDefault();
               onRename(nameInput.trim() === '' ? undefined : nameInput.trim());
-              setEditing(false);
+              closeRename();
             }}
           >
             <label className="logging-screen__field-label">
@@ -165,77 +260,35 @@ export function BlockCard({
                 className="logging-field-input"
                 value={nameInput}
                 onChange={(event) => setNameInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeRename();
+                  }
+                }}
                 autoFocus
               />
             </label>
-            <button
-              type="submit"
-              className="logging-button logging-button--icon-label"
-            >
-              <Icon name="check" />
-              Save name
-            </button>
+            <div className="block-card__rename-actions">
+              <button
+                type="submit"
+                className="logging-button logging-button--primary logging-button--icon-label"
+              >
+                <Icon name="check" />
+                Save
+              </button>
+              <button
+                type="button"
+                className="logging-button logging-button--icon-label"
+                onClick={closeRename}
+              >
+                <Icon name="close" />
+                Cancel
+              </button>
+            </div>
           </form>
-        ) : (
-          <>
-            <button
-              type="button"
-              className="logging-button block-card__collapse-toggle"
-              aria-expanded={!collapsed}
-              aria-label={
-                collapsed ? `Expand ${displayName}` : `Collapse ${displayName}`
-              }
-              onClick={toggleCollapsed}
-            >
-              <Icon name={collapsed ? 'chevron-right' : 'chevron-down'} />
-            </button>
-            <div className="block-card__title">
-              <h2>{displayName}</h2>
-              {subtitle && (
-                <span className="block-card__subtitle">{subtitle}</span>
-              )}
-            </div>
-            <div className="block-card__actions--inline">
-              <button
-                type="button"
-                className="logging-button logging-button--icon-label"
-                onClick={() => setEditing(true)}
-              >
-                <Icon name="pencil" />
-                Rename
-              </button>
-              <button
-                type="button"
-                className="logging-button logging-button--icon-label"
-                onClick={onDelete}
-              >
-                <Icon name="trash" />
-                Delete block
-              </button>
-            </div>
-            <div className="block-card__actions--menu">
-              <OverflowMenu label={`${displayName} actions`}>
-                <button
-                  type="button"
-                  className="logging-button logging-button--icon-label"
-                  onClick={() => setEditing(true)}
-                >
-                  <Icon name="pencil" />
-                  Rename
-                </button>
-                <button
-                  type="button"
-                  className="logging-button logging-button--icon-label"
-                  onClick={onDelete}
-                >
-                  <Icon name="trash" />
-                  Delete block
-                </button>
-              </OverflowMenu>
-            </div>
-          </>
-        )}
-      </div>
+        </div>
+      )}
       <label className="block-card__rounds">
         <span>Rounds</span>
         <input

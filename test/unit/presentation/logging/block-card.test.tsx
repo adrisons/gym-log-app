@@ -20,7 +20,7 @@ describe('BlockCard (FR-006, FR-007)', () => {
     expect(screen.queryByText(/untitled/i)).not.toBeInTheDocument();
   });
 
-  it('renaming calls onRename with the new name', async () => {
+  it('renaming opens a popup dialog and Save calls onRename with the new name (ADR-0009)', async () => {
     const onRename = vi.fn();
     render(
       <BlockCard
@@ -35,10 +35,65 @@ describe('BlockCard (FR-006, FR-007)', () => {
     );
 
     await userEvent.click(screen.getByRole('button', { name: /rename/i }));
+    const dialog = screen.getByRole('dialog', { name: /rename block 1/i });
     await userEvent.type(screen.getByLabelText(/block name/i), 'Squats');
-    await userEvent.click(screen.getByRole('button', { name: /save name/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     expect(onRename).toHaveBeenCalledWith('Squats');
+    expect(dialog).not.toBeInTheDocument();
+  });
+
+  it('Cancel discards the edit without calling onRename, and returns focus to Rename', async () => {
+    const onRename = vi.fn();
+    render(
+      <BlockCard
+        displayName="Block 1"
+        hasName={false}
+        onRename={onRename}
+        onSetRounds={() => {}}
+        onDelete={() => {}}
+      >
+        <p>content</p>
+      </BlockCard>,
+    );
+
+    const [renameButton] = screen.getAllByRole('button', { name: /rename/i });
+    await userEvent.click(renameButton!);
+    await userEvent.type(screen.getByLabelText(/block name/i), 'Squats');
+    await userEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect(onRename).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(renameButton).toHaveFocus();
+  });
+
+  it('Escape cancels the popup, and reopening starts from the committed name again', async () => {
+    const onRename = vi.fn();
+    render(
+      <BlockCard
+        displayName="Legs"
+        hasName={true}
+        onRename={onRename}
+        onSetRounds={() => {}}
+        onDelete={() => {}}
+      >
+        <p>content</p>
+      </BlockCard>,
+    );
+
+    await userEvent.click(
+      screen.getAllByRole('button', { name: /rename/i })[0]!,
+    );
+    await userEvent.type(screen.getByLabelText(/block name/i), ' extra');
+    await userEvent.keyboard('{Escape}');
+
+    expect(onRename).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getAllByRole('button', { name: /rename/i })[0]!,
+    );
+    expect(screen.getByLabelText(/block name/i)).toHaveValue('Legs');
   });
 
   it('delete calls onDelete', async () => {
