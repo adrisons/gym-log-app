@@ -14,15 +14,6 @@
  * own "add exercise" control, so grouping exercises into this block is a
  * single tap from where its contents already are.
  *
- * `bare`, when true, skips the header/border chrome entirely and renders
- * only `children`/`footer` — an implicit home for a "loose" exercise
- * added outside any block (`application/ports/logging-draft.ts`'s
- * `DraftBlock.loose`, presentation-only) shouldn't look like a block at
- * all. This is distinct from having no `name`: an explicitly created
- * block the user simply hasn't renamed yet is never `bare` — FR-2
- * requires it to keep showing its position label and stay
- * renameable/deletable.
- *
  * Collapse/expand (`docs/requirements.md` FR-2) is local UI state, reset
  * on remount — never persisted as part of the Session, and independent of
  * the block's own 5-second delete-undo window. The body always stays
@@ -71,7 +62,6 @@ export interface BlockCardProps {
   displayName: string;
   hasName: boolean;
   subtitle?: string;
-  bare?: boolean;
   rounds?: number | undefined;
   onRename: (name: string | undefined) => void;
   onSetRounds: (rounds: number | undefined) => void;
@@ -84,7 +74,6 @@ export function BlockCard({
   displayName,
   hasName,
   subtitle,
-  bare = false,
   rounds,
   onRename,
   onSetRounds,
@@ -164,15 +153,6 @@ export function BlockCard({
     if (event.propertyName === 'grid-template-rows') {
       setIsTransitioning(false);
     }
-  }
-
-  if (bare) {
-    return (
-      <>
-        {children}
-        {footer}
-      </>
-    );
   }
 
   return (

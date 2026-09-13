@@ -40,7 +40,12 @@ describe('openLoggingForm (FR-001, FR-024, FR-028; ADR-0009)', () => {
   it('returns a brand-new, unpersisted draft and no pending draft when none is stored', async () => {
     vi.setSystemTime(new Date('2026-09-11T09:00:00.000Z'));
     const { draft, pendingDraft } = await openLoggingForm(storage);
-    expect(draft.blocks).toEqual([]);
+    // ADR-0011: a brand-new draft always starts with one empty block.
+    expect(draft.blocks).toHaveLength(1);
+    expect(draft.blocks[0]).toMatchObject({
+      type: 'straightSets',
+      exercises: [],
+    });
     expect(pendingDraft).toBeUndefined();
     expect(await storage.getDraft()).toBeUndefined(); // never persisted by this call
     expect(
@@ -60,7 +65,13 @@ describe('openLoggingForm (FR-001, FR-024, FR-028; ADR-0009)', () => {
     const { draft, pendingDraft } = await openLoggingForm(storage);
 
     expect(draft.id).not.toBe(existing.id);
-    expect(draft.blocks).toEqual([]);
+    // ADR-0011: a brand-new active draft always starts with one empty
+    // block of its own, regardless of what the offered `pendingDraft` has.
+    expect(draft.blocks).toHaveLength(1);
+    expect(draft.blocks[0]).toMatchObject({
+      type: 'straightSets',
+      exercises: [],
+    });
     expect(pendingDraft).toEqual(existing);
     expect(await storage.getDraft()).toEqual(existing); // untouched by this call
   });
@@ -113,7 +124,12 @@ describe('registerWorkout (FR-027; ADR-0009)', () => {
 
     expect(result.session.dateTime).toBe(draft.dateTime);
     expect(result.draft.id).not.toBe(draft.id);
-    expect(result.draft.blocks).toEqual([]);
+    // ADR-0011: the fresh draft handed back starts with one empty block.
+    expect(result.draft.blocks).toHaveLength(1);
+    expect(result.draft.blocks[0]).toMatchObject({
+      type: 'straightSets',
+      exercises: [],
+    });
     expect(await storage.getDraft()).toBeUndefined();
     const sessions = await storage.listSessions({
       from: '2000-01-01',

@@ -7,7 +7,6 @@ import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
 import type { SessionId, ExerciseId } from '../domain/ids';
 import { StorageError } from '../application/errors';
-import { toPersistableDraft } from '../application/logging/draft';
 import {
   SESSIONS_DIR,
   EXERCISES_FILE,
@@ -763,7 +762,7 @@ export class FileSystemStorageAdapter implements StoragePort {
 
   async saveDraft(draft: LoggingDraft): Promise<void> {
     await this.#ensureSchemaCheckedForWrite();
-    await this.#writeJson(DRAFT_FILE, toPersistableDraft(draft));
+    await this.#writeJson(DRAFT_FILE, draft);
   }
 
   async getDraft(): Promise<LoggingDraft | undefined> {

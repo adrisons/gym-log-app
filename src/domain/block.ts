@@ -6,14 +6,6 @@
  * (FR-017) — enforced by `createBlock` accepting an empty list, not by any
  * length constraint on the type itself.
  *
- * Deliberately has no "loose"/implicit-container flag: whether a block
- * renders with header chrome or "bare" (`application/ports/logging-draft.ts`'s
- * `DraftBlock.loose`) is a presentation-only concern, scoped to the
- * in-progress editing state (`LoggingDraft`/`EditableSession`) and never
- * persisted here — adding a field to this type is a schema change under
- * `docs/requirements.md` §6 (version bump, ADR, migration), which a purely
- * cosmetic rendering choice doesn't warrant.
- *
  * `rounds` (ADR-0008, schema v3) is the one exception: a genuine, optional
  * schema field — a target round count for the whole block (e.g. "3 rounds"
  * of a circuit), independent of and never derived from how many sets each

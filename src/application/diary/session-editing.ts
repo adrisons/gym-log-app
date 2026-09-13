@@ -39,11 +39,6 @@ export function sessionToEditable(session: Session): EditableSession {
     blocks: session.blocks.map((block): DraftBlock => ({
       id: newId(),
       ...(block.name !== undefined ? { name: block.name } : {}),
-      // No `loose` here: the persisted `Block` doesn't carry it (see
-      // `domain/block.ts`'s doc comment) — every block reloaded from
-      // storage defaults to non-loose (shows its header), which is the
-      // FR-2-compliant choice for a block whose original "explicit vs.
-      // implicit" provenance wasn't persisted.
       type: block.type,
       ...(block.rounds !== undefined ? { rounds: block.rounds } : {}),
       exercises: block.exercises.map((entry): DraftExerciseEntry => ({
@@ -83,8 +78,6 @@ export function editableToSession(
     blocks: editable.blocks.map((block) =>
       createBlock({
         ...(block.name !== undefined ? { name: block.name } : {}),
-        // `block.loose` is deliberately dropped here — presentation-only,
-        // never part of the persisted `Block` (see `domain/block.ts`).
         type: block.type,
         ...(block.rounds !== undefined ? { rounds: block.rounds } : {}),
         exercises: block.exercises.map((entry) => ({

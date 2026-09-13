@@ -125,19 +125,21 @@ describe('Logging flow (US2 Independent Test)', () => {
     let { draft } = await openLoggingForm(storage);
     const exercise = await createExercise(storage, { canonicalName: 'Row' });
 
+    // `openLoggingForm` itself already seeded one empty block (ADR-0011),
+    // ahead of the two added here.
     draft = addBlock(draft, 'A', 'straightSets');
     draft = addBlock(draft, 'B', 'straightSets');
-    const blockAId = draft.blocks[0]!.id;
-    const blockBId = draft.blocks[1]!.id;
+    const blockAId = draft.blocks[1]!.id;
+    const blockBId = draft.blocks[2]!.id;
 
     // Target B explicitly (its own "add exercise" control would do the
     // same) — both blocks are named, so the no-blockId default would now
-    // start a third, unnamed block instead of nesting into either (draft.ts).
+    // just append to the trailing block (B) instead (draft.ts).
     draft = addExerciseEntry(draft, exercise.id, blockBId);
-    const entryId = draft.blocks[1]!.exercises[0]!.id;
+    const entryId = draft.blocks[2]!.exercises[0]!.id;
     draft = moveExerciseAcrossBlocks(draft, blockBId, entryId, blockAId);
-    expect(draft.blocks[0]?.exercises).toHaveLength(1);
-    expect(draft.blocks[1]?.exercises).toHaveLength(0);
+    expect(draft.blocks[1]?.exercises).toHaveLength(1);
+    expect(draft.blocks[2]?.exercises).toHaveLength(0);
 
     draft = addSet(
       draft,
@@ -154,7 +156,7 @@ describe('Logging flow (US2 Independent Test)', () => {
     const beforeDelete = draft;
 
     const { draft: afterDelete, undo } = deleteBlock(draft, blockAId);
-    expect(afterDelete.blocks).toHaveLength(1);
+    expect(afterDelete.blocks).toHaveLength(2);
 
     const restored = undo.restore(afterDelete);
     await storage.saveDraft(restored);

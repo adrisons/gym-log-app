@@ -37,7 +37,7 @@ function workingSet(): ReturnType<typeof createSet> {
 }
 
 describe('buildDiarySessionSummary', () => {
-  it('sums every set across blocks/entries (including a warm-up) and lists distinct exercises in first-referenced order', () => {
+  it('lists distinct exercises across blocks/entries in first-referenced order and derives kindOfWork', () => {
     const squat = exercise('ex-squat', 'Squat', 'squat');
     const bench = exercise('ex-bench', 'Bench Press', 'push');
     const catalogue = new Map([
@@ -77,7 +77,6 @@ describe('buildDiarySessionSummary', () => {
 
     const summary = buildDiarySessionSummary(session, catalogue);
 
-    expect(summary.setCount).toBe(5);
     expect(summary.mainExerciseNames).toEqual(['Squat', 'Bench Press']);
     expect(summary.kindOfWork).toBe('squat, push');
   });
