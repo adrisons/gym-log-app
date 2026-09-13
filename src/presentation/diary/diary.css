@@ -293,10 +293,11 @@
    sparkles + an emoji pop, canvas: `.toast`/`.toast-glow`/`.toast-sparkle`/
    `.toast-emoji`) is worth carrying over: it exists to be noticed once,
    nothing else on this screen needs to fight for the same attention.
-   The 1.8s spans below match VISIBLE_MS in session-saved-toast.tsx exactly
-   (the canvas reference also uses 1.8s) — this is the toast's own one-shot
-   lifecycle, not a reusable transition, so it isn't drawn from the
-   --duration-* scale the way the shared UI transitions elsewhere are. */
+   `--duration-reward` (tokens.css) matches VISIBLE_MS in
+   session-saved-toast.tsx exactly (the canvas reference also uses 1.8s) —
+   this is the toast's own one-shot lifecycle, its own named category, not
+   a reusable transition drawn from the instant/short/medium scale the
+   shared UI transitions elsewhere use. */
 .diary-screen__saved-toast {
   position: fixed;
   left: 50%;
@@ -317,7 +318,8 @@
      otherwise sit over (and intercept taps on) whatever's underneath for
      the animation's duration (Copilot review, PR #24). */
   pointer-events: none;
-  animation: diary-screen__saved-toast-in 1.8s var(--easing-decelerate) forwards;
+  animation: diary-screen__saved-toast-in var(--duration-reward)
+    var(--easing-decelerate) forwards;
 }
 
 .diary-screen__saved-toast-glow {
@@ -329,15 +331,16 @@
     color-mix(in oklab, var(--color-accent) 45%, transparent) 0%,
     transparent 70%
   );
-  animation: diary-screen__saved-toast-glow 1.8s var(--easing-standard) forwards;
+  animation: diary-screen__saved-toast-glow var(--duration-reward)
+    var(--easing-standard) forwards;
 }
 
 .diary-screen__saved-toast-sparkle {
   position: absolute;
   font-size: 0.8125rem;
   color: var(--color-accent);
-  animation: diary-screen__saved-toast-sparkle 1.8s var(--easing-standard)
-    forwards;
+  animation: diary-screen__saved-toast-sparkle var(--duration-reward)
+    var(--easing-standard) forwards;
 }
 
 .diary-screen__saved-toast-sparkle--1 {
@@ -354,8 +357,8 @@
 .diary-screen__saved-toast-emoji {
   position: relative;
   font-size: 1.25rem;
-  animation: diary-screen__saved-toast-emoji 1.8s var(--easing-decelerate)
-    forwards;
+  animation: diary-screen__saved-toast-emoji var(--duration-reward)
+    var(--easing-decelerate) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -368,7 +371,7 @@
      these two at their un-animated default — fully opaque — instead of
      the momentary burst they're meant to be, so a reduced-motion viewer
      would see a static glow+sparkles hanging on the toast for its whole
-     1.8s lifetime. They're decoration only (`aria-hidden`), so hiding
+     --duration-reward lifetime. They're decoration only (`aria-hidden`), so hiding
      them outright is the one bounded exception's actual boundary: text
      and emoji still acknowledge the save, the fireworks just don't run
      (Copilot review, PR #24). */

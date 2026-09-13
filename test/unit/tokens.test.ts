@@ -42,6 +42,7 @@ const EXPECTED_NON_COLOR_TOKENS = [
   '--duration-instant',
   '--duration-short',
   '--duration-medium',
+  '--duration-reward',
   '--easing-standard',
   '--easing-decelerate',
   '--easing-accelerate',

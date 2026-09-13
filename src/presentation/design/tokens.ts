@@ -27,6 +27,7 @@ export type TokenName =
   | '--duration-instant'
   | '--duration-short'
   | '--duration-medium'
+  | '--duration-reward'
   | '--easing-standard'
   | '--easing-decelerate'
   | '--easing-accelerate'
