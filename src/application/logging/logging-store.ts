@@ -212,20 +212,20 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     initialize: async () => {
       const { storage } = get();
       if (!storage) return;
+      // Reset before the reads below, not after they resolve — a pending
+      // debounced commit from a previous visit (ADR-0007's timer is
+      // deliberately not cancelled on unmount) can still fire and
+      // legitimately set these while this visit's own reads are in
+      // flight; resetting afterward would silently erase that signal
+      // (Copilot review, PR #22).
+      set({ justLoggedASet: false, lastAddedSetId: undefined });
       const [draft, catalogue, sessions, bandLabels] = await Promise.all([
         openLoggingForm(storage),
         storage.listExercises(),
         storage.listSessions(FULL_RANGE),
         storage.listBandLabels(),
       ]);
-      set({
-        draft,
-        catalogue,
-        sessions,
-        bandLabels,
-        justLoggedASet: false,
-        lastAddedSetId: undefined,
-      });
+      set({ draft, catalogue, sessions, bandLabels });
     },
 
     clearJustLoggedASet: () => set({ justLoggedASet: false }),

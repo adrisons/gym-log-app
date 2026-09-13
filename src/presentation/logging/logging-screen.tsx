@@ -53,6 +53,7 @@ import {
 } from '@/application/logging/view-models';
 import type { Exercise } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
+import { prefersReducedMotion } from '@/presentation/design/motion';
 import { SessionDateTimeField } from './session-date-time-field';
 import { AddExerciseControl } from './add-exercise-control';
 import { SetRow } from './set-row';
@@ -68,11 +69,6 @@ const UNDO_MESSAGES = {
   exerciseEntry: 'Exercise deleted',
   set: 'Set deleted',
 } as const;
-
-/** Must match logging.css's `--duration-medium` (the `set-summary-enter`
- * animation's own duration) — see the `lastAddedSetId` consumption effect
- * below for why. */
-const SET_SUMMARY_ANIMATION_MS = 260;
 
 export function LoggingScreen() {
   const draft = useLoggingSession((s) => s.draft);
@@ -119,18 +115,30 @@ export function LoggingScreen() {
   // indefinitely, an unrelated remount of this same route — or a
   // delete-then-undo that restores a set under its original id — would
   // reapply that animation to a row that isn't actually new anymore
-  // (Copilot review, PR #22). SET_SUMMARY_ANIMATION_MS matches
-  // logging.css's `set-summary-enter` duration (--duration-medium) so the
-  // marker outlives the animation it drives, not the other way round —
-  // clearing it earlier would cut the animation short by removing the
-  // class that declares it mid-flight.
+  // (Copilot review, PR #22). The marked row's own `onAnimationEnd`
+  // consumes it in the normal case (below) — no separate duration
+  // constant to keep in sync with logging.css's `set-summary-enter`,
+  // which would silently drift the moment either one changes. Reduced
+  // motion never fires that animation at all, so it's consumed
+  // immediately here instead.
   useEffect(() => {
-    if (lastAddedSetId === undefined) return;
-    const timeout = setTimeout(() => {
+    if (lastAddedSetId !== undefined && prefersReducedMotion()) {
       clearLastAddedSetId();
-    }, SET_SUMMARY_ANIMATION_MS);
-    return () => clearTimeout(timeout);
+    }
   }, [lastAddedSetId, clearLastAddedSetId]);
+
+  // Unmounting (navigating away) before the marked row's own
+  // `onAnimationEnd` fires must still consume the marker — otherwise a
+  // later remount of this same route, before initialize() resolves, could
+  // replay the animation for a row left over from a previous visit.
+  // Empty deps deliberately: this must run only on true unmount, reading
+  // whatever is live in the store at that moment, never on every
+  // lastAddedSetId change (which would just been re-added a moment later).
+  useEffect(() => {
+    return () => {
+      useLoggingSession.getState().clearLastAddedSetId();
+    };
+  }, []);
 
   if (!draft) {
     return <main className="logging-screen" aria-label="Log a session" />;
@@ -277,6 +285,9 @@ export function LoggingScreen() {
                               ? 'set-summary set-summary--new'
                               : 'set-summary'
                           }
+                          {...(isNewest
+                            ? { onAnimationEnd: () => clearLastAddedSetId() }
+                            : {})}
                         >
                           <span>{vm.loadLabel}</span>
                           <span>{vm.volumeLabel}</span>

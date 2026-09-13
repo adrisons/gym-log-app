@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BlockCard } from '@/presentation/logging/block-card';
 
@@ -107,7 +107,20 @@ describe('BlockCard (FR-006, FR-007)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /expand block 1/i }),
     );
+    // Still `inert` immediately after expanding: the grid-template-rows
+    // transition is still animating open, and jsdom fires no real CSS
+    // transition events on its own — content must stay clipped/unreachable
+    // until the wrapper's own `onTransitionEnd` says the transition
+    // actually finished (Copilot review, PR #22).
     expect(collapseWrap).not.toHaveClass('block-card__collapse--collapsed');
+    expect(collapseWrap).toHaveClass('block-card__collapse--transitioning');
+    expect(collapseWrap).toHaveAttribute('inert');
+
+    fireEvent.transitionEnd(collapseWrap, {
+      propertyName: 'grid-template-rows',
+    });
+
+    expect(collapseWrap).not.toHaveClass('block-card__collapse--transitioning');
     expect(collapseWrap).not.toHaveAttribute('inert');
   });
 

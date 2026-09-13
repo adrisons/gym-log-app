@@ -42,16 +42,12 @@
  * two together are what a collapsed-but-still-technically-present region
  * actually needs.
  */
-import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useState } from 'react';
+import type { ReactNode, TransitionEvent } from 'react';
 import { Icon } from '@/presentation/design/icons';
+import { prefersReducedMotion } from '@/presentation/design/motion';
 import { OverflowMenu } from './overflow-menu';
 import './logging.css';
-
-/** Must match logging.css's `--duration-medium` (the collapse's own
- * `grid-template-rows` transition duration) — see `isTransitioning`
- * below for why. */
-const COLLAPSE_TRANSITION_MS = 260;
 
 export interface BlockCardProps {
   displayName: string;
@@ -77,33 +73,37 @@ export function BlockCard({
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState(hasName ? displayName : '');
   const [collapsed, setCollapsed] = useState(false);
-  // Keeps `.block-card__body` clipped for the duration of the collapse's
-  // own grid-template-rows transition, expanding included — toggling
-  // `collapsed` alone drops overflow:hidden the instant `--collapsed` is
-  // removed, while the row is still animating open over
-  // COLLAPSE_TRANSITION_MS, so an exercise/set's full-height content can
-  // briefly paint outside the still-growing track and overlap the header
-  // (Copilot review, PR #22). A timeout, not a `transitionend` listener,
-  // so this still clears under `prefers-reduced-motion` (no transition
-  // ever fires there, which would otherwise leave this stuck permanently
-  // true and reintroduce the very overflow-menu clipping bug this
-  // mechanism replaced).
+  // Keeps `.block-card__body` clipped (and the region `inert`, below) for
+  // the duration of the collapse's own grid-template-rows transition,
+  // expanding included — toggling `collapsed` alone drops overflow:hidden
+  // (and `inert`) the instant `--collapsed` is removed, while the row is
+  // still animating open, so an exercise/set's full-height content can
+  // briefly paint outside the still-growing track and overlap the header,
+  // and focus/assistive tech can enter a region that isn't actually
+  // visible yet (Copilot review, PR #22). Cleared by the wrapper's own
+  // `onTransitionEnd` rather than a timeout duplicating the CSS
+  // transition's duration as a JS literal — nothing to keep in sync if
+  // that duration ever changes. Never set true under
+  // `prefers-reduced-motion` in the first place, since no transition
+  // fires there to end and clear it — leaving it permanently true would
+  // reintroduce the very overflow-menu clipping bug this mechanism
+  // replaced.
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  useEffect(() => {
-    return () => {
-      clearTimeout(transitionTimeoutRef.current);
-    };
-  }, []);
 
   function toggleCollapsed() {
     setCollapsed((current) => !current);
-    setIsTransitioning(true);
-    clearTimeout(transitionTimeoutRef.current);
-    transitionTimeoutRef.current = setTimeout(() => {
+    if (!prefersReducedMotion()) {
+      setIsTransitioning(true);
+    }
+  }
+
+  function handleCollapseTransitionEnd(event: TransitionEvent<HTMLDivElement>) {
+    // `.block-card__collapse` transitions both `grid-template-rows` and
+    // `margin-top` in parallel (see logging.css) — react to just one so
+    // this doesn't fire twice per toggle.
+    if (event.propertyName === 'grid-template-rows') {
       setIsTransitioning(false);
-    }, COLLAPSE_TRANSITION_MS);
+    }
   }
 
   if (bare) {
@@ -206,7 +206,8 @@ export function BlockCard({
       </div>
       <div
         className={`block-card__collapse${collapsed ? ' block-card__collapse--collapsed' : ''}${isTransitioning ? ' block-card__collapse--transitioning' : ''}`}
-        inert={collapsed}
+        inert={collapsed || isTransitioning}
+        onTransitionEnd={handleCollapseTransitionEnd}
       >
         <div className="block-card__body">
           {children}

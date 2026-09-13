@@ -10,6 +10,7 @@
  * instantly instead of smoothly when the user has asked for that.
  */
 import { useEffect, useId, useRef } from 'react';
+import { prefersReducedMotion } from '@/presentation/design/motion';
 import './logging.css';
 
 export interface WheelPickerOption<T> {
@@ -32,13 +33,6 @@ export interface WheelPickerProps<T> {
 }
 
 const ITEM_HEIGHT_PX = 44; // the app's own generous-hit-target minimum
-
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
-  );
-}
 
 export function WheelPicker<T>({
   options,
