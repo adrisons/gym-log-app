@@ -42,3 +42,23 @@
 - This feature targets the "Later" phase (docs/requirements.md §9, D12),
   not MVP/v1/v1.1 — recorded so the decision and its shape exist even
   though implementation is not scheduled yet.
+- **Reviewed by `spec-reviewer` and `schema-guardian`; findings applied.**
+  Fixed in this pass: (1) FR-001/User Story 1 no longer trigger on a
+  non-existent "session is saved" event — spec 001 has no such step; the
+  prompt now triggers on leaving the logging screen with ≥1 confirmed set,
+  and `docs/requirements.md` FR-14 was corrected to match. (2) FR-011/
+  FR-012 no longer misattribute a data-sufficiency threshold to FR-8 (spec
+  004 explicitly says the in-app chart has none); the borrowed threshold is
+  now FR-9/§5.7's per-exercise-progress rule, named explicitly.
+  (3) The Settings field addition no longer claims a schema-version bump/
+  ADR/migration — `docs/requirements.md` D13 closes that ambiguity against
+  Principle III's literal "canonical entity" scope, matching spec 006's own
+  precedent; the project owner confirmed this reading. (4) FR-008 now
+  states an explicit cross-exercise tie-break rule for "single highlight"
+  (previously undefined for a session with multiple different exercises
+  and no PR). (5) FR-010 now states the consistency calendar's own
+  data-sufficiency threshold (borrowed from FR-9's Consistency card).
+  (6) FR-015 (new) covers a session with sets but no working set. (7) FR-022
+  (new) covers a session mixing Strength with a later-added non-Strength
+  discipline. (8) SC-001's tap budget now accounts for the "a stat" flow's
+  two sub-choices (exercise and range) instead of undercounting them.

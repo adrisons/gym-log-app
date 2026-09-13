@@ -350,10 +350,11 @@ feature (D12): no account, no in-app sharing, no third-party posting API, no
 peer visibility. The same shape as FR-12's export, with a visual artifact
 instead of a data file.
 
-- Offered from two entry points: (a) an optional prompt shown right after
-  logging a session, with a "don't show again" preference the user can set
-  permanently (§11 settings); (b) on demand, at any time, from the session
-  detail view's menu.
+- Offered from two entry points: (a) an optional prompt shown when the user
+  leaves the logging screen having confirmed at least one set that session —
+  a session has no discrete "save" step to hook this to (FR-1) — with a
+  "don't show again" preference the user can set permanently (§11 settings);
+  (b) on demand, at any time, from the session detail view's menu.
 - Before the image is generated, the user picks one of three content types:
   - **Session summary** — the exercises performed and headline numbers (e.g.
     tonnage, set count). Not offered when the session has too many exercises
@@ -362,8 +363,13 @@ instead of a data file.
     prominently (e.g. "130kg in Hip Thrust!").
   - **A stat** — either a training-consistency calendar (a summary of which
     days were trained) or an exercise's progression chart over the last 6
-    months or the last year (reusing FR-8's chart and its data-sufficiency
-    rules).
+    months or the last year, reusing FR-8's own chart but gated by the
+    per-exercise-progress data-sufficiency threshold FR-9/§5.7 already
+    defines for Insights — FR-8's own chart carries no such threshold.
+  - Every content type considers Strength-discipline (§1.4) exercise
+    entries only; a session that also contains a later-added non-Strength
+    entry excludes it from every number shown and says so, rather than
+    mixing disciplines into one figure.
 - Every number shown on the image comes from an existing computation (§5,
   FR-8, FR-9); this feature introduces no new metric (Principle VI).
 - The image's visual style follows the app's design tokens and is easily
@@ -451,6 +457,14 @@ Below the threshold there is no "approximate" version: there is nothing.
   - newer version → write nothing and explain that the app is out of date.
 - **Format changes:** any change to the persisted schema bumps the version and
   ships with its ADR and a tested migration.
+- **Scope of "persisted schema":** the version-bump rule above, and
+  constitution Principle III, protect the canonical entities in §3.1 (and
+  the Load/Volume/Effort value objects that shape them) — the data a schema
+  version and migration exist to keep readable across app updates. Settings
+  and other per-device preference state (§11) are stored but are not part
+  of this canonical schema: adding, renaming, or removing a Settings field
+  needs no version bump, ADR, or migration — a missing field simply
+  defaults (D13).
 - **Recoverable writes:** after an interruption, launch reconciles from the
   source of truth; derived data is discarded and regenerated.
 - **Interchange format:** documented, versioned, and free of opaque internal
@@ -529,6 +543,7 @@ before code.
 | D10 | Whether the app tracks body composition (weight, body fat, etc.) | **Closed:** no — removed from scope entirely, in any version. This application is exercises and training metrics only; it never records body measurements. FR-10 (previously "Body composition") is retired; its ID is left unassigned rather than renumbering the FRs after it. |
 | D11 | What happens to a Set's history when an exercise's set-entry template changes | **Closed:** nothing — the template (default load type, default volume kind, whether effort is tracked) only decides what a *new* set defaults to; every already-recorded Set keeps exactly what it was given, no reconciliation or deprecation. Schema v2. → ADR-0006 |
 | D12 | Whether generating a shareable image for external platforms (e.g. Instagram) falls under the constitution's "social network" non-goal | **Closed:** no — it is a one-way, on-device export (render an image locally, hand off via the platform's native share sheet or a saved file), not a multi-user or in-app social feature. No account, no backend, no peer visibility, no third-party posting API; consistent with Invariant 1 (nothing leaves the device without the user explicitly choosing to send it). Targeted at the "Later" phase (§9), not MVP/v1/v1.1. → FR-14 |
+| D13 | Whether adding a field to Settings (per-device preference state, not a canonical entity) requires the §6/Principle III schema-version-bump-and-migration treatment | **Closed:** no — that treatment applies only to the canonical entities in §3.1 (Session, Block, Exercise entry, Set, Exercise catalogue). A Settings field defaults silently when absent: no version bump, no ADR, no migration. Matches the precedent already set in `specs/006-settings-data/spec.md`; §6 amended below with this scope note so future specs don't re-litigate it. |
 
 ---
 
