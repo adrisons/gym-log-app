@@ -39,6 +39,19 @@ import type {
 
 export type { LoggingDraft, DraftBlock, DraftExerciseEntry, DraftSet };
 
+/**
+ * FR-024/FR-027 (ADR-0009): whether the draft has anything worth keeping —
+ * the same threshold that gates both the first `saveDraft` call (nothing
+ * is persisted until this is true) and the "Log workout" control's own
+ * availability, so "worth saving as a draft" and "worth registering as a
+ * Session" never diverge. Editing only the session's date-time does not
+ * add a block, so it alone never makes this true (FR-024's explicit
+ * carve-out for that path).
+ */
+export function draftHasContent(draft: LoggingDraft): boolean {
+  return draft.blocks.length > 0;
+}
+
 /** Creates a brand-new, empty draft dated `now` (ISO 8601). */
 export function createDraft(now: string): LoggingDraft {
   return {
@@ -114,6 +127,54 @@ export function toPersistableDraft(draft: LoggingDraft): LoggingDraft {
       type: block.type,
       ...(block.rounds !== undefined ? { rounds: block.rounds } : {}),
       exercises: block.exercises,
+    })),
+  };
+}
+
+/**
+ * Repoints every reference to `fromId` onto `toId` in the *active,
+ * in-memory* draft (ADR-0009) — the logging store's own counterpart to
+ * `infrastructure/draft-cascade.ts`'s `repointDraftExerciseId`, which only
+ * ever touches the *stored* draft (`StoragePort.mergeExercises`'s own
+ * contract). `application/` cannot import `infrastructure/`
+ * (`docs/architecture.md`'s layer table), and the active draft is not
+ * necessarily the stored one any more (it may still be unpersisted), so
+ * the store must repoint its own in-memory copy directly rather than
+ * re-fetching `storage.getDraft()` and trusting it to be the same draft.
+ */
+export function repointDraftExerciseId(
+  draft: LoggingDraft,
+  fromId: ExerciseId,
+  toId: ExerciseId,
+): LoggingDraft {
+  return {
+    ...draft,
+    blocks: draft.blocks.map((block) => ({
+      ...block,
+      exercises: block.exercises.map((entry) =>
+        entry.exerciseId === fromId ? { ...entry, exerciseId: toId } : entry,
+      ),
+    })),
+  };
+}
+
+/**
+ * Removes every exercise entry (and its sets) referencing `exerciseId` from
+ * the active, in-memory draft — the store's counterpart to
+ * `pruneDraftExerciseId`, for the same reason `repointDraftExerciseId`
+ * above has one.
+ */
+export function pruneDraftExerciseId(
+  draft: LoggingDraft,
+  exerciseId: ExerciseId,
+): LoggingDraft {
+  return {
+    ...draft,
+    blocks: draft.blocks.map((block) => ({
+      ...block,
+      exercises: block.exercises.filter(
+        (entry) => entry.exerciseId !== exerciseId,
+      ),
     })),
   };
 }

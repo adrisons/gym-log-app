@@ -25,7 +25,7 @@ describe('Logging flow (US1 Independent Test)', () => {
   it('open → create exercise → add entry → add set → round-trips through storage.getDraft()', async () => {
     const { storage } = createHarness();
 
-    const draft = await openLoggingForm(storage);
+    const { draft } = await openLoggingForm(storage);
     const exercise = await createExercise(storage, {
       canonicalName: 'Back squat',
     });
@@ -61,7 +61,7 @@ describe('Logging flow (US1 Independent Test)', () => {
 describe('Logging flow (US3 Independent Test)', () => {
   it('records one set per load type and reads each back unchanged', async () => {
     const { storage } = createHarness();
-    const draft = await openLoggingForm(storage);
+    const { draft } = await openLoggingForm(storage);
     const exercise = await createExercise(storage, { canonicalName: 'Row' });
 
     let working = addExerciseEntry(draft, exercise.id);
@@ -122,7 +122,7 @@ describe('Logging flow (US3 Independent Test)', () => {
 describe('Logging flow (US2 Independent Test)', () => {
   it('moves an exercise across blocks, then delete+undo restores a block with sets exactly', async () => {
     const { storage } = createHarness();
-    let draft = await openLoggingForm(storage);
+    let { draft } = await openLoggingForm(storage);
     const exercise = await createExercise(storage, { canonicalName: 'Row' });
 
     draft = addBlock(draft, 'A', 'straightSets');
@@ -192,7 +192,7 @@ describe('Logging flow (US4 Independent Test)', () => {
 
   it('rename-collision accept: survivor keeps its own defaults, loser becomes an alias, every set (session + draft) reassigns', async () => {
     const { storage } = createHarness();
-    const draft = await openLoggingForm(storage);
+    const { draft } = await openLoggingForm(storage);
     const survivor = await createExercise(storage, {
       canonicalName: 'Hip thrust',
       defaultLoadType: 'band',

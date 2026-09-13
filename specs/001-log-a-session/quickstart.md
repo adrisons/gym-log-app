@@ -22,7 +22,10 @@ Run the dev server (`npm run dev`), open the app on a narrow (phone-width)
 viewport first, then a wide one, in both light and dark theme:
 
 1. **Cold start, no draft**: open the app → logging form opens directly to
-   a new session dated "now" (editable), no picker, no dialog (US1-1).
+   an empty, unsaved active draft dated "now" (editable), no picker, no
+   dialog, no recovery banner (US1-1). _(Amended by ADR-0008: nothing is
+   persisted yet at this point — closing right away leaves no draft
+   behind.)_
 2. **Log a set fast**: add an exercise, enter a load + rep count, confirm →
    appears instantly, no Save control anywhere, no spinner (US1-7, SC-001:
    count taps — repeating the previous set should be ≤ 3 taps once one set
@@ -65,12 +68,18 @@ viewport first, then a wide one, in both light and dark theme:
     logged sets → confirmation dialog offers merge as an alternative;
     confirm the delete anyway → cascade removes its entries/sets too
     (US4-6, FR-018).
-12. **Same-day vs. next-day reopen**: log a set, then (in dev tools or by
-    manipulating the system clock in a test build) simulate reopening the
-    form the next calendar day → the earlier draft is promoted to a
-    finished session, and a brand-new draft/session starts (US1-4,
-    research.md §4 — this is a plan-level resolution of an ambiguity in
-    spec.md, flag any mismatch with product intent back to the spec).
+12. **Register a workout, then recover an abandoned one** (ADR-0008): log a
+    set, then press "Log workout" → it appears in the diary immediately, no
+    dialog, and the form resets to a fresh empty draft (US1-10). Separately,
+    log a set, leave without pressing "Log workout" (close the tab or
+    navigate to the diary), then reopen the logging form → a "Recover"/
+    "Discard" banner offers the abandoned draft at the top of the screen;
+    adding a new block/exercise/set is unavailable until you choose one
+    (US1-2, FR-028); "Recover" fills the form with the earlier input,
+    "Discard" removes it permanently. Reopening the form a second time
+    with no draft ever registered nor discarded shows the same banner
+    again, however many days have passed — there is no automatic
+    day-based promotion any more.
 
 ## What "done" does not yet mean
 

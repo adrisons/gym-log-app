@@ -167,6 +167,14 @@ typos" requirement (spec.md Acceptance Scenario US4-1).
 
 ## 4. Draft → Session promotion (resolves an ambiguity between FR-001 and Key Entities)
 
+**Superseded by ADR-0008.** The automatic day-rollover promotion this
+section decided is removed outright: the project owner later asked for an
+explicit "Log workout" action instead (D16, `docs/requirements.md` §8),
+exactly the kind of differing-desired-behavior this section's own "Flag
+for the spec owner" paragraph anticipated. `LoggingDraft.lastEditedAt` is
+no longer used for any promotion check. Left below as the historical
+record of the decision this plan originally made.
+
 spec.md's Key Entities section says the Logging draft "becomes a Session
 only on submit," but FR-001..FR-024 describe no explicit "submit" or
 "finish session" UI action anywhere, and the constitution (Principle II)

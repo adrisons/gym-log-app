@@ -31,22 +31,22 @@
  * floating action on the diary rather than a nav tab, so a "‹ Diary" link
  * replaces what used to be implicit (the logging screen no longer lives
  * at the app's root). `DiaryScreen`'s one-shot save acknowledgement
- * (`docs/design.md` §1.1's bounded exception) reads
- * `useLoggingSession`'s own `justLoggedASet` flag rather than router state
- * handed off by this link — a plain "‹ Diary" `Link` with no `state` at
- * all works for every way of leaving this screen (this link, a browser
- * back/swipe gesture, …), where router state only ever covered the one
- * explicit link. `justLoggedASet` is set the moment `addSet` actually
- * records a set (not merely whether the draft *currently has* any — a
- * same-day draft reopened with sets already in it must not falsely claim
- * this visit saved something) and reset on the next `initialize()`. This
- * is presentation-only signaling between two screens, not a change to
- * D6/FR-024's draft lifecycle: the draft itself is already saved
- * continuously and keeps no open/closed state.
+ * (`docs/design.md` §1.1's bounded exception) reads `useLoggingSession`'s
+ * own `justRegisteredWorkout` flag rather than router state handed off by
+ * this link — a plain "‹ Diary" `Link` with no `state` at all works for
+ * every way of leaving this screen (this link, a browser back/swipe
+ * gesture, …), where router state only ever covered the one explicit
+ * link. `justRegisteredWorkout` is set only by `registerWorkout`'s
+ * success (ADR-0009, D16) — recording a set no longer implies a Session
+ * was saved, only that the pending draft was — and reset on the next
+ * `initialize()`.
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useLoggingSession } from '@/application/logging/logging-store';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  useLoggingSession,
+  draftHasContent,
+} from '@/application/logging/logging-store';
 import {
   toBlockViewModel,
   toSetSummaryViewModel,
@@ -71,7 +71,12 @@ const UNDO_MESSAGES = {
 } as const;
 
 export function LoggingScreen() {
+  const navigate = useNavigate();
   const draft = useLoggingSession((s) => s.draft);
+  const pendingDraft = useLoggingSession((s) => s.pendingDraft);
+  const recoverPendingDraft = useLoggingSession((s) => s.recoverPendingDraft);
+  const discardPendingDraft = useLoggingSession((s) => s.discardPendingDraft);
+  const registerWorkout = useLoggingSession((s) => s.registerWorkout);
   const catalogue = useLoggingSession((s) => s.catalogue);
   const undoStack = useLoggingSession((s) => s.undoStack);
   const initialize = useLoggingSession((s) => s.initialize);
@@ -192,6 +197,33 @@ export function LoggingScreen() {
         Diary
       </Link>
       <h1>Log a session</h1>
+
+      {pendingDraft && (
+        <div
+          className="logging-screen__draft-banner"
+          role="status"
+          aria-label="Unregistered workout found"
+        >
+          <p>You have an unregistered workout from a previous visit.</p>
+          <div className="logging-screen__draft-banner-actions">
+            <button
+              type="button"
+              className="logging-button logging-button--primary"
+              onClick={() => void recoverPendingDraft()}
+            >
+              Recover
+            </button>
+            <button
+              type="button"
+              className="logging-button"
+              onClick={() => void discardPendingDraft()}
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+
       <SessionDateTimeField
         value={draft.dateTime}
         onChange={(iso) => void setSessionDateTime(iso)}
@@ -390,26 +422,45 @@ export function LoggingScreen() {
         ))}
       </div>
 
-      <AddExerciseControl
-        buttonLabel="Add exercise"
-        fieldLabel="Exercise"
-        search={searchExercises}
-        onSelectExercise={(exercise) => void addExerciseEntry(exercise.id)}
-        onCreateExercise={(name) => {
-          void (async () => {
-            const exercise = await createExercise({ canonicalName: name });
-            await addExerciseEntry(exercise.id);
-          })();
-        }}
-      />
-      <button
-        type="button"
-        className="logging-button logging-button--icon-label"
-        onClick={() => void addBlock(undefined, 'straightSets')}
-      >
-        <Icon name="plus" />
-        Add block
-      </button>
+      {!pendingDraft && (
+        <>
+          <AddExerciseControl
+            buttonLabel="Add exercise"
+            fieldLabel="Exercise"
+            search={searchExercises}
+            onSelectExercise={(exercise) => void addExerciseEntry(exercise.id)}
+            onCreateExercise={(name) => {
+              void (async () => {
+                const exercise = await createExercise({ canonicalName: name });
+                await addExerciseEntry(exercise.id);
+              })();
+            }}
+          />
+          <button
+            type="button"
+            className="logging-button logging-button--icon-label"
+            onClick={() => void addBlock(undefined, 'straightSets')}
+          >
+            <Icon name="plus" />
+            Add block
+          </button>
+        </>
+      )}
+
+      {!pendingDraft && draftHasContent(draft) && (
+        <button
+          type="button"
+          className="logging-button logging-button--primary"
+          onClick={() => {
+            void (async () => {
+              await registerWorkout();
+              navigate('/diary');
+            })();
+          }}
+        >
+          Log workout
+        </button>
+      )}
     </main>
   );
 }

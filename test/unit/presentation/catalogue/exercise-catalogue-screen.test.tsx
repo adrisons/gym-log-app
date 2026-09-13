@@ -137,10 +137,6 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
 
   it('a merge re-syncs the logging store, not just this screen (stale-draft regression)', async () => {
     const storage = await seededStorage();
-    // `lastEditedAt` must be "now" (today) — `openLoggingForm` (called by
-    // the logging store's own `initialize()` below) promotes any draft
-    // from an earlier calendar day into a Session and replaces it with a
-    // brand-new empty draft, which would defeat this test's setup.
     const now = new Date().toISOString();
     await storage.saveDraft({
       id: 'draft-1',
@@ -169,6 +165,12 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
     // LoggingScreen before navigating here.
     useLoggingSession.getState().configure(storage);
     await useLoggingSession.getState().initialize();
+    // ADR-0008: opening the form no longer auto-loads a stored draft as
+    // the active one — it is offered as `pendingDraft` instead. Simulate
+    // the user having already recovered it (the way an earlier visit to
+    // LoggingScreen before navigating here would have), so the active
+    // `draft` is the one referencing `ex-1` that this regression targets.
+    await useLoggingSession.getState().recoverPendingDraft();
 
     render(<ExerciseCatalogueScreen />);
 

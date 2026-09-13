@@ -73,10 +73,16 @@ function withTemplateDefaults(exercise: Exercise): Exercise {
  * `getHandle()`, as the last resort when nothing is cached.
  *
  * Gesture-gated acquisition and the write overlay: `showDirectoryPicker()`
- * requires a live user gesture, but this app's very first write (an empty
- * `LoggingDraft` auto-created and saved the instant the logging screen
- * opens — spec 001 `openLoggingForm`) happens on mount, before the user
- * has done anything to click. Rather than reject that write (which would
+ * requires a live user gesture, but this app's very first write can be a
+ * schema-version migration (`#checkSchema`/`#migrateExerciseTemplateDefaults`,
+ * triggered lazily by whichever write happens first) rather than anything
+ * the user directly asked for — so it can still land before the user has
+ * done anything to click. (Before ADR-0009, an empty `LoggingDraft` was
+ * also auto-created and saved the instant the logging screen opened —
+ * spec 001's original `openLoggingForm` — which made this the common case
+ * rather than the rare one; opening the form no longer writes anything by
+ * itself, but the schema-check path still can, so the mechanism stays.)
+ * Rather than reject that write (which would
  * deadlock the screen — it never renders the interactive controls a
  * gesture could come from), a `getHandle()` failure is treated as
  * "not yet available," not a hard error: the write is kept in `#overlay`

@@ -12,7 +12,7 @@ import type {
   LoggingDraft,
 } from '@/application/ports/storage-port';
 import { createDraft, draftToSession } from '@/application/logging/draft';
-import { newSessionId, newExerciseId } from '@/application/logging/ids';
+import { newExerciseId } from '@/application/logging/ids';
 import { matchExercise, normalize } from '@/shared/fuzzy-match';
 import { renameExercise, deleteExercise } from '@/domain/exercise';
 import type { Exercise } from '@/domain/exercise';
@@ -41,48 +41,61 @@ export type { SessionId };
 /** Re-exported so `ExerciseSearchField` can check for an exact name/alias match the same accent/case-insensitive way `matchExercise` itself does, instead of a narrower ad hoc comparison. */
 export { normalize };
 
-function isSameLocalDay(isoA: string, isoB: string): boolean {
-  const a = new Date(isoA);
-  const b = new Date(isoB);
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+/**
+ * FR-001, FR-028 (ADR-0009). Opening the logging form never creates or
+ * persists anything by itself: `draft` is always a brand-new, in-memory-
+ * only `LoggingDraft` — the caller (the logging store) only writes it to
+ * storage once the user's own first edit changes it. `pendingDraft` is
+ * whatever draft is currently stored, if any — surfaced as the FR-028
+ * recovery banner, never auto-loaded into `draft`. There is deliberately
+ * no day-rollover auto-promotion any more: a `Session` is only ever
+ * created by `registerWorkout`, below.
+ */
+export interface OpenLoggingFormResult {
+  draft: LoggingDraft;
+  pendingDraft: LoggingDraft | undefined;
+}
+
+export async function openLoggingForm(
+  storage: StoragePort,
+): Promise<OpenLoggingFormResult> {
+  const now = new Date().toISOString();
+  const pendingDraft = await storage.getDraft();
+  return { draft: createDraft(now), pendingDraft };
+}
+
+/** FR-024, FR-028: discards the pending draft and its data. */
+export async function discardDraft(storage: StoragePort): Promise<void> {
+  await storage.discardDraft();
 }
 
 /**
- * FR-001/FR-024; research.md §4. No stored draft → creates and persists a
- * fresh one. A stored draft still on today's local calendar day →
- * restored unchanged. A stored draft from an earlier local calendar day →
- * promoted to a real `Session` (`saveSession` + `discardDraft`), then a
- * brand-new draft is created and returned — this is what makes "opening
- * the logging form" always end in exactly one open draft.
+ * FR-027 (ADR-0009): the one and only way a `Session` is created from the
+ * logging screen. Converts `draft` to a real `Session` (`draftToSession`),
+ * saves it, clears whatever draft is stored (there is at most one), and
+ * returns a brand-new, in-memory-only draft for the caller to make its new
+ * active one — the same "fresh, unpersisted" contract `openLoggingForm`
+ * itself returns, so the screen is immediately ready for the next workout.
+ *
+ * The Session's id is `draft.id` itself (cast, not a fresh
+ * `newSessionId()`) — deliberately, so this call is idempotent under
+ * retry: `saveSession` is a plain upsert keyed by id in every adapter
+ * (Copilot review, PR #25). If `saveSession` succeeds but the following
+ * `discardDraft` fails (a real, if rare, local-storage failure), the
+ * draft is left stored and could be recovered and registered again —
+ * with a freshly-minted id, that would create a second, duplicate
+ * `Session` for the same workout; keyed off the draft's own stable id
+ * instead, a retry just re-saves the same `Session` record rather than
+ * duplicating it.
  */
-export async function openLoggingForm(
+export async function registerWorkout(
   storage: StoragePort,
-): Promise<LoggingDraft> {
-  const now = new Date().toISOString();
-  const existing = await storage.getDraft();
-
-  if (existing && isSameLocalDay(existing.lastEditedAt, now)) {
-    return existing;
-  }
-
-  if (existing) {
-    const session = draftToSession(existing, newSessionId());
-    await storage.saveSession(session);
-    await storage.discardDraft();
-  }
-
-  const draft = createDraft(now);
-  await storage.saveDraft(draft);
-  return draft;
-}
-
-/** FR-024, Acceptance Scenario 3: discards the draft and its data. */
-export async function discardDraft(storage: StoragePort): Promise<void> {
+  draft: LoggingDraft,
+): Promise<{ session: Session; draft: LoggingDraft }> {
+  const session = draftToSession(draft, draft.id as SessionId);
+  await storage.saveSession(session);
   await storage.discardDraft();
+  return { session, draft: createDraft(new Date().toISOString()) };
 }
 
 interface ExerciseUsage {

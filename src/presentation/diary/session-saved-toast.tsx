@@ -11,9 +11,9 @@
  * `onDismiss`, when given, fires once this mount is done with the flag it
  * was conditioned on — either the visible-duration timeout elapses, or
  * this component unmounts first (e.g. navigating away before it does).
- * `DiaryScreen` uses it to clear the logging store's `justLoggedASet` flag
- * either way, so the one-shot acknowledgement stays one-shot (a later
- * remount of that same route, with nothing new logged since, renders
+ * `DiaryScreen` uses it to clear the logging store's `justRegisteredWorkout`
+ * flag either way, so the one-shot acknowledgement stays one-shot (a later
+ * remount of that same route, with nothing new registered since, renders
  * nothing here at all) — not only on the visible self-dismissal case its
  * name suggests.
  */

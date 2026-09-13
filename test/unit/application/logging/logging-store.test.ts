@@ -103,8 +103,14 @@ describe('useLoggingSession (research.md §5)', () => {
     await addSetPromise;
     await initializePromise;
 
+    // ADR-0009: re-`initialize()` always hands back a fresh, empty active
+    // draft — the previously-active one (with the just-committed set) is
+    // what it offers back as `pendingDraft` instead. The property under
+    // test is unchanged: the write already in flight when `initialize()`
+    // started must still be reflected somewhere, not silently lost to a
+    // stale read.
     const finalSets =
-      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets;
+      useLoggingSession.getState().pendingDraft!.blocks[0]!.exercises[0]!.sets;
     expect(finalSets.map((s) => s.id)).toContain(committedSetId);
   });
 
@@ -283,11 +289,11 @@ describe('useLoggingSession.addSet (ADR-0007 debounce / stale-block-id regressio
     ).resolves.toBeUndefined();
   });
 
-  it('sets justLoggedASet only once a set is actually recorded, and initialize() resets it', async () => {
+  it('does not set justRegisteredWorkout merely because a set was recorded (ADR-0008)', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
     await useLoggingSession.getState().initialize();
-    expect(useLoggingSession.getState().justLoggedASet).toBe(false);
+    expect(useLoggingSession.getState().justRegisteredWorkout).toBe(false);
 
     await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
     const entryId =
@@ -298,10 +304,27 @@ describe('useLoggingSession.addSet (ADR-0007 debounce / stale-block-id regressio
       setKind: 'working',
     });
 
-    expect(useLoggingSession.getState().justLoggedASet).toBe(true);
+    expect(useLoggingSession.getState().justRegisteredWorkout).toBe(false);
+  });
+
+  it('sets justRegisteredWorkout only once registerWorkout succeeds, and initialize() resets it', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+
+    await useLoggingSession.getState().registerWorkout();
+    expect(useLoggingSession.getState().justRegisteredWorkout).toBe(true);
 
     await useLoggingSession.getState().initialize();
-    expect(useLoggingSession.getState().justLoggedASet).toBe(false);
+    expect(useLoggingSession.getState().justRegisteredWorkout).toBe(false);
   });
 
   it('lastAddedSetId tracks whichever set was most recently committed, and resets on initialize() (PR #22 Copilot review — set-summary-enter animation scope)', async () => {
@@ -418,7 +441,7 @@ describe('useLoggingSession.addSet (ADR-0007 debounce / stale-block-id regressio
     expect(useLoggingSession.getState().lastAddedSetId).toBe(secondSetId);
   });
 
-  it('clearJustLoggedASet resets the flag without touching anything else', async () => {
+  it('clearJustRegisteredWorkout resets the flag without touching anything else', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
     await useLoggingSession.getState().initialize();
@@ -430,14 +453,123 @@ describe('useLoggingSession.addSet (ADR-0007 debounce / stale-block-id regressio
       load: { kind: 'none' },
       setKind: 'working',
     });
-    expect(useLoggingSession.getState().justLoggedASet).toBe(true);
+    await useLoggingSession.getState().registerWorkout();
+    expect(useLoggingSession.getState().justRegisteredWorkout).toBe(true);
 
-    useLoggingSession.getState().clearJustLoggedASet();
+    useLoggingSession.getState().clearJustRegisteredWorkout();
 
-    expect(useLoggingSession.getState().justLoggedASet).toBe(false);
+    expect(useLoggingSession.getState().justRegisteredWorkout).toBe(false);
+  });
+});
+
+describe('useLoggingSession pending draft (FR-024, FR-027, FR-028; ADR-0008)', () => {
+  it('starts empty and unpersisted; nothing is stored until the draft has a block', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+
+    expect(useLoggingSession.getState().pendingDraft).toBeUndefined();
+    expect(await storage.getDraft()).toBeUndefined();
+
+    await useLoggingSession
+      .getState()
+      .setSessionDateTime('2026-09-11T09:00:00.000Z');
+    expect(await storage.getDraft()).toBeUndefined(); // date-only edit persists nothing
+  });
+
+  it('persists the draft once it gains a block, and offers it as pendingDraft on the next initialize()', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+
+    await useLoggingSession.getState().addBlock(undefined, 'straightSets');
+    expect(await storage.getDraft()).toBeDefined();
+
+    await useLoggingSession.getState().initialize();
+    expect(useLoggingSession.getState().draft!.blocks).toEqual([]);
+    expect(useLoggingSession.getState().pendingDraft?.blocks).toHaveLength(1);
+  });
+
+  it('addBlock/addExerciseEntry/addSet are no-ops while a pendingDraft is unresolved', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addBlock(undefined, 'straightSets');
+    await useLoggingSession.getState().initialize(); // re-open: now offers a pendingDraft
+
+    expect(useLoggingSession.getState().pendingDraft).toBeDefined();
+
+    await useLoggingSession.getState().addBlock('New', 'straightSets');
+    expect(useLoggingSession.getState().draft!.blocks).toEqual([]);
+
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    expect(useLoggingSession.getState().draft!.blocks).toEqual([]);
+  });
+
+  it('recoverPendingDraft loads the pending draft as the active one and clears the banner', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addBlock('Legs', 'straightSets');
+    const savedId = useLoggingSession.getState().draft!.id;
+    await useLoggingSession.getState().initialize();
+
+    await useLoggingSession.getState().recoverPendingDraft();
+
+    expect(useLoggingSession.getState().pendingDraft).toBeUndefined();
+    expect(useLoggingSession.getState().draft!.id).toBe(savedId);
+    expect(useLoggingSession.getState().draft!.blocks[0]?.name).toBe('Legs');
+  });
+
+  it('discardPendingDraft removes it from storage and leaves the active draft untouched', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addBlock('Legs', 'straightSets');
+    await useLoggingSession.getState().initialize();
+    const activeId = useLoggingSession.getState().draft!.id;
+
+    await useLoggingSession.getState().discardPendingDraft();
+
+    expect(useLoggingSession.getState().pendingDraft).toBeUndefined();
+    expect(await storage.getDraft()).toBeUndefined();
+    expect(useLoggingSession.getState().draft!.id).toBe(activeId);
+    expect(useLoggingSession.getState().draft!.blocks).toEqual([]);
+  });
+});
+
+describe('useLoggingSession registerWorkout (FR-027; ADR-0008)', () => {
+  it('is a no-op while the active draft has no block', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    const before = useLoggingSession.getState().draft;
+
+    await useLoggingSession.getState().registerWorkout();
+
+    expect(useLoggingSession.getState().draft).toBe(before);
     expect(
-      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets,
-    ).toHaveLength(1);
+      await storage.listSessions({ from: '2000-01-01', to: '2100-01-01' }),
+    ).toEqual([]);
+  });
+
+  it('converts the draft to a Session and resets the active draft to a fresh, empty, unpersisted one', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addBlock(undefined, 'straightSets');
+    const draftId = useLoggingSession.getState().draft!.id;
+
+    await useLoggingSession.getState().registerWorkout();
+
+    expect(useLoggingSession.getState().draft!.id).not.toBe(draftId);
+    expect(useLoggingSession.getState().draft!.blocks).toEqual([]);
+    expect(await storage.getDraft()).toBeUndefined();
+    const sessions = await storage.listSessions({
+      from: '2000-01-01',
+      to: '2100-01-01',
+    });
+    expect(sessions).toHaveLength(1);
   });
 });
 

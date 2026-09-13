@@ -84,8 +84,9 @@ step and returns the updated value).
 
 | Use case | FRs | Behavior |
 |---|---|---|
-| `openLoggingForm(storage)` | FR-001, FR-024, research.md §4 | Loads the stored draft. If none, creates a new `LoggingDraft` with `dateTime`/`lastEditedAt` = now. If one exists and `lastEditedAt` is today (local), returns it unchanged. If one exists and `lastEditedAt` is an earlier local day, promotes it (`draftToSession` + `saveSession` + `discardDraft`) then creates and returns a fresh draft. |
-| `discardDraft(storage)` | FR-024 | `discardDraft()` on the port; caller resets its in-memory draft state. |
+| `openLoggingForm(storage)` | FR-001, FR-024, FR-028 | _(Amended by ADR-0008.)_ Returns `{ draft, pendingDraft }`: `draft` is always a brand-new, in-memory-only `LoggingDraft` (`createDraft(now)`) — never written to storage by this call. `pendingDraft` is whatever draft is currently stored (`storage.getDraft()`), or `undefined` if none — surfaced by the presentation layer as the FR-028 recovery banner, never auto-loaded into `draft`. No day-rollover promotion any more (removed, not superseded — nothing else calls it). |
+| `discardDraft(storage)` | FR-024, FR-028 | `discardDraft()` on the port; caller resets its in-memory pending-draft state. |
+| `registerWorkout(storage, draft)` | FR-027 | _(Added by ADR-0008.)_ Converts `draft` to a `Session` (`draftToSession` + `saveSession`), clears the stored draft (`discardDraft`), and returns a brand-new, in-memory-only `LoggingDraft` for the caller to make the new active draft — mirrors `openLoggingForm`'s "fresh draft, not yet persisted" contract. |
 | `addBlock(draft, name?, type)` | FR-006 | Appends a `DraftBlock`; returns the updated draft. Pure — persistence is the caller's `saveDraft` call. |
 | `renameBlock` / `reorderBlockExercise` / `moveExerciseAcrossBlocks` | FR-006 | Pure draft transforms, list-position moves only (FR-018 — no separate order field). |
 | `setBlockRounds(draft, blockId, rounds?)` | FR-2 (ADR-0008) | Sets or clears (`undefined`) a block's target round count. Unvalidated at this layer — a draft may hold a transient, not-yet-valid value; domain `createBlock` rejects a non-positive-integer `rounds` at promotion time (`draftToSession`), the same point every other draft-only laxness is caught. |

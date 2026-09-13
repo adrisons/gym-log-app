@@ -3,6 +3,7 @@ import { InMemoryStorage } from '../../../support';
 import {
   openLoggingForm,
   discardDraft,
+  registerWorkout,
   searchExercises,
   createExercise,
   updateExerciseTemplate,
@@ -15,16 +16,16 @@ import {
 } from '@/application/logging/use-cases';
 import { StorageError } from '@/application/errors';
 import { ExerciseDeleteConfirmationRequiredError } from '@/domain/errors';
-import { createDraft } from '@/application/logging/draft';
+import { createDraft, addBlock } from '@/application/logging/draft';
 import type { Exercise } from '@/domain/exercise';
 import type { Session } from '@/domain/session';
 import type { ExerciseId, SessionId } from '@/domain/ids';
 
-// Foundational: openLoggingForm/discardDraft. searchExercises/createExercise
-// are US1. Every other use case in this file is added by later phases
-// (US3/US2/US4) — see tasks.md.
+// Foundational: openLoggingForm/discardDraft/registerWorkout.
+// searchExercises/createExercise are US1. Every other use case in this
+// file is added by later phases (US3/US2/US4) — see tasks.md.
 
-describe('openLoggingForm (FR-001, FR-024; research.md §4)', () => {
+describe('openLoggingForm (FR-001, FR-024, FR-028; ADR-0009)', () => {
   let storage: InMemoryStorage;
 
   beforeEach(() => {
@@ -36,59 +37,130 @@ describe('openLoggingForm (FR-001, FR-024; research.md §4)', () => {
     vi.useRealTimers();
   });
 
-  it('creates a new draft when no draft is stored, and does not save a Session (Acceptance Scenario 1)', async () => {
+  it('returns a brand-new, unpersisted draft and no pending draft when none is stored', async () => {
     vi.setSystemTime(new Date('2026-09-11T09:00:00.000Z'));
-    const draft = await openLoggingForm(storage);
+    const { draft, pendingDraft } = await openLoggingForm(storage);
     expect(draft.blocks).toEqual([]);
-    expect(await storage.getDraft()).toEqual(draft);
+    expect(pendingDraft).toBeUndefined();
+    expect(await storage.getDraft()).toBeUndefined(); // never persisted by this call
     expect(
       await storage.listSessions({ from: '2000-01-01', to: '2100-01-01' }),
     ).toEqual([]);
   });
 
-  it('restores the stored draft unchanged when its lastEditedAt is today (Acceptance Scenario 2)', async () => {
+  it('offers a stored draft as pendingDraft without loading it into the active draft', async () => {
     vi.setSystemTime(new Date('2026-09-11T09:00:00.000Z'));
-    const existing = createDraft('2026-09-11T08:00:00.000Z');
+    const existing = addBlock(
+      createDraft('2026-09-11T08:00:00.000Z'),
+      undefined,
+      'straightSets',
+    );
     await storage.saveDraft(existing);
 
-    const draft = await openLoggingForm(storage);
+    const { draft, pendingDraft } = await openLoggingForm(storage);
 
-    expect(draft).toEqual(existing);
+    expect(draft.id).not.toBe(existing.id);
+    expect(draft.blocks).toEqual([]);
+    expect(pendingDraft).toEqual(existing);
+    expect(await storage.getDraft()).toEqual(existing); // untouched by this call
+  });
+
+  it('never promotes a stored draft to a Session, regardless of how old it is', async () => {
+    const old = addBlock(
+      createDraft('2020-01-01T00:00:00.000Z'),
+      undefined,
+      'straightSets',
+    );
+    await storage.saveDraft(old);
+
+    vi.setSystemTime(new Date('2026-09-11T09:00:00.000Z'));
+    const { pendingDraft } = await openLoggingForm(storage);
+
+    expect(pendingDraft).toEqual(old);
     expect(
       await storage.listSessions({ from: '2000-01-01', to: '2100-01-01' }),
     ).toEqual([]);
   });
+});
 
-  it('promotes a draft from an earlier local calendar day to a Session, then returns a brand-new draft (Acceptance Scenario 4)', async () => {
-    const yesterday = createDraft('2026-09-10T20:00:00.000Z');
-    await storage.saveDraft({ ...yesterday, lastEditedAt: yesterday.dateTime });
+describe('discardDraft (FR-024, FR-028, Acceptance Scenario 3)', () => {
+  it('clears the stored draft', async () => {
+    const storage = new InMemoryStorage();
+    const existing = addBlock(
+      createDraft(new Date().toISOString()),
+      undefined,
+      'straightSets',
+    );
+    await storage.saveDraft(existing);
 
-    vi.setSystemTime(new Date('2026-09-11T09:00:00.000Z'));
-    const draft = await openLoggingForm(storage);
+    await discardDraft(storage);
 
-    expect(draft.id).not.toBe(yesterday.id);
-    expect(draft.blocks).toEqual([]);
-    expect(await storage.getDraft()).toEqual(draft);
+    expect(await storage.getDraft()).toBeUndefined();
+  });
+});
 
+describe('registerWorkout (FR-027; ADR-0009)', () => {
+  it('converts the draft to a Session, clears the stored draft, and returns a fresh unpersisted draft', async () => {
+    const storage = new InMemoryStorage();
+    const draft = addBlock(
+      createDraft('2026-09-11T08:00:00.000Z'),
+      undefined,
+      'straightSets',
+    );
+    await storage.saveDraft(draft); // simulates the active draft already having been persisted
+
+    const result = await registerWorkout(storage, draft);
+
+    expect(result.session.dateTime).toBe(draft.dateTime);
+    expect(result.draft.id).not.toBe(draft.id);
+    expect(result.draft.blocks).toEqual([]);
+    expect(await storage.getDraft()).toBeUndefined();
     const sessions = await storage.listSessions({
       from: '2000-01-01',
       to: '2100-01-01',
     });
     expect(sessions).toHaveLength(1);
-    expect(sessions[0]?.dateTime).toBe(yesterday.dateTime);
+    expect(sessions[0]?.id).toBe(result.session.id);
   });
-});
 
-describe('discardDraft (FR-024, Acceptance Scenario 3)', () => {
-  it('clears the stored draft; a subsequent openLoggingForm returns a new one, not the discarded one', async () => {
+  it('clears a stored draft even if it is not the one being registered', async () => {
     const storage = new InMemoryStorage();
-    const original = await openLoggingForm(storage);
+    const stored = addBlock(
+      createDraft('2026-01-01T00:00:00.000Z'),
+      undefined,
+      'straightSets',
+    );
+    await storage.saveDraft(stored);
+    const active = addBlock(
+      createDraft('2026-09-11T08:00:00.000Z'),
+      undefined,
+      'straightSets',
+    );
 
-    await discardDraft(storage);
+    await registerWorkout(storage, active);
+
     expect(await storage.getDraft()).toBeUndefined();
+  });
 
-    const next = await openLoggingForm(storage);
-    expect(next.id).not.toBe(original.id);
+  it('is retry-safe: calling it twice on the same draft upserts one Session, never two (Copilot review, PR #25)', async () => {
+    const storage = new InMemoryStorage();
+    const draft = addBlock(
+      createDraft('2026-09-11T08:00:00.000Z'),
+      undefined,
+      'straightSets',
+    );
+
+    // Simulates a `discardDraft` failure on the first attempt: the caller
+    // sees a rejection and the same `draft` is registered again.
+    const first = await registerWorkout(storage, draft);
+    const second = await registerWorkout(storage, draft);
+
+    expect(second.session.id).toBe(first.session.id);
+    const sessions = await storage.listSessions({
+      from: '2000-01-01',
+      to: '2100-01-01',
+    });
+    expect(sessions).toHaveLength(1);
   });
 });
 

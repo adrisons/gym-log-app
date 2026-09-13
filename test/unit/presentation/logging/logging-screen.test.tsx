@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { LoggingScreen } from '@/presentation/logging/logging-screen';
 import { useLoggingSession } from '@/application/logging/logging-store';
 import { InMemoryStorage } from '../../../support';
+
+function renderAtLog() {
+  return render(
+    <MemoryRouter initialEntries={['/log']}>
+      <Routes>
+        <Route path="/log" element={<LoggingScreen />} />
+        <Route path="/diary" element={<div>Diary screen</div>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 describe('LoggingScreen (FR-001)', () => {
   it('calls initialize on mount and renders the restored/created draft with no loading spinner', async () => {
@@ -257,5 +268,132 @@ describe('LoggingScreen (FR-001)', () => {
     expect(
       screen.queryByRole('button', { name: /^rename$/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('LoggingScreen "Log workout" (FR-027; ADR-0008)', () => {
+  it('is not offered while the active draft has no block, and appears once one is added', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    renderAtLog();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Add exercise' }),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Log workout' }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add block' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Log workout' }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('registers the workout, clears the stored draft, and navigates to the diary', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    renderAtLog();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Add exercise' }),
+      ).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.type(
+      screen.getByPlaceholderText(/search or create an exercise/i),
+      'Back squat',
+    );
+    await userEvent.click(screen.getByText('Create "Back squat"'));
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Back squat' }),
+      ).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
+    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Log workout' }),
+      ).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Log workout' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Diary screen')).toBeInTheDocument();
+    });
+    expect(await storage.getDraft()).toBeUndefined();
+    const sessions = await storage.listSessions({
+      from: '2000-01-01',
+      to: '2100-01-01',
+    });
+    expect(sessions).toHaveLength(1);
+  });
+});
+
+describe('LoggingScreen pending-draft recovery banner (FR-024, FR-028; ADR-0008)', () => {
+  it('offers Recover/Discard for a stored draft, blocks new content until resolved, and Recover fills the form', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addBlock('Legs', 'straightSets');
+    // Re-initialize (as a fresh mount of this screen would) so the block
+    // just added is offered back as a pending draft rather than active.
+    await useLoggingSession.getState().initialize();
+
+    renderAtLog();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/unregistered workout from a previous visit/i),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Add exercise' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add block' }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Recover' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Legs')).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/unregistered workout from a previous visit/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('Discard removes the stored draft and leaves the active form empty', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addBlock('Legs', 'straightSets');
+    await useLoggingSession.getState().initialize();
+
+    renderAtLog();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Discard' }),
+      ).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/unregistered workout from a previous visit/i),
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText('Legs')).not.toBeInTheDocument();
+    expect(await storage.getDraft()).toBeUndefined();
   });
 });

@@ -32,6 +32,7 @@ import type { Session } from '@/domain/session';
 import type { ExerciseId } from '@/domain/ids';
 import {
   openLoggingForm,
+  registerWorkout as registerWorkoutUseCase,
   searchExercises as searchExercisesUseCase,
   createExercise as createExerciseUseCase,
   updateExerciseTemplate as updateExerciseTemplateUseCase,
@@ -59,6 +60,9 @@ import {
   deleteBlock as deleteBlockFromDraft,
   deleteExerciseEntry as deleteExerciseEntryFromDraft,
   deleteSet as deleteSetFromDraft,
+  draftHasContent,
+  repointDraftExerciseId,
+  pruneDraftExerciseId,
 } from '@/application/logging/draft';
 import type {
   AddSetInput,
@@ -67,6 +71,8 @@ import type {
   UndoEntry,
   DeleteResult,
 } from '@/application/logging/draft';
+
+export { draftHasContent };
 
 export type { UndoEntry };
 
@@ -82,21 +88,27 @@ function touch(draft: LoggingDraft): LoggingDraft {
 export interface LoggingSessionState {
   storage: StoragePort | undefined;
   draft: LoggingDraft | undefined;
+  /** FR-028 (ADR-0009): a draft found already stored when the form was
+   * opened, offered as a recovery banner — never auto-loaded into `draft`.
+   * `undefined` once resolved (recovered or discarded) or when none was
+   * stored to begin with. Adding a block, exercise, or set to `draft` is
+   * refused by this store while this is set (see `addBlock`/
+   * `addExerciseEntry`/`addSet`), so an unresolved pending draft can never
+   * be silently overwritten by unrelated new input. */
+  pendingDraft: LoggingDraft | undefined;
   undoStack: UndoEntry[];
   catalogue: Exercise[];
   sessions: Session[];
   bandLabels: string[];
   /** entryId → ms epoch of the last confirmed set on that entry (FR-025). */
   lastConfirmedAt: Record<string, number>;
-  /** Set true the moment `addSet` actually appends a set (not a FR-025
-   * debounced no-op), reset on every `initialize()` — the one reliable
-   * signal for "did this visit to the logging form record a set", which
+  /** Set true only by `registerWorkout`'s success (ADR-0009) — the one
+   * reliable signal for "this visit registered a workout", which
    * `DiaryScreen`'s save-acknowledgement toast reads once and clears
-   * (`clearJustLoggedASet`). Deliberately not derived from the draft's
-   * total set count (`docs/design.md` §1.1's refinement note) — that would
-   * also read true for a same-day draft that already had sets before this
-   * visit even started. */
-  justLoggedASet: boolean;
+   * (`clearJustRegisteredWorkout`). Recording a set no longer sets this on
+   * its own: a set can be safely recorded in a draft for a long time
+   * before (or without ever) being registered as a Session. */
+  justRegisteredWorkout: boolean;
   /** The id of the set `addSet` most recently appended — `undefined` once
    * consumed or before any set has been added this visit. `LoggingScreen`
    * reads this once per commit to mark only that one `.set-summary` row
@@ -112,6 +124,8 @@ export interface LoggingSessionState {
   configure: (storage: StoragePort) => void;
   initialize: () => Promise<void>;
   setSessionDateTime: (iso: string) => Promise<void>;
+  /** FR-028: a no-op while `pendingDraft` is set — the user must recover or
+   * discard it first. */
   addExerciseEntry: (exerciseId: ExerciseId, blockId?: string) => Promise<void>;
   /** Resolves the entry's *current* block itself (entry ids are globally
    * unique — `findBlockIdForEntry`), rather than taking one from the
@@ -119,10 +133,29 @@ export interface LoggingSessionState {
    * to a different block (`moveExerciseAcrossBlocks`) would otherwise bake
    * in a block id the entry no longer lives under by the time a debounced
    * commit (ADR-0007) actually fires. A no-op if the entry no longer
-   * resolves to any block at all (deleted in the meantime). */
+   * resolves to any block at all (deleted in the meantime), or while
+   * `pendingDraft` is set (FR-028). */
   addSet: (entryId: string, input: AddSetInput) => Promise<void>;
-  clearJustLoggedASet: () => void;
+  clearJustRegisteredWorkout: () => void;
   clearLastAddedSetId: () => void;
+  /** FR-028: loads `pendingDraft` as the active `draft` and clears it,
+   * queued against `discardPendingDraft` (below) so whichever of the two
+   * runs first wins and the other becomes a no-op — never both. A no-op
+   * if there is none. */
+  recoverPendingDraft: () => Promise<void>;
+  /** FR-028: removes `pendingDraft` from storage and clears it, leaving the
+   * active `draft` untouched; queued against `recoverPendingDraft` (same
+   * reason). A no-op if there is none. */
+  discardPendingDraft: () => Promise<void>;
+  /** FR-027: the only way a Session is created from this screen. Queued
+   * behind any outstanding draft write and re-checks the active draft's
+   * identity once its turn comes up, so a debounced commit still in
+   * flight can't be resurrected by this call, and a double-tap can't
+   * register the same draft twice (Copilot review, PR #25). A no-op
+   * while the active draft has no block at all (`draftHasContent`) —
+   * callers/UI must not offer this control until then, per FR-019's
+   * "unavailable rather than rejected" convention. */
+  registerWorkout: () => Promise<void>;
   prefillNextSet: (blockId: string, entryId: string) => SetPrefill | undefined;
   searchExercises: (query: string) => Exercise[];
   createExercise: (input: CreateExerciseInput) => Promise<Exercise>;
@@ -229,11 +262,28 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     pendingCatalogueOp = settled;
     return attempt;
   }
+  // FR-024 (ADR-0009): persists the active draft once it has content
+  // (`draftHasContent`), or removes it from storage once it no longer does
+  // (e.g. the user deletes its last block) — the single rule that makes
+  // both "no data ⇒ nothing stored" and "some data ⇒ recoverable draft"
+  // fall out of *when* this is called, rather than a separate check at
+  // every call site. Editing only the session's date-time on an
+  // otherwise-empty draft therefore persists nothing (FR-024's explicit
+  // carve-out). Queued (`enqueueDraftOp`) the same as every other draft
+  // write, so it's always ordered against `registerWorkout`/
+  // `recoverPendingDraft`/`discardPendingDraft` below.
   const persistDraft = (
     storage: StoragePort,
     draft: LoggingDraft,
-  ): Promise<void> => enqueueDraftOp(() => storage.saveDraft(draft));
-  const readDraft = (storage: StoragePort): Promise<LoggingDraft> =>
+  ): Promise<void> =>
+    enqueueDraftOp(() =>
+      draftHasContent(draft)
+        ? storage.saveDraft(draft)
+        : storage.discardDraft(),
+    );
+  const readDraft = (
+    storage: StoragePort,
+  ): Promise<{ draft: LoggingDraft; pendingDraft: LoggingDraft | undefined }> =>
     enqueueDraftOp(() => openLoggingForm(storage));
 
   /**
@@ -281,12 +331,13 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
   return {
     storage: undefined,
     draft: undefined,
+    pendingDraft: undefined,
     undoStack: [],
     catalogue: [],
     sessions: [],
     bandLabels: [],
     lastConfirmedAt: {},
-    justLoggedASet: false,
+    justRegisteredWorkout: false,
     lastAddedSetId: undefined,
 
     configure: (storage) => set({ storage }),
@@ -300,13 +351,15 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       // legitimately set these while this visit's own reads are in
       // flight; resetting afterward would silently erase that signal
       // (Copilot review, PR #22).
-      set({ justLoggedASet: false, lastAddedSetId: undefined });
+      set({ justRegisteredWorkout: false, lastAddedSetId: undefined });
       // Captured synchronously, before awaiting anything below — a
-      // concurrent action's own optimistic `set()` call (e.g. `addSet`)
-      // always runs synchronously too, so capturing these any later (after
-      // the queue wait just below, say) risks absorbing that same mutation
-      // into "before" instead of detecting it as a change.
+      // concurrent action's own optimistic `set()` call (e.g. `addSet`,
+      // or `recoverPendingDraft`/`discardPendingDraft` resolving their own
+      // queued turn) always runs synchronously too, so capturing these any
+      // later (after the queue wait just below, say) risks absorbing that
+      // same mutation into "before" instead of detecting it as a change.
       const draftBeforeReads = get().draft;
+      const pendingDraftBeforeReads = get().pendingDraft;
       const catalogueBeforeReads = get().catalogue;
       const bandLabelsBeforeReads = get().bandLabels;
       // `readDraft` (not calling `openLoggingForm` directly) queues this
@@ -330,19 +383,25 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       // flight before it started remains a narrower, unclosed gap here
       // (Copilot review, PR #22) — closing it needs per-exercise
       // conflict tracking on the read side, not a write-side queue.
-      const [draft, catalogue, sessions, bandLabels] = await Promise.all([
-        readDraft(storage),
-        storage.listExercises(),
-        storage.listSessions(FULL_RANGE),
-        storage.listBandLabels(),
-      ]);
-      // Same reasoning as `draft` above, for the other two slices these
-      // reads can also race: `createExercise`/`updateExerciseTemplate`
-      // against `catalogue`, `saveBandLabels` against `bandLabels`
-      // (Copilot review, PR #22) — only overwrite a slice if nothing else
-      // already did while we were reading.
+      const [{ draft, pendingDraft }, catalogue, sessions, bandLabels] =
+        await Promise.all([
+          readDraft(storage),
+          storage.listExercises(),
+          storage.listSessions(FULL_RANGE),
+          storage.listBandLabels(),
+        ]);
+      // Same reasoning as `draft` above, for the other slices these reads
+      // can also race: `createExercise`/`updateExerciseTemplate` against
+      // `catalogue`, `saveBandLabels` against `bandLabels`,
+      // `recoverPendingDraft`/`discardPendingDraft` against `pendingDraft`
+      // (Copilot review, PR #22 and PR #25) — only overwrite a slice if
+      // nothing else already did while we were reading.
       set((state) => ({
         draft: state.draft === draftBeforeReads ? draft : state.draft,
+        pendingDraft:
+          state.pendingDraft === pendingDraftBeforeReads
+            ? pendingDraft
+            : state.pendingDraft,
         catalogue:
           state.catalogue === catalogueBeforeReads
             ? catalogue
@@ -355,7 +414,59 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       }));
     },
 
-    clearJustLoggedASet: () => set({ justLoggedASet: false }),
+    clearJustRegisteredWorkout: () => set({ justRegisteredWorkout: false }),
+
+    // `recoverPendingDraft`/`discardPendingDraft` both go through
+    // `enqueueDraftOp` and re-check `pendingDraft`'s identity once their
+    // turn comes up: whichever the user actually clicked first wins that
+    // race and clears `pendingDraft`, so the other sees it already gone
+    // and no-ops, instead of both racing to act on the same banner
+    // (Copilot review, PR #25) — e.g. Discard's `storage.discardDraft()`
+    // can no longer land *after* Recover has already adopted that same
+    // draft as the active one and moved on.
+    recoverPendingDraft: async () => {
+      const target = get().pendingDraft;
+      if (!target) return;
+      await enqueueDraftOp(async () => {
+        if (get().pendingDraft !== target) return;
+        set({ draft: target, pendingDraft: undefined });
+      });
+    },
+
+    discardPendingDraft: async () => {
+      const { storage } = get();
+      const target = get().pendingDraft;
+      if (!storage || !target) return;
+      await enqueueDraftOp(async () => {
+        if (get().pendingDraft !== target) return;
+        await storage.discardDraft();
+        set({ pendingDraft: undefined });
+      });
+    },
+
+    // Queued behind any outstanding draft write (`persistDraft` uses the
+    // same `enqueueDraftOp`), so an older `addSet`/`addBlock` save already
+    // in flight is guaranteed to land *before* this reads/clears the
+    // draft — never after, which would otherwise resurrect the just-
+    // registered workout in storage (Copilot review, PR #25). The
+    // identity re-check once this call's turn comes up also makes a
+    // double-tap safe: the second call's `current` is the same draft
+    // object as the first's, but by the time its turn arrives `draft` has
+    // already moved on to the fresh one the first call produced, so it
+    // no-ops instead of registering the same content twice.
+    registerWorkout: async () => {
+      const { storage, draft: current } = get();
+      if (!storage || !current || !draftHasContent(current)) return;
+      await enqueueDraftOp(async () => {
+        if (get().draft !== current) return;
+        const { draft: fresh } = await registerWorkoutUseCase(storage, current);
+        set({
+          draft: fresh,
+          pendingDraft: undefined,
+          justRegisteredWorkout: true,
+        });
+      });
+    },
 
     clearLastAddedSetId: () => set({ lastAddedSetId: undefined }),
 
@@ -368,8 +479,8 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     },
 
     addExerciseEntry: async (exerciseId, blockId) => {
-      const { storage, draft: current } = get();
-      if (!storage || !current) return;
+      const { storage, draft: current, pendingDraft } = get();
+      if (!storage || !current || pendingDraft) return;
       const updated = touch(
         addExerciseEntryToDraft(current, exerciseId, blockId),
       );
@@ -378,8 +489,8 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     },
 
     addSet: async (entryId, input) => {
-      const { storage, draft: current, lastConfirmedAt } = get();
-      if (!storage || !current) return;
+      const { storage, draft: current, pendingDraft, lastConfirmedAt } = get();
+      if (!storage || !current || pendingDraft) return;
       const blockId = findBlockIdForEntry(current, entryId);
       if (!blockId) return; // entry no longer exists — nothing to commit to
       const nowMs = Date.now();
@@ -407,7 +518,6 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       set((state) => ({
         draft: updated,
         lastConfirmedAt: { ...state.lastConfirmedAt, [entryId]: nowMs },
-        justLoggedASet: true,
         lastAddedSetId: newSetId,
       }));
       await persistDraft(storage, updated);
@@ -491,8 +601,8 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     },
 
     addBlock: async (name, type) => {
-      const { storage, draft: current } = get();
-      if (!storage || !current) return;
+      const { storage, draft: current, pendingDraft } = get();
+      if (!storage || !current || pendingDraft) return;
       const updated = touch(addBlockToDraft(current, name, type));
       set({ draft: updated });
       await persistDraft(storage, updated);
@@ -608,32 +718,63 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       return result;
     },
 
-    // Merge/cascade-delete repoint or prune the stored draft too
-    // (contracts/storage-port-extension.md §1) — this store's own
-    // in-memory `draft` copy is stale once that happens server-side, so
-    // both actions re-fetch draft + catalogue from storage afterward
-    // rather than trying to replicate the repoint/prune logic locally.
+    // Merge/cascade-delete repoint or prune the *stored* draft too
+    // (contracts/storage-port-extension.md §1) — but the active `draft`
+    // being edited (ADR-0009) is not necessarily the stored one at all
+    // (it may still be unpersisted), so it is repointed/pruned directly,
+    // in memory, with the same pure transforms `infrastructure/draft-
+    // cascade.ts` applies to the stored copy (`application/` cannot import
+    // `infrastructure/` — docs/architecture.md's layer table — hence the
+    // small duplication in `application/logging/draft.ts`). `pendingDraft`
+    // *is* the stored draft, so it's simply re-fetched (queued — see
+    // below), which also refreshes an already-rendered recovery banner if
+    // the merge/delete just rewrote it (FR-024).
+    //
     // The rewrite itself joins *both* queues (`enqueueOnBoth`) since it
-    // touches both slices; the re-fetch then queues each half on its own
-    // matching queue. Run unqueued, an unrelated in-flight write (e.g. a
-    // debounced commit) could land between the rewrite and the re-fetch,
+    // touches both slices; the catalogue re-fetch and the `pendingDraft`
+    // re-fetch then each queue on their own matching queue. Run unqueued,
+    // an unrelated in-flight write (e.g. a debounced commit, or
+    // `registerWorkout`) could land between the rewrite and the re-fetch,
     // or after either, and silently overwrite the rewrite's own result
     // (Copilot review, PR #22).
+    //
+    // `draft` itself is (re-)read *after* awaiting the gated rewrite
+    // above, not captured at the top of this action — a concurrent
+    // optimistic update (e.g. `addExerciseEntry`) can land in memory
+    // while the rewrite is still in flight, and repointing/pruning a
+    // stale pre-rewrite snapshot capture would silently discard it once
+    // this action's own `set()` below overwrites `draft` with that stale
+    // result (Copilot review, PR #25). The identity check on `set()`
+    // closes the remaining, narrower gap the same way `initialize()`'s
+    // own does: something mutating `draft` again in the brief window
+    // between that re-read and this `set()` call.
     mergeExercises: async (survivorId, loserId) => {
-      const { storage } = get();
+      const { storage, pendingDraft: pendingBefore } = get();
       if (!storage) return;
       await enqueueOnBoth(() =>
         mergeExercisesUseCase(storage, survivorId, loserId),
       );
-      const [draft, catalogue] = await Promise.all([
-        enqueueDraftOp(() => storage.getDraft()),
+      const draftBeforeRepoint = get().draft;
+      const draft = draftBeforeRepoint
+        ? repointDraftExerciseId(draftBeforeRepoint, loserId, survivorId)
+        : draftBeforeRepoint;
+      // Only refresh the banner if one was already showing — this must
+      // never fabricate a pending draft where none existed, since
+      // `storage.getDraft()` may just be re-describing the active `draft`
+      // itself once it has been persisted.
+      const [pendingDraft, catalogue] = await Promise.all([
+        pendingBefore ? enqueueDraftOp(() => storage.getDraft()) : undefined,
         enqueueCatalogueOp(() => storage.listExercises()),
       ]);
-      set({ draft, catalogue });
+      set((state) => ({
+        draft: state.draft === draftBeforeRepoint ? draft : state.draft,
+        pendingDraft,
+        catalogue,
+      }));
     },
 
     deleteExerciseCascade: async (exerciseId, hasHistory, confirmed) => {
-      const { storage } = get();
+      const { storage, pendingDraft: pendingBefore } = get();
       if (!storage) return;
       await enqueueOnBoth(() =>
         deleteExerciseCascadeUseCase(
@@ -643,11 +784,19 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
           confirmed,
         ),
       );
-      const [draft, catalogue] = await Promise.all([
-        enqueueDraftOp(() => storage.getDraft()),
+      const draftBeforePrune = get().draft;
+      const draft = draftBeforePrune
+        ? pruneDraftExerciseId(draftBeforePrune, exerciseId)
+        : draftBeforePrune;
+      const [pendingDraft, catalogue] = await Promise.all([
+        pendingBefore ? enqueueDraftOp(() => storage.getDraft()) : undefined,
         enqueueCatalogueOp(() => storage.listExercises()),
       ]);
-      set({ draft, catalogue });
+      set((state) => ({
+        draft: state.draft === draftBeforePrune ? draft : state.draft,
+        pendingDraft,
+        catalogue,
+      }));
     },
   };
 });

@@ -80,14 +80,17 @@ interface PendingDeleteBatch {
 }
 
 export function DiaryScreen() {
-  // Read reactively, not just once at mount: `SetRow`'s debounced commit
-  // (ADR-0007) can still be pending when the user navigates here, so the
-  // flag may only flip true *after* this screen has already rendered — a
-  // one-time mount check would miss that and never show the acknowledgement
-  // at all. `SessionSavedToast`'s own `onDismiss` clears it once shown, so a
-  // later remount of this same route (browser back/forward, or any other
-  // way of arriving here) with nothing new logged since renders nothing.
-  const justLoggedASet = useLoggingSession((s) => s.justLoggedASet);
+  // Read reactively, not just once at mount: `LoggingScreen`'s "Log
+  // workout" control (ADR-0009) awaits `registerWorkout()` before
+  // navigating here, so in practice the flag is already true by the time
+  // this screen mounts — but reading it live rather than snapshotting once
+  // costs nothing and stays correct if that ordering ever changes.
+  // `SessionSavedToast`'s own `onDismiss` clears it once shown, so a later
+  // remount of this same route (browser back/forward, or any other way of
+  // arriving here) with nothing new registered since renders nothing.
+  const justRegisteredWorkout = useLoggingSession(
+    (s) => s.justRegisteredWorkout,
+  );
   const [sessions, setSessions] = useState<SessionListItem[] | undefined>(
     undefined,
   );
@@ -117,18 +120,19 @@ export function DiaryScreen() {
     stillLoadingRef.current = summaries === undefined || sessions === undefined;
   });
 
-  // Leaving while still loading, with a set already logged this visit,
-  // means `SessionSavedToast` never mounted at all — its own unmount
-  // cleanup can't consume `justLoggedASet` if it was never rendered to
-  // begin with, leaving the flag to surface as a stale "Session saved" on
-  // a later, unrelated visit to this same route (Copilot review, PR #22).
+  // Leaving while still loading, with a workout already registered this
+  // visit, means `SessionSavedToast` never mounted at all — its own
+  // unmount cleanup can't consume `justRegisteredWorkout` if it was never
+  // rendered to begin with, leaving the flag to surface as a stale
+  // "Session saved" on a later, unrelated visit to this same route
+  // (Copilot review, PR #22).
   useEffect(() => {
     return () => {
       if (
         stillLoadingRef.current &&
-        useLoggingSession.getState().justLoggedASet
+        useLoggingSession.getState().justRegisteredWorkout
       ) {
-        useLoggingSession.getState().clearJustLoggedASet();
+        useLoggingSession.getState().clearJustRegisteredWorkout();
       }
     };
   }, []);
@@ -380,9 +384,11 @@ export function DiaryScreen() {
           Log session
         </Link>
         {undoToasts}
-        {justLoggedASet && (
+        {justRegisteredWorkout && (
           <SessionSavedToast
-            onDismiss={() => useLoggingSession.getState().clearJustLoggedASet()}
+            onDismiss={() =>
+              useLoggingSession.getState().clearJustRegisteredWorkout()
+            }
           />
         )}
       </main>
@@ -537,9 +543,11 @@ export function DiaryScreen() {
       )}
 
       {undoToasts}
-      {justLoggedASet && (
+      {justRegisteredWorkout && (
         <SessionSavedToast
-          onDismiss={() => useLoggingSession.getState().clearJustLoggedASet()}
+          onDismiss={() =>
+            useLoggingSession.getState().clearJustRegisteredWorkout()
+          }
         />
       )}
     </main>
