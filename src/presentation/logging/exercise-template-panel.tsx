@@ -7,16 +7,10 @@
  * or invalidate history).
  */
 import { useEffect, useRef, useState } from 'react';
-import { LoadTypePicker } from './load-type-picker';
+import { ExerciseTemplateFields } from './exercise-template-fields';
 import type { Exercise, Load, Volume } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
 import './logging.css';
-
-const VOLUME_KIND_LABELS: Record<Volume['kind'], string> = {
-  reps: 'Reps',
-  duration: 'Duration',
-  distance: 'Distance',
-};
 
 export interface ExerciseTemplate {
   defaultLoadType: Load['kind'];
@@ -72,41 +66,14 @@ export function ExerciseTemplatePanel({
         Sets you already logged keep exactly what you recorded.
       </p>
 
-      <div className="logging-screen__field-label">
-        <span>Load type</span>
-        <LoadTypePicker selected={loadType} onSelect={setLoadType} />
-      </div>
-
-      <div className="logging-screen__field-label">
-        <span>Volume kind</span>
-        <div
-          role="radiogroup"
-          aria-label="Volume kind"
-          className="set-row__inputs"
-        >
-          {(Object.keys(VOLUME_KIND_LABELS) as Volume['kind'][]).map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              role="radio"
-              aria-checked={kind === volumeKind}
-              className="logging-button"
-              onClick={() => setVolumeKind(kind)}
-            >
-              {VOLUME_KIND_LABELS[kind]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <label className="exercise-template-panel__checkbox-label">
-        <input
-          type="checkbox"
-          checked={trackEffort}
-          onChange={(event) => setTrackEffort(event.target.checked)}
-        />
-        <span>Track effort for this exercise</span>
-      </label>
+      <ExerciseTemplateFields
+        loadType={loadType}
+        onLoadTypeChange={setLoadType}
+        volumeKind={volumeKind}
+        onVolumeKindChange={setVolumeKind}
+        trackEffort={trackEffort}
+        onTrackEffortChange={setTrackEffort}
+      />
 
       <button
         type="button"

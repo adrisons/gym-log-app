@@ -63,8 +63,13 @@ describe('LoggingScreen (FR-001)', () => {
       ).toBeInTheDocument();
     });
 
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /weight/i }),
+      '60',
+    );
     await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
     await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
 
     await waitFor(async () => {
       const draft = await storage.getDraft();
@@ -98,20 +103,29 @@ describe('LoggingScreen (FR-001)', () => {
       ).toBeInTheDocument();
     });
 
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /weight/i }),
+      '60',
+    );
     await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
     await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
     await waitFor(async () => {
       const draft = await storage.getDraft();
       expect(draft?.blocks[0]?.exercises[0]?.sets).toHaveLength(1);
     });
 
-    // A fresh SetRow mounts for the next set (keyed on the entry's set
-    // count) — logging a second set must move the animation marker to it
-    // instead of leaving (or also adding) it on the first. (It prefills
-    // from the repeat-last-set value, so this only needs *a* further edit,
-    // not any particular rep count.)
+    // Confirming the first set collapsed the form to a "+ Add set" button
+    // (ADR-0010) — a fresh SetRow mounts once it's reopened, pre-filled
+    // from the previous set (FR-008). One further edit (a different rep
+    // count, so FR-025's identical-within-1s debounce doesn't treat this
+    // as a repeat of the same commit) plus Confirm logs this second set,
+    // which must move the animation marker to it instead of leaving (or
+    // also adding) it on the first.
+    await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
     await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
     await userEvent.keyboard('{ArrowDown}');
+    await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
     // One `waitFor`, not two: the animation marker is intentionally
     // consumed once the marked row's own entrance animation ends (or
     // immediately under reduced motion), so asserting the DOM in a

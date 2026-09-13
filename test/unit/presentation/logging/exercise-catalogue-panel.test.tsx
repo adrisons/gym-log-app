@@ -41,6 +41,7 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
         onRename={onRename}
         onMerge={() => {}}
         onDeleteConfirm={() => {}}
+        onEditTemplate={() => {}}
         onClose={() => {}}
       />,
     );
@@ -73,6 +74,7 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
         onRename={onRename}
         onMerge={onMerge}
         onDeleteConfirm={() => {}}
+        onEditTemplate={() => {}}
         onClose={() => {}}
       />,
     );
@@ -102,6 +104,7 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
         onRename={onRename}
         onMerge={onMerge}
         onDeleteConfirm={() => {}}
+        onEditTemplate={() => {}}
         onClose={() => {}}
       />,
     );
@@ -125,6 +128,7 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
         onRename={vi.fn()}
         onMerge={() => {}}
         onDeleteConfirm={() => {}}
+        onEditTemplate={() => {}}
         onClose={() => {}}
       />,
     );
@@ -155,6 +159,7 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
         onRename={vi.fn()}
         onMerge={() => {}}
         onDeleteConfirm={onDeleteConfirm}
+        onEditTemplate={() => {}}
         onClose={() => {}}
       />,
     );
@@ -167,5 +172,27 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
     );
 
     expect(onDeleteConfirm).toHaveBeenCalled();
+  });
+
+  it('offers "Edit tracked fields…" to open the set-entry template editor (ADR-0010)', async () => {
+    const onEditTemplate = vi.fn();
+    render(
+      <ExerciseCataloguePanel
+        exercise={exercise}
+        hasHistory={false}
+        search={() => []}
+        onRename={vi.fn()}
+        onMerge={() => {}}
+        onDeleteConfirm={() => {}}
+        onEditTemplate={onEditTemplate}
+        onClose={() => {}}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /edit tracked fields/i }),
+    );
+
+    expect(onEditTemplate).toHaveBeenCalled();
   });
 });

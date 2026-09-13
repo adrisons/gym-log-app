@@ -75,11 +75,94 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     });
     expect(screen.getByText('100 kg')).toBeInTheDocument();
 
+    await userEvent.click(
+      screen.getByRole('button', { name: /100 kg 5 reps actions/i }),
+    );
     await userEvent.click(screen.getByText('Delete set'));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
       expect(saved?.blocks[0]?.exercises[0]?.sets).toHaveLength(0);
+    });
+  });
+
+  it("editing a set's weight preserves its setKind and completed — not the add-form's fixed 'working'/true (ADR-0010, Copilot review, PR #27)", async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const sessionId = 's1' as SessionId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [
+          createBlock({
+            type: 'straightSets',
+            exercises: [
+              {
+                exerciseId,
+                notes: '',
+                sets: [
+                  createSet({
+                    volume: createVolume({ kind: 'reps', count: 5 }),
+                    load: createLoad({
+                      kind: 'weight',
+                      value: 100,
+                      unit: 'kg',
+                    }),
+                    setKind: 'warmUp',
+                    completed: false,
+                  }),
+                ],
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <Routes>
+          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Squat' }),
+      ).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /100 kg 5 reps actions/i }),
+    );
+    await userEvent.click(screen.getByText('Edit'));
+    const weightField = screen.getByRole('spinbutton', { name: /weight/i });
+    await userEvent.clear(weightField);
+    await userEvent.type(weightField, '110');
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    await waitFor(async () => {
+      const saved = await storage.getSession(sessionId);
+      const set = saved?.blocks[0]?.exercises[0]?.sets[0];
+      expect(set?.load).toEqual({ kind: 'weight', value: 110, unit: 'kg' });
+      expect(set?.setKind).toBe('warmUp');
+      expect(set?.completed).toBe(false);
     });
   });
 

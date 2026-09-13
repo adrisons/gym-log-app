@@ -332,6 +332,12 @@ marked as personal records.
 - **FR-013**: The system MUST provide a progression screen for a single
   Exercise, reachable from search results and from an exercise referenced
   in a session detail view.
+  **(ADR-0010, supersedes "and from an exercise referenced in a session
+  detail view")** The session detail view's per-exercise entries no longer
+  link to this screen — progression-class stats are, for now, reachable
+  only from search results (this spec) and from Insights
+  (`specs/005-insights`). The progression screen itself and its other entry
+  point are unaffected; only this one link was removed.
 - **FR-014**: The progression screen's list representation MUST show one
   row per Session that has at least one Set for that Exercise, reverse
   chronological, each row showing that session's date, the best working

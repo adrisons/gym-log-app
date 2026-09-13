@@ -14,7 +14,7 @@
  * (ADR-0006) is editable through its own menu.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { requireStorage } from '@/application/storage-access';
 import { useLoggingSession } from '@/application/logging/logging-store';
 import {
@@ -24,10 +24,7 @@ import {
 } from '@/application/diary/session-editing';
 import type { EditableSession } from '@/application/diary/session-editing';
 import { searchExercises } from '@/application/search/exercise-search';
-import {
-  toBlockViewModel,
-  toSetSummaryViewModel,
-} from '@/application/logging/view-models';
+import { toBlockViewModel } from '@/application/logging/view-models';
 import type {
   Exercise,
   Session,
@@ -36,7 +33,7 @@ import type {
 import { Icon } from '@/presentation/design/icons';
 import { BlockCard } from '../logging/block-card';
 import { ExerciseEntryCard } from '../logging/exercise-entry-card';
-import { SetRow } from '../logging/set-row';
+import { ExerciseSetList } from '../logging/exercise-set-list';
 import { AddExerciseControl } from '../logging/add-exercise-control';
 import { ExerciseTemplatePanel } from '../logging/exercise-template-panel';
 import type { DraftBlock } from '@/application/logging/draft';
@@ -358,12 +355,6 @@ export function SessionDetailScreen() {
               const exercise = catalogue.find((e) => e.id === entry.exerciseId);
               return (
                 <div key={entry.id}>
-                  <Link
-                    to={`/exercises/${entry.exerciseId}/progression`}
-                    className="session-detail-screen__progression-link"
-                  >
-                    View {entryVm.exerciseName} progression
-                  </Link>
                   <ExerciseEntryCard
                     exerciseName={entryVm.exerciseName}
                     canMoveUp={false}
@@ -393,55 +384,15 @@ export function SessionDetailScreen() {
                       }))
                     }
                   >
-                    <ul className="set-list">
-                      {entry.sets.map((set) => {
-                        const vm = toSetSummaryViewModel(set);
-                        return (
-                          <li key={vm.id} className="set-summary">
-                            <span>{vm.loadLabel}</span>
-                            <span>{vm.volumeLabel}</span>
-                            <button
-                              type="button"
-                              className="logging-button logging-button--icon-label"
-                              onClick={() =>
-                                persist((editable) => ({
-                                  ...editable,
-                                  blocks: editable.blocks.map((b) =>
-                                    b.id === block.id
-                                      ? {
-                                          ...b,
-                                          exercises: b.exercises.map((e) =>
-                                            e.id === entry.id
-                                              ? {
-                                                  ...e,
-                                                  sets: e.sets.filter(
-                                                    (s) => s.id !== vm.id,
-                                                  ),
-                                                }
-                                              : e,
-                                          ),
-                                        }
-                                      : b,
-                                  ),
-                                }))
-                              }
-                            >
-                              <Icon name="trash" />
-                              Delete set
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    <SetRow
-                      key={`${entry.id}-${entry.sets.length}-${exercise?.defaultLoadType ?? 'none'}-${exercise?.defaultVolumeKind ?? 'reps'}-${exercise?.trackEffort ?? false}`}
-                      prefill={undefined}
+                    <ExerciseSetList
+                      sets={entry.sets}
                       loadKind={exercise?.defaultLoadType ?? 'none'}
                       volumeKind={exercise?.defaultVolumeKind ?? 'reps'}
                       trackEffort={exercise?.trackEffort ?? false}
                       bandLabels={bandLabels}
                       freeTextSuggestions={[]}
-                      onConfirm={(input) =>
+                      prefill={undefined}
+                      onAddSet={(input) =>
                         persist((editable) => ({
                           ...editable,
                           blocks: editable.blocks.map((b) =>
@@ -467,6 +418,73 @@ export function SessionDetailScreen() {
                                               completed: true,
                                             },
                                           ],
+                                        }
+                                      : e,
+                                  ),
+                                }
+                              : b,
+                          ),
+                        }))
+                      }
+                      onUpdateSet={(setId, input) =>
+                        persist((editable) => ({
+                          ...editable,
+                          blocks: editable.blocks.map((b) =>
+                            b.id === block.id
+                              ? {
+                                  ...b,
+                                  exercises: b.exercises.map((e) =>
+                                    e.id === entry.id
+                                      ? {
+                                          ...e,
+                                          // FR-029's editable surface is
+                                          // load/volume/effort only —
+                                          // `setKind`/`completed` are kept
+                                          // from `s` itself, not taken
+                                          // from `input` (which always
+                                          // carries the add-form's fixed
+                                          // `setKind: 'working'`), so
+                                          // correcting e.g. a warm-up set's
+                                          // weight doesn't silently turn it
+                                          // into a completed working set.
+                                          sets: e.sets.map((s) =>
+                                            s.id === setId
+                                              ? {
+                                                  id: setId,
+                                                  ...(input.volume !== undefined
+                                                    ? { volume: input.volume }
+                                                    : {}),
+                                                  load: input.load,
+                                                  ...(input.effort !== undefined
+                                                    ? { effort: input.effort }
+                                                    : {}),
+                                                  setKind: s.setKind,
+                                                  completed: s.completed,
+                                                }
+                                              : s,
+                                          ),
+                                        }
+                                      : e,
+                                  ),
+                                }
+                              : b,
+                          ),
+                        }))
+                      }
+                      onDeleteSet={(setId) =>
+                        persist((editable) => ({
+                          ...editable,
+                          blocks: editable.blocks.map((b) =>
+                            b.id === block.id
+                              ? {
+                                  ...b,
+                                  exercises: b.exercises.map((e) =>
+                                    e.id === entry.id
+                                      ? {
+                                          ...e,
+                                          sets: e.sets.filter(
+                                            (s) => s.id !== setId,
+                                          ),
                                         }
                                       : e,
                                   ),

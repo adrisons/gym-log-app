@@ -146,26 +146,6 @@
   min-width: 44px;
 }
 
-/* Press feedback (docs/design.md §4.5 — every tappable control scales
-   down slightly on press); this link had none at all. `inline-block` is
-   required, not decorative — `transform` has no effect on a non-replaced
-   inline element like a bare `<a>` (Copilot review, PR #24's emoji-pop
-   fix hit the same thing). */
-.session-detail-screen__progression-link {
-  display: inline-block;
-  transition: transform var(--duration-instant) var(--easing-standard);
-}
-
-.session-detail-screen__progression-link:active {
-  transform: scale(0.97);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .session-detail-screen__progression-link:active {
-    transform: none;
-  }
-}
-
 /* A tinted badge behind the icon (canvas reference: `.chip`) — a plain
    unfilled icon read as far quieter than the mockup's colour-tinted
    square, one of the concrete visual gaps against that reference. Neutral

@@ -8,10 +8,9 @@
  * `StoragePort.saveSession`, not the draft-promotion path.
  *
  * Scope note: mirrors spec 001's own editable surface (add/rename/delete
- * a block; add/delete an exercise entry; add/delete a set) — spec 001's
- * confirmed sets are themselves never edited in place, only added or
- * deleted (`logging-screen.tsx`), so this screen doesn't need to either.
- * Undo is intentionally out of scope for this screen: spec.md FR-005
+ * a block; add/delete/edit an exercise entry's sets — ADR-0010 added
+ * editing a set in place, spec 001 FR-029, alongside add/delete). Undo is
+ * intentionally out of scope for this screen: spec.md FR-005
  * requires edits to be editable and persisted, not undoable — the 5-second
  * undo window is spec 001 FR-001's own logging-critical-path guarantee,
  * not restated for after-the-fact editing here.
