@@ -153,6 +153,19 @@ export function LoggingScreen() {
   // Empty deps deliberately: this must run only on true unmount, reading
   // whatever is live in the store at that moment, never on every
   // lastAddedSetId change (which would just be re-added a moment later).
+  //
+  // Known residual gap (Copilot review, PR #22): a `SetRow` debounce timer
+  // deliberately survives unmount (ADR-0007) and can fire *after* this
+  // cleanup runs, re-setting `lastAddedSetId` for a set that was in fact
+  // just committed on the previous visit. A remount before `initialize()`'s
+  // own (synchronous, top-of-function) reset reaches the store can then
+  // paint one frame with that stale marker applied before it's cleared.
+  // Not fixed here: doing so needs the reset to happen before this
+  // component's first paint rather than in an effect (which only runs
+  // after it), and every way to do that reaches outside this component's
+  // own render — e.g. a Zustand `set()` call during another component's
+  // render — trading a one-frame, rarely-reachable animation glitch for a
+  // real risk of state-update-during-render issues. Left as is.
   useEffect(() => {
     return () => {
       useLoggingSession.getState().clearLastAddedSetId();
@@ -307,7 +320,25 @@ export function LoggingScreen() {
                               : 'set-summary'
                           }
                           {...(isNewest
-                            ? { onAnimationEnd: () => clearLastAddedSetId() }
+                            ? {
+                                onAnimationEnd: () => {
+                                  // Guards against a stale closure: if a
+                                  // second set committed (moving the
+                                  // marker on) before this row's own
+                                  // animation ended, only *that* row's
+                                  // handler should consume it — this one
+                                  // clearing a marker that has already
+                                  // moved on would strand the newer row's
+                                  // own entrance animation mid-flight
+                                  // (Copilot review, PR #22).
+                                  if (
+                                    useLoggingSession.getState()
+                                      .lastAddedSetId === vm.id
+                                  ) {
+                                    clearLastAddedSetId();
+                                  }
+                                },
+                              }
                             : {})}
                         >
                           <span>{vm.loadLabel}</span>

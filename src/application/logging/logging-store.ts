@@ -172,49 +172,69 @@ export interface LoggingSessionState {
 }
 
 export const useLoggingSession = create<LoggingSessionState>((set, get) => {
-  // Every draft-mutating action below persists through this one chain
-  // instead of calling `storage.saveDraft` directly, and `initialize()`'s
-  // own read (`readDraft`, below) is queued onto it too instead of calling
-  // `openLoggingForm` directly — three reasons:
-  // (1) it serializes writes against each other, so a slower earlier write
-  // can never finish after (and clobber) a faster later one;
-  // (2) `openLoggingForm` can itself call `storage.saveDraft` when it
-  // rotates a stale draft into a `Session` and starts a new one for today
-  // — queuing it here keeps that rotation from interleaving with an
-  // in-flight write for the *old* draft (e.g. ADR-0007's debounce timer,
-  // which outlives unmount) instead of running against storage
-  // independently and unordered (Copilot review, PR #22);
-  // (3) `initialize()` no longer needs its own separate wait before
-  // trusting `readDraft`'s result — queuing it here already orders it
-  // after whatever write was already pending, which a before/after
-  // identity check on `draft` alone couldn't guarantee on its own.
+  // Two independent queues, not one shared queue for every storage
+  // operation: draft writes/reads (`enqueueDraftOp`) and catalogue/
+  // band-label writes/reads (`enqueueCatalogueOp`) are unrelated most of
+  // the time (an `addSet` commit has no reason to wait on an unrelated
+  // `createExercise`'s call, or on `initialize()`'s `listExercises` read),
+  // and forcing them through one shared queue serializes them anyway —
+  // this deadlocked in exactly the case a test caught: `initialize()`'s
+  // (queued) catalogue read left gated mid-flight, with a concurrent
+  // `addSet`'s own draft write stuck behind it on the same shared queue,
+  // each awaiting the other. `enqueueOnBoth` (below) is the one place
+  // that deliberately joins both queues, for the two operations that
+  // genuinely touch both slices at once.
   //
-  // `pendingDraftWrite` itself is kept *always-settled* (the `.catch(() =>
-  // {})` below): if it instead held the last write's own promise, one
-  // rejected write would leave every later `persistDraft`/`readDraft` call
-  // — including a future `initialize()` — permanently awaiting a rejected
-  // promise (Copilot review, PR #22). The caller-facing promise each
-  // function returns (`attempt`) still rejects normally.
-  let pendingDraftWrite: Promise<void> = Promise.resolve();
+  // Each queue is kept *always-settled* (the trailing `.then(ok, ok)`
+  // below): if a queue instead held the last operation's own promise, one
+  // rejected operation would leave every later queued call — including a
+  // future `initialize()` — permanently awaiting a rejected promise
+  // (Copilot review, PR #22). The caller-facing promise `enqueue*` returns
+  // still rejects normally.
+  let pendingDraftOp: Promise<void> = Promise.resolve();
+  let pendingCatalogueOp: Promise<void> = Promise.resolve();
+  function enqueueDraftOp<T>(operation: () => Promise<T>): Promise<T> {
+    const attempt = pendingDraftOp.then(operation, operation);
+    pendingDraftOp = attempt.then(
+      () => undefined,
+      () => undefined,
+    );
+    return attempt;
+  }
+  function enqueueCatalogueOp<T>(operation: () => Promise<T>): Promise<T> {
+    const attempt = pendingCatalogueOp.then(operation, operation);
+    pendingCatalogueOp = attempt.then(
+      () => undefined,
+      () => undefined,
+    );
+    return attempt;
+  }
+  // `mergeExercises`/`deleteExerciseCascade` rewrite the draft *and* the
+  // catalogue in one call (contracts/storage-port-extension.md §1) — this
+  // joins both queues instead of picking one, so a draft write queued
+  // behind it still waits for it, and so does a catalogue write, without
+  // making either queue wait on the *other's* unrelated backlog the way a
+  // single shared queue would.
+  function enqueueOnBoth<T>(operation: () => Promise<T>): Promise<T> {
+    const gate = Promise.all([pendingDraftOp, pendingCatalogueOp]).then(
+      () => undefined,
+      () => undefined,
+    );
+    const attempt = gate.then(operation, operation);
+    const settled = attempt.then(
+      () => undefined,
+      () => undefined,
+    );
+    pendingDraftOp = settled;
+    pendingCatalogueOp = settled;
+    return attempt;
+  }
   const persistDraft = (
     storage: StoragePort,
     draft: LoggingDraft,
-  ): Promise<void> => {
-    const attempt = pendingDraftWrite.then(
-      () => storage.saveDraft(draft),
-      () => storage.saveDraft(draft),
-    );
-    pendingDraftWrite = attempt.catch(() => {});
-    return attempt;
-  };
-  const readDraft = (storage: StoragePort): Promise<LoggingDraft> => {
-    const attempt = pendingDraftWrite.then(() => openLoggingForm(storage));
-    pendingDraftWrite = attempt.then(
-      () => undefined,
-      () => undefined,
-    );
-    return attempt;
-  };
+  ): Promise<void> => enqueueDraftOp(() => storage.saveDraft(draft));
+  const readDraft = (storage: StoragePort): Promise<LoggingDraft> =>
+    enqueueDraftOp(() => openLoggingForm(storage));
 
   /**
    * Shared by `deleteBlock`/`deleteExerciseEntry`/`deleteSet`: applies the
@@ -284,18 +304,32 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       // Captured synchronously, before awaiting anything below — a
       // concurrent action's own optimistic `set()` call (e.g. `addSet`)
       // always runs synchronously too, so capturing these any later (after
-      // the `pendingDraftWrite` wait just below, say) risks absorbing that
-      // same mutation into "before" instead of detecting it as a change.
+      // the queue wait just below, say) risks absorbing that same mutation
+      // into "before" instead of detecting it as a change.
       const draftBeforeReads = get().draft;
       const catalogueBeforeReads = get().catalogue;
       const bandLabelsBeforeReads = get().bandLabels;
-      // `readDraft` (not `openLoggingForm` directly) queues this read
-      // behind whatever draft write is already pending — a debounced
+      // `readDraft` (not calling `openLoggingForm` directly) queues this
+      // read behind whatever draft write is already pending — a debounced
       // commit (ADR-0007's timer outlives unmount) can be mid-write right
       // as this runs, and reading around it can otherwise return the
       // pre-write snapshot even though nothing further mutates `draft` in
       // our own window, which the before/after identity check right after
       // can't catch on its own (Copilot review, PR #22).
+      //
+      // `catalogue`/`bandLabels` below are deliberately *not* queued the
+      // same way: unlike the single draft, `createExercise`/
+      // `updateExerciseTemplate` are designed to run concurrently against
+      // each other (each keeps its own optimistic entry by reference —
+      // see `updateExerciseTemplate`'s rollback below — precisely so one
+      // slow write can't block or corrupt another), and queuing this read
+      // behind them would either serialize writes that must stay
+      // concurrent or still race a write that hasn't reached the queue
+      // yet. The before/after identity check right after this still
+      // catches a write that lands *during* this read; a write already in
+      // flight before it started remains a narrower, unclosed gap here
+      // (Copilot review, PR #22) — closing it needs per-exercise
+      // conflict tracking on the read side, not a write-side queue.
       const [draft, catalogue, sessions, bandLabels] = await Promise.all([
         readDraft(storage),
         storage.listExercises(),
@@ -393,6 +427,8 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     createExercise: async (input) => {
       const { storage } = get();
       if (!storage) throw new Error('useLoggingSession: not configured yet.');
+      // Not queued — deliberately concurrent with `updateExerciseTemplate`
+      // (see that action's own comment below).
       const exercise = await createExerciseUseCase(storage, input);
       set((state) => ({ catalogue: [...state.catalogue, exercise] }));
       return exercise;
@@ -410,6 +446,13 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
         ),
       }));
       try {
+        // Not queued against `createExercise`/another concurrent
+        // `updateExerciseTemplate` call — each keeps and rolls back only
+        // its own optimistic entry by reference (below), so two of these
+        // are designed to run concurrently without corrupting each
+        // other's result; serializing them here would only add latency
+        // for no correctness gain, and would block a `createExercise`
+        // behind an unrelated slow write it has no relation to.
         await updateExerciseTemplateUseCase(storage, exerciseId, template);
       } catch (error) {
         // Roll back only this call's own optimistic entry, by reference —
@@ -487,7 +530,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       toBlockId,
       toIndex,
     ) => {
-      const { storage, draft: current } = get();
+      const { storage, draft: current, lastAddedSetId } = get();
       if (!storage || !current) return;
       const updated = touch(
         moveExerciseAcrossBlocksInDraft(
@@ -498,7 +541,22 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
           toIndex,
         ),
       );
-      set({ draft: updated });
+      // Moving an entry to a different block remounts its set rows under a
+      // new `BlockCard` — a different parent, even with the same `key` —
+      // so if the marked "just added" set lives in this entry, that remount
+      // would replay its entrance animation even though nothing was
+      // actually just logged (Copilot review, PR #22).
+      const movedEntryHadMarkedSet =
+        lastAddedSetId !== undefined &&
+        (current.blocks
+          .find((block) => block.id === fromBlockId)
+          ?.exercises.find((entry) => entry.id === entryId)
+          ?.sets.some((s) => s.id === lastAddedSetId) ??
+          false);
+      set({
+        draft: updated,
+        ...(movedEntryHadMarkedSet ? { lastAddedSetId: undefined } : {}),
+      });
       await persistDraft(storage, updated);
     },
 
@@ -555,13 +613,21 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     // in-memory `draft` copy is stale once that happens server-side, so
     // both actions re-fetch draft + catalogue from storage afterward
     // rather than trying to replicate the repoint/prune logic locally.
+    // The rewrite itself joins *both* queues (`enqueueOnBoth`) since it
+    // touches both slices; the re-fetch then queues each half on its own
+    // matching queue. Run unqueued, an unrelated in-flight write (e.g. a
+    // debounced commit) could land between the rewrite and the re-fetch,
+    // or after either, and silently overwrite the rewrite's own result
+    // (Copilot review, PR #22).
     mergeExercises: async (survivorId, loserId) => {
       const { storage } = get();
       if (!storage) return;
-      await mergeExercisesUseCase(storage, survivorId, loserId);
+      await enqueueOnBoth(() =>
+        mergeExercisesUseCase(storage, survivorId, loserId),
+      );
       const [draft, catalogue] = await Promise.all([
-        storage.getDraft(),
-        storage.listExercises(),
+        enqueueDraftOp(() => storage.getDraft()),
+        enqueueCatalogueOp(() => storage.listExercises()),
       ]);
       set({ draft, catalogue });
     },
@@ -569,15 +635,17 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     deleteExerciseCascade: async (exerciseId, hasHistory, confirmed) => {
       const { storage } = get();
       if (!storage) return;
-      await deleteExerciseCascadeUseCase(
-        storage,
-        exerciseId,
-        hasHistory,
-        confirmed,
+      await enqueueOnBoth(() =>
+        deleteExerciseCascadeUseCase(
+          storage,
+          exerciseId,
+          hasHistory,
+          confirmed,
+        ),
       );
       const [draft, catalogue] = await Promise.all([
-        storage.getDraft(),
-        storage.listExercises(),
+        enqueueDraftOp(() => storage.getDraft()),
+        enqueueCatalogueOp(() => storage.listExercises()),
       ]);
       set({ draft, catalogue });
     },

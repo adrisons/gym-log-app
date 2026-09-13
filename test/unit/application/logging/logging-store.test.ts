@@ -534,3 +534,72 @@ describe('useLoggingSession.updateExerciseTemplate (docs/requirements.md §7.1)'
     expect(catalogue.find((e) => e.id === exerciseId)?.trackEffort).toBe(false);
   });
 });
+
+describe('useLoggingSession.mergeExercises (Copilot review, PR #22)', () => {
+  it('queues a concurrent draft write behind an in-flight merge, instead of letting it land unordered against the merge’s own draft rewrite', async () => {
+    const storage = new InMemoryStorage();
+    const survivorId = 'ex-survivor' as ExerciseId;
+    const loserId = 'ex-loser' as ExerciseId;
+    await storage.saveExercise({
+      id: survivorId,
+      canonicalName: 'Back squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveExercise({
+      id: loserId,
+      canonicalName: 'Barbell squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+
+    let releaseMerge = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseMerge = resolve;
+    });
+    const originalMergeExercises = storage.mergeExercises.bind(storage);
+    vi.spyOn(storage, 'mergeExercises').mockImplementation(async (a, b) => {
+      await gate;
+      return originalMergeExercises(a, b);
+    });
+
+    const mergePromise = useLoggingSession
+      .getState()
+      .mergeExercises(survivorId, loserId);
+
+    let addExerciseEntryResolved = false;
+    const addExerciseEntryPromise = useLoggingSession
+      .getState()
+      .addExerciseEntry(survivorId)
+      .then(() => {
+        addExerciseEntryResolved = true;
+      });
+
+    // Give any not-actually-queued microtasks a chance to run — if
+    // `addExerciseEntry` weren't queued behind the gated merge, its own
+    // (ungated) storage write would have already resolved by now.
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(addExerciseEntryResolved).toBe(false);
+
+    releaseMerge();
+    await mergePromise;
+    await addExerciseEntryPromise;
+
+    expect(addExerciseEntryResolved).toBe(true);
+    expect(
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.exerciseId,
+    ).toBe(survivorId);
+  });
+});
