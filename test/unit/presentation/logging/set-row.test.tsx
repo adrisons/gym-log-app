@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { SetRow, COMMIT_DEBOUNCE_MS } from '@/presentation/logging/set-row';
+import { SetRow } from '@/presentation/logging/set-row';
 
 const baseProps = {
   loadKind: 'weight' as const,
@@ -12,25 +12,41 @@ const baseProps = {
   onSaveBandLabels: () => {},
 };
 
-/** Real time, real waiting: mixing `userEvent` with vitest's fake timers
- * deadlocks (userEvent's own internal delays need real timers), so these
- * tests wait out the actual debounce window instead of simulating it. */
-function waitForCommit(onConfirm: ReturnType<typeof vi.fn>) {
-  return waitFor(() => expect(onConfirm).toHaveBeenCalled(), {
-    timeout: COMMIT_DEBOUNCE_MS + 1000,
-  });
+function confirmButton() {
+  return screen.getByRole('button', { name: /add set/i });
 }
 
-describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, ADR-0007)', () => {
-  it('shows a stated reason instead of any control until a load or volume is entered (FR-019)', () => {
+describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, ADR-0010)', () => {
+  it('the Confirm button is disabled and a reason is shown until every field the template asks for is filled (FR-019, ADR-0010)', () => {
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
 
+    expect(confirmButton()).toBeDisabled();
     expect(
-      screen.getByText(/enter a load or a rep count/i),
+      screen.getByText(/enter a weight and a rep count/i),
     ).toBeInTheDocument();
+  });
+
+  it('names only the still-missing field once the other is filled, not both (the exact bug this design fixes)', async () => {
+    render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
+
+    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
+    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+
+    expect(confirmButton()).toBeDisabled();
     expect(
-      screen.queryByRole('button', { name: /repeat last set/i }),
-    ).not.toBeInTheDocument();
+      screen.getByText(/^enter a weight to record this set\.$/i),
+    ).toBeInTheDocument();
+  });
+
+  it('filling only reps never confirms a Weight-tracked set on its own — the button stays disabled (regression: used to silently save load "none")', async () => {
+    const onConfirm = vi.fn();
+    render(<SetRow {...baseProps} prefill={undefined} onConfirm={onConfirm} />);
+
+    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
+    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.click(confirmButton());
+
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
   it('shows only the load input and volume control the template says — no load-type or volume-kind switcher', () => {
@@ -63,101 +79,68 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     ).toBeInTheDocument();
   });
 
-  it('there is no confirm control anywhere on the row (ADR-0007, FR-003)', () => {
-    render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
+  it('nothing is recorded from filling in fields alone — Confirm must be pressed (ADR-0010, supersedes ADR-0007)', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        loadKind="none"
+        prefill={undefined}
+        onConfirm={onConfirm}
+      />,
+    );
 
-    expect(
-      screen.queryByRole('button', { name: /add set/i }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText(/^save$/i)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
+    await userEvent.keyboard('{ArrowDown}'.repeat(8));
+
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  it(
-    'entering reps commits a set with load "none" once the debounce settles, not per keystroke (ADR-0007, FR-019)',
-    async () => {
-      const onConfirm = vi.fn();
-      render(
-        <SetRow
-          {...baseProps}
-          loadKind="none"
-          prefill={undefined}
-          onConfirm={onConfirm}
-        />,
-      );
+  it('pressing Confirm records the set with load "none" once reps alone satisfies the template', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        loadKind="none"
+        prefill={undefined}
+        onConfirm={onConfirm}
+      />,
+    );
 
-      await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
-      await userEvent.keyboard('{ArrowDown}'.repeat(8));
+    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
+    await userEvent.keyboard('{ArrowDown}'.repeat(8));
+    await userEvent.click(confirmButton());
 
-      // Not committed yet — the debounce window hasn't elapsed.
-      expect(onConfirm).not.toHaveBeenCalled();
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith({
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+  });
 
-      await waitForCommit(onConfirm);
+  it('filling weight then reps and pressing Confirm records exactly one set with both', async () => {
+    const onConfirm = vi.fn();
+    render(<SetRow {...baseProps} prefill={undefined} onConfirm={onConfirm} />);
 
-      // Exactly one set, with the final settled value — not one per
-      // intermediate arrow-key step along the way to 8.
-      expect(onConfirm).toHaveBeenCalledTimes(1);
-      expect(onConfirm).toHaveBeenCalledWith({
-        volume: { kind: 'reps', count: 8 },
-        load: { kind: 'none' },
-        setKind: 'working',
-      });
-    },
-    COMMIT_DEBOUNCE_MS + 2000,
-  );
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /weight/i }),
+      '60',
+    );
+    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
+    await userEvent.keyboard('{ArrowDown}'.repeat(8));
+    await userEvent.click(confirmButton());
 
-  it(
-    'typing a weight commits it as a Weight load, ≥ 0, once the debounce settles (FR-026, ADR-0007)',
-    async () => {
-      const onConfirm = vi.fn();
-      render(
-        <SetRow {...baseProps} prefill={undefined} onConfirm={onConfirm} />,
-      );
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith({
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'weight', value: 60, unit: 'kg' },
+      setKind: 'working',
+    });
+  });
 
-      await userEvent.type(
-        screen.getByRole('spinbutton', { name: /weight/i }),
-        '60',
-      );
-      expect(onConfirm).not.toHaveBeenCalled();
-
-      await waitForCommit(onConfirm);
-
-      expect(onConfirm).toHaveBeenCalledTimes(1);
-      expect(onConfirm).toHaveBeenCalledWith({
-        load: { kind: 'weight', value: 60, unit: 'kg' },
-        setKind: 'working',
-      });
-    },
-    COMMIT_DEBOUNCE_MS + 2000,
-  );
-
-  it(
-    'filling weight then reps in quick succession commits exactly one set with both, not one per field (multi-field debounce regression)',
-    async () => {
-      const onConfirm = vi.fn();
-      render(
-        <SetRow {...baseProps} prefill={undefined} onConfirm={onConfirm} />,
-      );
-
-      await userEvent.type(
-        screen.getByRole('spinbutton', { name: /weight/i }),
-        '60',
-      );
-      await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
-      await userEvent.keyboard('{ArrowDown}'.repeat(8));
-
-      await waitForCommit(onConfirm);
-
-      expect(onConfirm).toHaveBeenCalledTimes(1);
-      expect(onConfirm).toHaveBeenCalledWith({
-        volume: { kind: 'reps', count: 8 },
-        load: { kind: 'weight', value: 60, unit: 'kg' },
-        setKind: 'working',
-      });
-    },
-    COMMIT_DEBOUNCE_MS + 2000,
-  );
-
-  it("pre-fills from the previous set's load/volume when it matches the current template and offers a single-tap repeat (FR-008, ADR-0007)", () => {
+  it("pre-fills from the previous set's load/volume when it matches the current template, ready for a single Confirm tap (FR-008)", async () => {
+    const onConfirm = vi.fn();
     render(
       <SetRow
         {...baseProps}
@@ -165,7 +148,7 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
           volume: { kind: 'reps', count: 5 },
           load: { kind: 'weight', value: 100, unit: 'kg' },
         }}
-        onConfirm={() => {}}
+        onConfirm={onConfirm}
       />,
     );
 
@@ -176,27 +159,9 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
       'aria-selected',
       'true',
     );
-    expect(
-      screen.getByRole('button', { name: /repeat last set/i }),
-    ).toBeInTheDocument();
-  });
+    expect(confirmButton()).toBeEnabled();
 
-  it('tapping "Repeat last set" confirms the pre-filled set unchanged, immediately (no debounce)', async () => {
-    const onConfirm = vi.fn();
-    render(
-      <SetRow
-        {...baseProps}
-        prefill={{
-          volume: { kind: 'reps', count: 5 },
-          load: { kind: 'weight', value: 100, unit: 'kg' },
-        }}
-        onConfirm={onConfirm}
-      />,
-    );
-
-    await userEvent.click(
-      screen.getByRole('button', { name: /repeat last set/i }),
-    );
+    await userEvent.click(confirmButton());
 
     expect(onConfirm).toHaveBeenCalledWith({
       volume: { kind: 'reps', count: 5 },
@@ -205,37 +170,7 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     });
   });
 
-  it(
-    '"Repeat last set" disappears the instant the user edits anything, and does not itself schedule a duplicate commit',
-    async () => {
-      const onConfirm = vi.fn();
-      render(
-        <SetRow
-          {...baseProps}
-          prefill={{
-            volume: { kind: 'reps', count: 5 },
-            load: { kind: 'weight', value: 100, unit: 'kg' },
-          }}
-          onConfirm={onConfirm}
-        />,
-      );
-
-      await userEvent.type(
-        screen.getByRole('spinbutton', { name: /weight/i }),
-        '5',
-      );
-
-      expect(
-        screen.queryByRole('button', { name: /repeat last set/i }),
-      ).not.toBeInTheDocument();
-
-      await waitForCommit(onConfirm);
-      expect(onConfirm).toHaveBeenCalledTimes(1);
-    },
-    COMMIT_DEBOUNCE_MS + 2000,
-  );
-
-  it('does not offer "Repeat last set" with no previous set to repeat, even if the row is already valid', () => {
+  it('a fresh Bodyweight row still needs its volume filled — Bodyweight load alone is not enough (ADR-0010: every template field is required to add a set)', async () => {
     render(
       <SetRow
         {...baseProps}
@@ -245,29 +180,12 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
       />,
     );
 
-    expect(
-      screen.queryByRole('button', { name: /repeat last set/i }),
-    ).not.toBeInTheDocument();
-  });
+    expect(confirmButton()).toBeDisabled();
 
-  it('offers "Log this set" for a fresh, untouched Bodyweight-only row with nothing else required, and it commits immediately (no debounce)', async () => {
-    const onConfirm = vi.fn();
-    render(
-      <SetRow
-        {...baseProps}
-        loadKind="bodyweight"
-        prefill={undefined}
-        onConfirm={onConfirm}
-      />,
-    );
+    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
+    await userEvent.keyboard('{ArrowDown}'.repeat(5));
 
-    const button = screen.getByRole('button', { name: /log this set/i });
-    await userEvent.click(button);
-
-    expect(onConfirm).toHaveBeenCalledWith({
-      load: { kind: 'bodyweight' },
-      setKind: 'working',
-    });
+    expect(confirmButton()).toBeEnabled();
   });
 
   it('normalizes an out-of-range historical rep-count prefill instead of offering it under an "unset" wheel (out-of-range-prefill regression)', async () => {
@@ -290,17 +208,8 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
       'aria-selected',
       'true',
     );
-
-    // ...and the weight alone (still pre-filled) already makes "Repeat
-    // last set" available without the stale out-of-range count.
-    await userEvent.click(
-      screen.getByRole('button', { name: /repeat last set/i }),
-    );
-
-    expect(onConfirm).toHaveBeenCalledWith({
-      load: { kind: 'weight', value: 100, unit: 'kg' },
-      setKind: 'working',
-    });
+    // ...so Confirm stays disabled until reps is re-entered.
+    expect(confirmButton()).toBeDisabled();
   });
 
   it("ignores a prefill whose load kind no longer matches the exercise's template", () => {
@@ -322,34 +231,6 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     expect(screen.getByRole('radio', { name: 'Red' })).toBeInTheDocument();
   });
 
-  it('labels the control "Log this set", not "Repeat last set", for a fresh Bodyweight row whose prefill is from a different, no-longer-matching load kind (mismatched-prefill regression)', async () => {
-    const onConfirm = vi.fn();
-    render(
-      <SetRow
-        {...baseProps}
-        loadKind="bodyweight"
-        prefill={{
-          load: { kind: 'weight', value: 100, unit: 'kg' },
-        }}
-        onConfirm={onConfirm}
-      />,
-    );
-
-    expect(
-      screen.queryByRole('button', { name: /repeat last set/i }),
-    ).not.toBeInTheDocument();
-    const button = screen.getByRole('button', { name: /log this set/i });
-
-    await userEvent.click(button);
-
-    // Commits the current (plain Bodyweight) state, not the mismatched
-    // historical weight prefill — there is nothing to "repeat" here.
-    expect(onConfirm).toHaveBeenCalledWith({
-      load: { kind: 'bodyweight' },
-      setKind: 'working',
-    });
-  });
-
   it('the weight field has no dedicated quick-increment buttons (numeric keypad only)', () => {
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
 
@@ -361,83 +242,193 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     ).not.toBeInTheDocument();
   });
 
-  it(
-    'selecting a band commits it as a Band load once the debounce settles, no expand step',
-    async () => {
-      const onConfirm = vi.fn();
-      render(
-        <SetRow
-          {...baseProps}
-          loadKind="band"
-          prefill={undefined}
-          onConfirm={onConfirm}
-        />,
-      );
+  it('selecting a band and pressing Confirm records it as a Band load, no expand step', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        loadKind="band"
+        volumeKind="reps"
+        prefill={undefined}
+        onConfirm={onConfirm}
+      />,
+    );
 
-      await userEvent.click(screen.getByRole('radio', { name: 'Red' }));
-      await waitForCommit(onConfirm);
+    await userEvent.click(screen.getByRole('radio', { name: 'Red' }));
+    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
+    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.click(confirmButton());
 
-      expect(onConfirm).toHaveBeenCalledWith({
-        load: { kind: 'band', label: 'Red' },
-        setKind: 'working',
-      });
-    },
-    COMMIT_DEBOUNCE_MS + 2000,
-  );
+    expect(onConfirm).toHaveBeenCalledWith({
+      volume: { kind: 'reps', count: 5 },
+      load: { kind: 'band', label: 'Red' },
+      setKind: 'working',
+    });
+  });
 
-  it(
-    'Bodyweight with no component is valid once the added/assisted field is touched and the debounce settles (US3, Acceptance Scenario 3.5)',
-    async () => {
-      const onConfirm = vi.fn();
-      render(
-        <SetRow
-          {...baseProps}
-          loadKind="bodyweight"
-          prefill={undefined}
-          onConfirm={onConfirm}
-        />,
-      );
+  it('Bodyweight with no component is confirmable once the volume is filled (US3, Acceptance Scenario 3.5)', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        loadKind="bodyweight"
+        prefill={undefined}
+        onConfirm={onConfirm}
+      />,
+    );
 
-      await userEvent.type(
-        screen.getByRole('spinbutton', { name: /added.*assisted/i }),
-        '10',
-      );
-      await waitForCommit(onConfirm);
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /added.*assisted/i }),
+      '10',
+    );
+    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
+    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.click(confirmButton());
 
-      expect(onConfirm).toHaveBeenCalledWith({
-        load: { kind: 'bodyweight', addedOrAssistedKg: 10 },
-        setKind: 'working',
-      });
-    },
-    COMMIT_DEBOUNCE_MS + 2000,
-  );
+    expect(onConfirm).toHaveBeenCalledWith({
+      volume: { kind: 'reps', count: 5 },
+      load: { kind: 'bodyweight', addedOrAssistedKg: 10 },
+      setKind: 'working',
+    });
+  });
 
-  it(
-    'selecting an effort level includes it, always paired with its word label, and commits once settled (ADR-0003)',
-    async () => {
-      const onConfirm = vi.fn();
-      render(
-        <SetRow
-          {...baseProps}
-          trackEffort
-          prefill={undefined}
-          onConfirm={onConfirm}
-        />,
-      );
+  it('selecting an effort level includes it, always paired with its word label (ADR-0003)', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        trackEffort
+        prefill={undefined}
+        onConfirm={onConfirm}
+      />,
+    );
 
-      await userEvent.type(
-        screen.getByRole('spinbutton', { name: /weight/i }),
-        '20',
-      );
-      await userEvent.click(screen.getByRole('listbox', { name: /^effort$/i }));
-      await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}');
-      await waitForCommit(onConfirm);
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /weight/i }),
+      '20',
+    );
+    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
+    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.click(screen.getByRole('listbox', { name: /^effort$/i }));
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}');
+    await userEvent.click(confirmButton());
 
-      expect(onConfirm).toHaveBeenCalledTimes(1);
-      expect(onConfirm).toHaveBeenCalledWith(
-        expect.objectContaining({ effort: 3 }),
-      );
-    },
-    COMMIT_DEBOUNCE_MS + 2000,
-  );
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ effort: 3 }),
+    );
+  });
+});
+
+describe('SetRow editing an existing set in place (ADR-0010)', () => {
+  it('pre-fills every field — including effort — from the set being edited, using its own load/volume kind', () => {
+    render(
+      <SetRow
+        {...baseProps}
+        loadKind="bodyweight"
+        volumeKind="duration"
+        trackEffort
+        prefill={undefined}
+        editingSet={{
+          load: { kind: 'weight', value: 80, unit: 'kg' },
+          volume: { kind: 'reps', count: 6 },
+          effort: 4,
+        }}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('spinbutton', { name: /weight/i })).toHaveValue(80);
+    expect(screen.getByRole('option', { name: '6' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByRole('option', { name: '4 — Hard' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  it('shows a Cancel button only when onCancel is given, labels Confirm "Save changes", and requires only the domain minimum', async () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        prefill={undefined}
+        editingSet={{ load: { kind: 'weight', value: 80, unit: 'kg' } }}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />,
+    );
+
+    // A load alone is already enough to edit — the stricter add-mode
+    // "both fields the template tracks" rule doesn't apply here.
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeEnabled();
+
+    await userEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+    expect(onCancel).toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('confirms the edited values, not the exercise template it was originally recorded under', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        loadKind="bodyweight"
+        prefill={undefined}
+        editingSet={{
+          load: { kind: 'weight', value: 80, unit: 'kg' },
+          volume: { kind: 'reps', count: 6 },
+        }}
+        onConfirm={onConfirm}
+        onCancel={() => {}}
+      />,
+    );
+
+    const weightField = screen.getByRole('spinbutton', { name: /weight/i });
+    await userEvent.clear(weightField);
+    await userEvent.type(weightField, '85');
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    expect(onConfirm).toHaveBeenCalledWith({
+      volume: { kind: 'reps', count: 6 },
+      load: { kind: 'weight', value: 85, unit: 'kg' },
+      setKind: 'working',
+    });
+  });
+
+  it('preserves a previously recorded effort even when the template no longer tracks it', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        trackEffort={false}
+        prefill={undefined}
+        editingSet={{
+          load: { kind: 'weight', value: 80, unit: 'kg' },
+          volume: { kind: 'reps', count: 6 },
+          effort: 5,
+        }}
+        onConfirm={onConfirm}
+        onCancel={() => {}}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('listbox', { name: /effort/i }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ effort: 5 }),
+    );
+  });
 });

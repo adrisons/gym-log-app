@@ -281,12 +281,26 @@ Create a session and add blocks, exercises and sets.
   field for an exercise — each set is its own record, and the heaviest one,
   the best one, or a session total is a computation over that entry's sets
   (§5), never a fact entered separately.
-- **(ADR-0007, supersedes the wording above)** Adding a set defaults to the
-  previous set's values (unchanged), but "confirming is one tap" no longer
-  names a general confirm control — there is none. Recording an *identical*
-  repeat of the previous set (the pre-filled row, untouched) is still one
-  tap, on a control explicitly labelled for that ("Repeat last set"), never
-  a generic "confirm"/"Add set" action offered on every set.
+- **(ADR-0007, superseded in turn by ADR-0010 below)** Adding a set defaults
+  to the previous set's values (unchanged), but "confirming is one tap" no
+  longer names a general confirm control — there is none. Recording an
+  *identical* repeat of the previous set (the pre-filled row, untouched) is
+  still one tap, on a control explicitly labelled for that ("Repeat last
+  set"), never a generic "confirm"/"Add set" action offered on every set.
+- **(ADR-0010, supersedes both bullets above)** Adding a set has an explicit
+  Confirm ("Add set") button again — no field edit, alone, records anything.
+  The button stays disabled, with a status line naming exactly what is
+  still missing, until every field the exercise's *current* template
+  actually tracks is filled (not merely "a load or a volume" — the loosest
+  case a `Set` can legally hold, per §3.3, which is no longer enough to
+  enable Confirm when the template tracks both a load and a volume kind).
+  "Repeat last set"/"Log this set" are retired: a pre-filled row is simply
+  already valid, so Confirm is enabled immediately and one tap still
+  suffices for an identical repeat, matching this FR's original "one tap"
+  intent without a separately-labelled control. Editing an already-recorded
+  set in place (new — spec 001 never had this) uses the same form and the
+  domain-minimum rule (a load or a volume present) rather than the fuller
+  per-field requirement, since it starts from an already-valid set.
 
 ### FR-4 — Effort `[v1]`
 
@@ -310,6 +324,12 @@ Create a session and add blocks, exercises and sets.
   and there is no user-facing discipline picker — the field exists in the
   data so a future discipline (D8) is additive, not a rework.
 - Merge duplicates from the catalogue screen.
+- **(ADR-0010)** The catalogue screen (`/exercises`) also creates a brand-new
+  exercise directly — name plus its set-entry template (load type, volume
+  kind, whether effort is tracked — ADR-0006) together, the same controls
+  the template editor itself uses — and edits an existing exercise's
+  template from its own management panel, not only from a per-entry menu
+  on the logging/session-detail screens (which keep that shortcut too).
 
 ### FR-6 — Diary / history `[v1]`
 
@@ -604,11 +624,12 @@ before code.
 | D9 | Whether the app ships a seed exercise catalogue | **Closed:** yes — a seed set of common strength exercises is present from first launch so there is no empty state on the logging critical path; seed entries are ordinary editable catalogue entries and the list is app-bundle data, not persisted schema. → ADR-0005 |
 | D10 | Whether the app tracks body composition (weight, body fat, etc.) | **Closed:** no — removed from scope entirely, in any version. This application is exercises and training metrics only; it never records body measurements. FR-10 (previously "Body composition") is retired; its ID is left unassigned rather than renumbering the FRs after it. |
 | D11 | What happens to a Set's history when an exercise's set-entry template changes | **Closed:** nothing — the template (default load type, default volume kind, whether effort is tracked) only decides what a *new* set defaults to; every already-recorded Set keeps exactly what it was given, no reconciliation or deprecation. Schema v2. → ADR-0006 |
-| D12 | Whether recording a set requires an explicit confirm step | **Closed:** no — a set commits automatically the moment the user's own edit makes it valid (FR-3); the previous generic confirm control is retired, with a narrow "Repeat last set" control kept for the one case (an untouched, pre-filled row) an automatic trigger has nothing to anchor to. No schema change. → ADR-0007 |
+| D12 | Whether recording a set requires an explicit confirm step | **Superseded by D17 below.** Originally closed as no — see ADR-0007's own text for that reasoning, no longer current. → ADR-0007, superseded by ADR-0010 |
 | D13 | Whether generating a shareable image for external platforms (e.g. Instagram) falls under the constitution's "social network" non-goal | **Closed:** no — it is a one-way, on-device export (render an image locally, hand off via the platform's native share sheet or a saved file), not a multi-user or in-app social feature. No account, no backend, no peer visibility, no third-party posting API; consistent with Invariant 1 (nothing leaves the device without the user explicitly choosing to send it). Targeted at the "Later" phase (§9), not MVP/v1/v1.1. → FR-14 |
 | D14 | Whether adding a field to Settings (per-device preference state, not a canonical entity) requires the §6/Principle III schema-version-bump-and-migration treatment | **Closed:** no — that treatment applies only to the canonical entities in §3.1 (Session, Block, Exercise entry, Set, Exercise catalogue). A Settings field defaults silently when absent: no version bump, no ADR, no migration. Matches the precedent already set in `specs/006-settings-data/spec.md`; §6 amended below with this scope note so future specs don't re-litigate it. |
 | D15 | Whether a Block can carry a target round count, and what it means | **Closed:** yes — an optional integer field on `Block` naming how many times the whole block is meant to be repeated (e.g. "3 rounds" of a circuit), independent of and never inferred from how many sets each exercise entry in it has actually logged. Additive, optional, no default value backfilled for existing blocks. Schema v3. → ADR-0008 |
-| D16 | Whether a workout (the logging draft) becomes a Session automatically, or only when the user explicitly says so | **Closed:** explicitly — an explicit "Log workout" action is the only way a draft becomes a Session; the previous automatic day-rollover promotion is removed. Recording a *set* is unaffected and stays exactly as immediate as D12 already made it (no confirm step, no waiting) — this decision is scoped to the session-level "commit to the diary" step only. A draft with no block at all is never persisted; a draft with at least one block persists and, if left unregistered, is offered (never auto-loaded) as a recovery banner the next time the logging form opens. No schema change: `LoggingDraft`'s shape and the storage port are unaffected. "One draft per training type" is not built by this decision — it collapses to the single existing draft, since only the Strength discipline is implemented today (D8). → ADR-0009 |
+| D16 | Whether a workout (the logging draft) becomes a Session automatically, or only when the user explicitly says so | **Closed:** explicitly — an explicit "Log workout" action is the only way a draft becomes a Session; the previous automatic day-rollover promotion is removed. Recording a *set* is unaffected — this decision is scoped to the session-level "commit to the diary" step only. A draft with no block at all is never persisted; a draft with at least one block persists and, if left unregistered, is offered (never auto-loaded) as a recovery banner the next time the logging form opens. No schema change: `LoggingDraft`'s shape and the storage port are unaffected. "One draft per training type" is not built by this decision — it collapses to the single existing draft, since only the Strength discipline is implemented today (D8). → ADR-0009 |
+| D17 | Whether recording a set requires an explicit confirm step (reopens D12); whether an already-recorded set can be edited in place; whether the per-exercise progression view (FR-013) stays reachable from a session detail view; whether the `/exercises` screen can create a new catalogue Exercise and edit an existing one's set-entry template | **Closed, all together (one design-refinement pass):** (1) Confirm is explicit again — a set commits only on an explicit "Add set"/"Save changes" tap, enabled only once every field the exercise's current template tracks is filled; the auto-commit-on-edit behavior and its "Repeat last set"/"Log this set" controls (D12/ADR-0007) are retired. (2) A `Set` can now be edited in place (load/volume/effort), not only added or deleted — new capability, still no schema change (`Set`'s shape is unaffected; only *how* one is produced changes). (3) A session detail view's per-exercise entries no longer link to the progression screen — for now, that stays reachable only from search results (spec 004 FR-013) and Insights (spec 005); FR-013 is amended accordingly, not removed (the progression screen itself, and its other two entry points, are unaffected). (4) The `/exercises` screen (spec 004 FR-5) gains "New exercise" (name + set-entry template together) alongside its existing rename/merge/delete, and its management panel gains "Edit tracked fields…" (ADR-0006) for an existing exercise — previously only reachable per-entry from the logging/session-detail screens. No schema change for (3) or (4) either — purely which screens link where, and use-cases (`createExercise`, `updateExerciseTemplate`) both already existed. → ADR-0010 |
 
 ---
 

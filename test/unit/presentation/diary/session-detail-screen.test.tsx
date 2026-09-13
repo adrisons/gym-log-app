@@ -75,6 +75,9 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     });
     expect(screen.getByText('100 kg')).toBeInTheDocument();
 
+    await userEvent.click(
+      screen.getByRole('button', { name: /100 kg 5 reps actions/i }),
+    );
     await userEvent.click(screen.getByText('Delete set'));
 
     await waitFor(async () => {

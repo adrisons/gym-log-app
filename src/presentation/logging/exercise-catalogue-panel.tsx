@@ -20,6 +20,11 @@ export interface ExerciseCataloguePanelProps {
   onRename: (newName: string) => Promise<RenameExerciseResult>;
   onMerge: (survivorId: ExerciseId, loserId: ExerciseId) => void;
   onDeleteConfirm: () => void;
+  /** ADR-0010: opens the exercise's set-entry template editor
+   * (`ExerciseTemplatePanel`, ADR-0006) — closes this panel first, the
+   * same one-dialog-at-a-time convention `ExerciseEntryCard`'s own
+   * "Edit tracked fields…" menu item follows. */
+  onEditTemplate: () => void;
   onClose: () => void;
 }
 
@@ -32,6 +37,7 @@ export function ExerciseCataloguePanel({
   onRename,
   onMerge,
   onDeleteConfirm,
+  onEditTemplate,
   onClose,
 }: ExerciseCataloguePanelProps) {
   const [mode, setMode] = useState<Mode>('rename');
@@ -109,6 +115,15 @@ export function ExerciseCataloguePanel({
               </button>
             </div>
           )}
+
+          <button
+            type="button"
+            className="logging-button logging-button--icon-label"
+            onClick={onEditTemplate}
+          >
+            <Icon name="sliders" />
+            Edit tracked fields…
+          </button>
 
           <button
             type="button"

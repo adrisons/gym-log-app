@@ -404,6 +404,54 @@ export function addSet(
   };
 }
 
+/**
+ * ADR-0010: edits an already-recorded set in place — spec 001 never had
+ * this capability (a confirmed set could only be added or deleted), added
+ * alongside restoring an explicit confirm step. Validates via domain
+ * `createSet`, the same as `addSet`; the caller/UI must not offer a
+ * confirm control until this would succeed (`SetRow`'s own `canConfirm`).
+ * A no-op (returns `draft` unchanged) if `entryId`/`setId` don't resolve.
+ */
+export function updateSet(
+  draft: LoggingDraft,
+  blockId: string,
+  entryId: string,
+  setId: string,
+  input: AddSetInput,
+): LoggingDraft {
+  const entry = findEntry(draft, blockId, entryId);
+  const index = entry ? entry.sets.findIndex((s) => s.id === setId) : -1;
+  if (!entry || index === -1) return draft;
+
+  const validated = createSet({
+    ...(input.volume !== undefined ? { volume: input.volume } : {}),
+    load: input.load,
+    ...(input.effort !== undefined ? { effort: input.effort } : {}),
+    setKind: input.setKind,
+    completed: true,
+  });
+  const updatedSet: DraftSet = { id: setId, ...validated };
+
+  return {
+    ...draft,
+    blocks: draft.blocks.map((block) =>
+      block.id !== blockId
+        ? block
+        : {
+            ...block,
+            exercises: block.exercises.map((e) =>
+              e.id !== entryId
+                ? e
+                : {
+                    ...e,
+                    sets: e.sets.map((s) => (s.id === setId ? updatedSet : s)),
+                  },
+            ),
+          },
+    ),
+  };
+}
+
 /** FR-006: appends a new block, unnamed when `name` is omitted. */
 export function addBlock(
   draft: LoggingDraft,

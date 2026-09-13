@@ -462,6 +462,108 @@ describe('useLoggingSession.addSet (ADR-0007 debounce / stale-block-id regressio
   });
 });
 
+describe('useLoggingSession.updateSet (ADR-0010: editing an already-recorded set in place)', () => {
+  it("edits a set's own values, persisting the change and leaving the set count unchanged", async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 5 },
+      load: { kind: 'weight', value: 100, unit: 'kg' },
+      setKind: 'working',
+    });
+    const setId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+
+    await useLoggingSession.getState().updateSet(entryId, setId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'weight', value: 110, unit: 'kg' },
+      setKind: 'working',
+    });
+
+    const sets =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets;
+    expect(sets).toHaveLength(1);
+    expect(sets[0]!.id).toBe(setId);
+    expect(sets[0]!.load).toEqual({ kind: 'weight', value: 110, unit: 'kg' });
+    expect(sets[0]!.volume).toEqual({ kind: 'reps', count: 8 });
+
+    const persisted = await storage.getDraft();
+    expect(persisted?.blocks[0]?.exercises[0]?.sets[0]?.load).toEqual({
+      kind: 'weight',
+      value: 110,
+      unit: 'kg',
+    });
+  });
+
+  it("resolves the entry's current block by id, the same as addSet (stale-block-id regression)", async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addBlock('A', 'straightSets');
+    await useLoggingSession.getState().addBlock('B', 'straightSets');
+    const blockA = useLoggingSession.getState().draft!.blocks[0]!.id;
+    const blockB = useLoggingSession.getState().draft!.blocks[1]!.id;
+    await useLoggingSession
+      .getState()
+      .addExerciseEntry('ex-1' as ExerciseId, blockA);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 5 },
+      load: { kind: 'weight', value: 100, unit: 'kg' },
+      setKind: 'working',
+    });
+    const setId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+
+    await useLoggingSession
+      .getState()
+      .moveExerciseAcrossBlocks(blockA, entryId, blockB);
+    await useLoggingSession.getState().updateSet(entryId, setId, {
+      volume: { kind: 'reps', count: 9 },
+      load: { kind: 'weight', value: 100, unit: 'kg' },
+      setKind: 'working',
+    });
+
+    const draft = useLoggingSession.getState().draft!;
+    expect(draft.blocks[0]!.exercises).toHaveLength(0);
+    expect(draft.blocks[1]!.exercises[0]!.sets[0]!.volume).toEqual({
+      kind: 'reps',
+      count: 9,
+    });
+  });
+
+  it('is a no-op when the entry no longer resolves to any block (deleted in the meantime)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const blockId = useLoggingSession.getState().draft!.blocks[0]!.id;
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 5 },
+      load: { kind: 'weight', value: 100, unit: 'kg' },
+      setKind: 'working',
+    });
+    const setId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.sets[0]!.id;
+    await useLoggingSession.getState().deleteExerciseEntry(blockId, entryId);
+
+    await expect(
+      useLoggingSession.getState().updateSet(entryId, setId, {
+        volume: { kind: 'reps', count: 9 },
+        load: { kind: 'weight', value: 100, unit: 'kg' },
+        setKind: 'working',
+      }),
+    ).resolves.toBeUndefined();
+  });
+});
+
 describe('useLoggingSession pending draft (FR-024, FR-027, FR-028; ADR-0008)', () => {
   it('starts empty and unpersisted; nothing is stored until the draft has a block', async () => {
     const storage = new InMemoryStorage();

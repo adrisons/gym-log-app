@@ -464,7 +464,11 @@ result — independently verifiable without blocks, load types, or effort.
   and MUST let the user create a new exercise from that same search field.
 - **FR-003**: The system MUST persist every change (set added, block
   created, exercise added, etc.) automatically, with no explicit save
-  action exposed anywhere in the logging flow.
+  action exposed anywhere in the logging flow. _(Amended by ADR-0010: a set
+  specifically is the one exception now — it requires an explicit Confirm
+  tap (see FR-019, FR-025 below); every other change in this list (block/
+  exercise creation, rename, rounds, etc.) is still saved automatically
+  with no confirm step, unchanged.)_
 - **FR-004**: The system MUST make every destructive action on the logging
   screen (deleting a set, an exercise entry, or a block) undoable for at
   least 5 seconds from the same screen before the undo option disappears.
@@ -486,11 +490,11 @@ result — independently verifiable without blocks, load types, or effort.
 - **FR-008**: The system MUST pre-fill a new set for an exercise with the
   previous set's load and volume for that same exercise, so confirming an
   identical set is a single tap. Effort is deliberately NOT carried forward
-  — it is re-entered or left blank on each set. _(Amended by ADR-0007: there
-  is no general confirm control any more — a freshly-edited valid set
-  commits on its own. "Single tap" now names the dedicated "Repeat last
-  set" control, offered only for a pre-filled row the user has not
-  touched.)_
+  — it is re-entered or left blank on each set. _(Amended by ADR-0007, in
+  turn superseded by ADR-0010: there is a general confirm control again
+  ("Add set"/`SetConfirmControl`) — a pre-filled row is simply already
+  enabled, so "single tap" is satisfied by pressing that same control once,
+  with no separately-labelled "Repeat last set" control needed.)_
 - **FR-009**: The system MUST let the user choose a load type per exercise
   (Weight, Band, Bodyweight, Free text, or None), remember it as that
   exercise's default, and allow overriding it per individual set. _(Amended
@@ -536,9 +540,14 @@ result — independently verifiable without blocks, load types, or effort.
   volume MUST NOT be stored (per `docs/requirements.md` §3.3). Confirming
   such a set MUST store nothing: the confirm action is a silent no-op, or
   the confirm control is unavailable, until the set is valid. _(Amended by
-  ADR-0007: with no general confirm control, this means an edit that still
-  leaves the set invalid simply does not commit anything — same rule,
-  nothing left to tap.)_
+  ADR-0007, in turn superseded by ADR-0010: the confirm control
+  (`SetConfirmControl`) is back, `disabled` rather than unavailable, until
+  the set is valid — this rule's substance (nothing is stored for an
+  invalid set) is unchanged. `docs/requirements.md`'s FR-3 also amends this
+  rule further for *adding* a set specifically: the exercise's current
+  template can require more than this FR's domain-minimum "either one
+  present" — see that document for the fuller add-mode requirement, which
+  does not apply to editing an already-recorded set.)_
 - **FR-020**: Renaming a catalogue exercise MUST NOT change what any past
   set refers to — references are by identifier, never by name.
 - **FR-021**: The system MUST allow more than one session per calendar day,
@@ -609,12 +618,24 @@ result — independently verifiable without blocks, load types, or effort.
 - **FR-025**: When the user confirms a set, the system MUST ignore an
   identical confirmation repeated within a short debounce window (~1
   second); a subsequent identical set confirmed after that window MUST be
-  recorded as a new set. _(Amended by ADR-0007: "confirms" now covers
-  either the automatic commit on a valid edit or a tap on "Repeat last
-  set" — the debounce mechanism is unchanged and applies to both.)_
+  recorded as a new set. _(Amended by ADR-0007, in turn superseded by
+  ADR-0010: "confirms" now means only an explicit tap on
+  `SetConfirmControl` — there is no automatic commit on a valid edit any
+  more, and no separate "Repeat last set" control. The debounce mechanism
+  itself is unchanged, and still exists mainly to guard a double-tap on
+  that one button.)_
 - **FR-026**: A numeric Volume value MUST be greater than 0. A numeric Load
   value (Weight, or the added side of a Bodyweight component) MUST be
   greater than or equal to 0.
+- **FR-029**: The system MUST let the user edit an already-recorded set's
+  load, volume, and effort in place, not only add a new one or delete it.
+  Editing MUST use the set's own load kind and volume kind — never the
+  exercise's *current* template, which may have changed since (ADR-0006) —
+  and MUST accept any edited result that meets FR-019's domain-minimum rule
+  (a load or a volume present), not the fuller per-field requirement FR-003/
+  `docs/requirements.md` FR-3 impose when *adding* a set. An edit that
+  would leave neither present MUST NOT be stored (same as FR-019). _(Added
+  by ADR-0010.)_
 
 ### Key Entities *(include if feature involves data)*
 

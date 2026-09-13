@@ -103,6 +103,21 @@
   outline-offset: 2px;
 }
 
+/* A `role="radio"` option's selected state (LoadTypePicker, the Volume
+   kind radiogroup in ExerciseTemplateFields) — `aria-checked` was already
+   set correctly, but nothing painted a visual difference for it, so a
+   picker looked unselected no matter which option was actually chosen. */
+.logging-button[aria-checked='true'] {
+  background: var(--color-accent);
+  color: var(--color-accent-foreground);
+  border-color: var(--color-accent);
+}
+
+.logging-button[aria-checked='true']:hover {
+  background: var(--color-accent);
+  opacity: 0.9;
+}
+
 .logging-button--primary {
   background: var(--color-accent);
   color: var(--color-accent-foreground);
@@ -228,12 +243,19 @@
 
 .set-summary {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-3);
   align-items: baseline;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   background: var(--color-surface-raised);
   font-family: var(--font-mono);
+}
+
+/* Pins the edit/delete menu to the row's end regardless of how many value
+   spans (load, volume, effort) wrap ahead of it. */
+.set-summary .overflow-menu {
+  margin-left: auto;
 }
 
 /* Plays once, only for the one row `LoggingScreen` marks as the set

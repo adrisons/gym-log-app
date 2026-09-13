@@ -47,20 +47,16 @@ import {
   useLoggingSession,
   draftHasContent,
 } from '@/application/logging/logging-store';
-import {
-  toBlockViewModel,
-  toSetSummaryViewModel,
-} from '@/application/logging/view-models';
+import { toBlockViewModel } from '@/application/logging/view-models';
 import type { Exercise } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
 import { prefersReducedMotion } from '@/presentation/design/motion';
 import { SessionDateTimeField } from './session-date-time-field';
 import { AddExerciseControl } from './add-exercise-control';
-import { SetRow } from './set-row';
+import { ExerciseSetList } from './exercise-set-list';
 import { BlockCard } from './block-card';
 import { ExerciseEntryCard } from './exercise-entry-card';
 import { ExerciseTemplatePanel } from './exercise-template-panel';
-import { OverflowMenu } from './overflow-menu';
 import { UndoToast } from './undo-toast';
 import './logging.css';
 
@@ -83,6 +79,7 @@ export function LoggingScreen() {
   const setSessionDateTime = useLoggingSession((s) => s.setSessionDateTime);
   const addExerciseEntry = useLoggingSession((s) => s.addExerciseEntry);
   const addSet = useLoggingSession((s) => s.addSet);
+  const updateSet = useLoggingSession((s) => s.updateSet);
   const lastAddedSetId = useLoggingSession((s) => s.lastAddedSetId);
   const clearLastAddedSetId = useLoggingSession((s) => s.clearLastAddedSetId);
   const prefillNextSet = useLoggingSession((s) => s.prefillNextSet);
@@ -339,70 +336,37 @@ export function LoggingScreen() {
                     exercise ? () => setEditingTemplateFor(exercise) : undefined
                   }
                 >
-                  <ul className="set-list">
-                    {entry.sets.map((set) => {
-                      const vm = toSetSummaryViewModel(set);
-                      const isNewest = vm.id === lastAddedSetId;
-                      return (
-                        <li
-                          key={vm.id}
-                          className={
-                            isNewest
-                              ? 'set-summary set-summary--new'
-                              : 'set-summary'
-                          }
-                          {...(isNewest
-                            ? {
-                                onAnimationEnd: () => {
-                                  // Guards against a stale closure: if a
-                                  // second set committed (moving the
-                                  // marker on) before this row's own
-                                  // animation ended, only *that* row's
-                                  // handler should consume it — this one
-                                  // clearing a marker that has already
-                                  // moved on would strand the newer row's
-                                  // own entrance animation mid-flight
-                                  // (Copilot review, PR #22).
-                                  if (
-                                    useLoggingSession.getState()
-                                      .lastAddedSetId === vm.id
-                                  ) {
-                                    clearLastAddedSetId();
-                                  }
-                                },
-                              }
-                            : {})}
-                        >
-                          <span>{vm.loadLabel}</span>
-                          <span>{vm.volumeLabel}</span>
-                          <OverflowMenu
-                            label={`${vm.loadLabel} ${vm.volumeLabel} actions`}
-                          >
-                            <button
-                              type="button"
-                              className="logging-button logging-button--icon-label"
-                              onClick={() =>
-                                void deleteSet(block.id, entry.id, vm.id)
-                              }
-                            >
-                              <Icon name="trash" />
-                              Delete set
-                            </button>
-                          </OverflowMenu>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <SetRow
-                    key={`${entry.id}-${entry.sets.length}-${exercise?.defaultLoadType ?? 'none'}-${exercise?.defaultVolumeKind ?? 'reps'}-${exercise?.trackEffort ?? false}`}
-                    prefill={prefillNextSet(block.id, entry.id)}
+                  <ExerciseSetList
+                    sets={entry.sets}
                     loadKind={exercise?.defaultLoadType ?? 'none'}
                     volumeKind={exercise?.defaultVolumeKind ?? 'reps'}
                     trackEffort={exercise?.trackEffort ?? false}
                     bandLabels={bandLabels}
                     freeTextSuggestions={suggestFreeTextLoads(entry.exerciseId)}
-                    onConfirm={(input) => void addSet(entry.id, input)}
+                    prefill={prefillNextSet(block.id, entry.id)}
+                    onAddSet={(input) => void addSet(entry.id, input)}
+                    onUpdateSet={(setId, input) =>
+                      void updateSet(entry.id, setId, input)
+                    }
+                    onDeleteSet={(setId) =>
+                      void deleteSet(block.id, entry.id, setId)
+                    }
                     onSaveBandLabels={(labels) => void saveBandLabels(labels)}
+                    newestSetId={lastAddedSetId}
+                    onNewestSetAnimationEnd={(setId) => {
+                      // Guards against a stale closure: if a second set
+                      // committed (moving the marker on) before this row's
+                      // own animation ended, only *that* row's handler
+                      // should consume it — this one clearing a marker
+                      // that has already moved on would strand the newer
+                      // row's own entrance animation mid-flight (Copilot
+                      // review, PR #22).
+                      if (
+                        useLoggingSession.getState().lastAddedSetId === setId
+                      ) {
+                        clearLastAddedSetId();
+                      }
+                    }}
                   />
                 </ExerciseEntryCard>
               );

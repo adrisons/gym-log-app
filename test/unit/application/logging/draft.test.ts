@@ -6,6 +6,7 @@ import {
   addExerciseEntry,
   prefillNextSet,
   addSet,
+  updateSet,
   addBlock,
   renameBlock,
   findBlockIdForEntry,
@@ -390,6 +391,121 @@ describe('addSet (FR-003, FR-008, FR-019, FR-025, FR-026)', () => {
 
     expect(afterSecond).not.toBe(afterFirst);
     expect(afterSecond.blocks[0]?.exercises[0]?.sets).toHaveLength(2);
+  });
+});
+
+describe('updateSet (ADR-0010: editing an already-recorded set in place)', () => {
+  function seed() {
+    const drafted = addExerciseEntry(
+      createDraft('2026-09-11T18:00:00.000Z'),
+      'ex-1' as ExerciseId,
+    );
+    const blockId = drafted.blocks[0]!.id;
+    const entryId = drafted.blocks[0]!.exercises[0]!.id;
+    const withSet = addSet(
+      drafted,
+      blockId,
+      entryId,
+      {
+        volume: { kind: 'reps', count: 5 },
+        load: { kind: 'weight', value: 100, unit: 'kg' },
+        setKind: 'working',
+      },
+      1000,
+      undefined,
+    );
+    const setId = withSet.blocks[0]!.exercises[0]!.sets[0]!.id;
+    return { draft: withSet, blockId, entryId, setId };
+  }
+
+  it("replaces the set's own load/volume/effort, keeping its id, without adding a new set", () => {
+    const { draft, blockId, entryId, setId } = seed();
+
+    const updated = updateSet(draft, blockId, entryId, setId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'weight', value: 110, unit: 'kg' },
+      effort: 4,
+      setKind: 'working',
+    });
+
+    const sets = updated.blocks[0]?.exercises[0]?.sets;
+    expect(sets).toHaveLength(1);
+    expect(sets?.[0]?.id).toBe(setId);
+    expect(sets?.[0]?.load).toEqual({ kind: 'weight', value: 110, unit: 'kg' });
+    expect(sets?.[0]?.volume).toEqual({ kind: 'reps', count: 8 });
+    expect(sets?.[0]?.effort).toBe(4);
+  });
+
+  it('leaves every other set in the entry untouched', () => {
+    const { draft, blockId, entryId } = seed();
+    const withSecond = addSet(
+      draft,
+      blockId,
+      entryId,
+      {
+        volume: { kind: 'reps', count: 3 },
+        load: { kind: 'weight', value: 50, unit: 'kg' },
+        setKind: 'working',
+      },
+      3000,
+      1000,
+    );
+    const firstId = withSecond.blocks[0]!.exercises[0]!.sets[0]!.id;
+    const secondId = withSecond.blocks[0]!.exercises[0]!.sets[1]!.id;
+
+    const updated = updateSet(withSecond, blockId, entryId, secondId, {
+      volume: { kind: 'reps', count: 9 },
+      load: { kind: 'weight', value: 55, unit: 'kg' },
+      setKind: 'working',
+    });
+
+    const sets = updated.blocks[0]?.exercises[0]?.sets;
+    expect(sets).toHaveLength(2);
+    expect(sets?.find((s) => s.id === firstId)?.load).toEqual({
+      kind: 'weight',
+      value: 100,
+      unit: 'kg',
+    });
+    expect(sets?.find((s) => s.id === secondId)?.load).toEqual({
+      kind: 'weight',
+      value: 55,
+      unit: 'kg',
+    });
+  });
+
+  it('throws InvalidSetError when the edited values have neither a volume nor a non-none load (FR-019)', () => {
+    const { draft, blockId, entryId, setId } = seed();
+
+    expect(() =>
+      updateSet(draft, blockId, entryId, setId, {
+        load: { kind: 'none' },
+        setKind: 'working',
+      }),
+    ).toThrow(InvalidSetError);
+  });
+
+  it('is a no-op, returning the same draft reference, when the setId does not resolve', () => {
+    const { draft, blockId, entryId } = seed();
+
+    const updated = updateSet(draft, blockId, entryId, 'no-such-set', {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'weight', value: 110, unit: 'kg' },
+      setKind: 'working',
+    });
+
+    expect(updated).toBe(draft);
+  });
+
+  it('is a no-op when the entry/block do not resolve', () => {
+    const { draft, setId } = seed();
+
+    const updated = updateSet(draft, 'no-block', 'no-entry', setId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'weight', value: 110, unit: 'kg' },
+      setKind: 'working',
+    });
+
+    expect(updated).toBe(draft);
   });
 });
 

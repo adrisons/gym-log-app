@@ -248,3 +248,126 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
     expect(renamed?.canonicalName).toBe('Barbell back squat');
   });
 });
+
+describe('ExerciseCatalogueScreen creating a new exercise (ADR-0010)', () => {
+  it('opens the creation form from "New exercise", and lists the exercise once created', async () => {
+    const storage = await seededStorage();
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'New exercise' }));
+    expect(
+      screen.getByRole('dialog', { name: /new exercise/i }),
+    ).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText(/^name$/i), 'Romanian deadlift');
+    await userEvent.click(screen.getByRole('radio', { name: 'Duration' }));
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /track effort/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /create exercise/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Romanian deadlift')).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole('dialog', { name: /new exercise/i }),
+    ).not.toBeInTheDocument();
+
+    const saved = await storage.listExercises();
+    const created = saved.find((e) => e.canonicalName === 'Romanian deadlift');
+    expect(created?.defaultVolumeKind).toBe('duration');
+    expect(created?.trackEffort).toBe(true);
+
+    // The logging store's own in-memory catalogue must include it too, the
+    // same reason renaming/merging already re-sync it (this screen's own
+    // doc comment) — otherwise LoggingScreen could offer to create a
+    // duplicate.
+    expect(
+      useLoggingSession
+        .getState()
+        .catalogue.some((e) => e.canonicalName === 'Romanian deadlift'),
+    ).toBe(true);
+  });
+
+  it('the Create button stays disabled until a name is entered', async () => {
+    useStorageAccess.getState().configure(await seededStorage());
+    useLoggingSession.getState().configure(new InMemoryStorage());
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'New exercise' }));
+
+    expect(
+      screen.getByRole('button', { name: /create exercise/i }),
+    ).toBeDisabled();
+  });
+
+  it('Cancel closes the form without creating anything', async () => {
+    const storage = await seededStorage();
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'New exercise' }));
+    await userEvent.type(screen.getByLabelText(/^name$/i), 'Nope');
+    await userEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+    expect(
+      screen.queryByRole('dialog', { name: /new exercise/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Nope')).not.toBeInTheDocument();
+  });
+});
+
+describe("ExerciseCatalogueScreen editing an existing exercise's tracked fields (ADR-0010)", () => {
+  it('opens the template editor from the management panel and re-syncs both storage and the logging store', async () => {
+    const storage = await seededStorage();
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Manage Back squat' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /edit tracked fields/i }),
+    );
+    expect(
+      screen.getByRole('dialog', { name: /edit back squat's tracked fields/i }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /track effort/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    await waitFor(async () => {
+      const saved = await storage.getExercise('ex-1' as ExerciseId);
+      expect(saved?.trackEffort).toBe(true);
+    });
+    expect(
+      useLoggingSession.getState().catalogue.find((e) => e.id === 'ex-1')
+        ?.trackEffort,
+    ).toBe(true);
+  });
+});
