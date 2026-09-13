@@ -9,11 +9,20 @@
  * (there is no persistent nav tab for it — `docs/design.md` §6). Bulk
  * select is reached either by a sustained press on a row, or (keyboard/
  * screen-reader path) the "Select sessions" button, which arms selection
- * mode with nothing yet selected; once active, a tap or an Enter/Space on
- * a focused row toggles its selection instead of opening it (a native
- * `<a>`'s Enter keypress already dispatches a `click` event, so the same
- * `handleRowClick` handles both). While active the FAB is replaced by a
- * floating Cancel/Delete bar. Deleting/undoing is orchestrated by
+ * mode with nothing yet selected; once active, a tap or Enter/Space on a
+ * focused row toggles its selection instead of opening it — a native `<a>`
+ * dispatches `click` for Enter on its own, but not for Space (which
+ * scrolls instead), so `onKeyDown` handles Space explicitly while active.
+ * The press/release/cancel tracking uses Pointer Events (one event family
+ * for mouse/touch/pen) rather than separate mouse+touch handlers: a real
+ * touch interaction still fires *synthetic* compatibility mouse events
+ * afterward, which would otherwise re-run the same start/end logic a
+ * second time and could immediately toggle a just-made touch selection
+ * back off. A selected row swaps to `role="button"`/`aria-pressed` while
+ * active, since that's what it actually behaves as in this mode (a toggle,
+ * not a navigation link) — screen-reader/assistive-tech users need that
+ * exposed, not just the visual selected style. While active the FAB is
+ * replaced by a floating Cancel/Delete bar. Deleting/undoing is orchestrated by
  * `deleteSessionsWithUndo` (`application/diary/diary-bulk-delete.ts`) —
  * this screen never calls a `StoragePort` write method itself
  * (`storage-access.ts` documents its instance as read-only for the diary/
@@ -29,10 +38,11 @@
  * table) while still keeping full `Session` objects for exact restoration.
  */
 import { useEffect, useRef, useState } from 'react';
-import type { MouseEvent } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import type { KeyboardEvent, MouseEvent, PointerEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { Icon } from '@/presentation/design/icons';
 import { requireStorage } from '@/application/storage-access';
+import { useLoggingSession } from '@/application/logging/logging-store';
 import { allStoredDataRange } from '@/application/date-range';
 import { buildDiarySessionSummary } from '@/application/diary/diary-summary';
 import type { DiarySessionSummary } from '@/application/diary/diary-summary';
@@ -53,6 +63,9 @@ type SessionListItem = Awaited<
 
 const LONG_PRESS_MS = 500;
 const DELETE_UNDO_MS = 5000;
+/** A press that moves more than this many pixels before the long-press
+ * timer fires is a scroll, not a selection gesture. */
+const PRESS_MOVE_CANCEL_PX = 10;
 
 interface PendingDeleteBatch {
   batchId: string;
@@ -67,16 +80,17 @@ interface PendingDeleteBatch {
 }
 
 export function DiaryScreen() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  // Captured once, at mount, from the router state the "‹ Diary" link
-  // navigated here with — never updated afterward, so it stays stable
-  // across the state-clearing navigate() call below (a fresh navigation
-  // back to this route always remounts DiaryScreen, so a lazy initializer
-  // is enough; no effect needs to set this).
+  // Captured once, at mount, from the logging store's own flag — set the
+  // moment `addSet` actually records a set (not merely whether the draft
+  // currently has any), reset on the store's next `initialize()`. Reading
+  // it via a lazy initializer, then clearing it in the mount effect below,
+  // means a later remount of this same route (browser back/forward, or any
+  // other way of arriving here) sees it already cleared instead of
+  // replaying a visit that already showed it (docs/design.md §1.1's
+  // exception is "immediately after logging a session", not "any time this
+  // route is entered").
   const [justLogged] = useState(
-    () =>
-      (location.state as { justLogged?: boolean } | null)?.justLogged === true,
+    () => useLoggingSession.getState().justLoggedASet,
   );
   const [sessions, setSessions] = useState<SessionListItem[] | undefined>(
     undefined,
@@ -95,6 +109,9 @@ export function DiaryScreen() {
     undefined,
   );
   const longPressFiredRef = useRef(false);
+  const pressOriginRef = useRef<{ x: number; y: number } | undefined>(
+    undefined,
+  );
 
   useEffect(() => {
     void (async () => {
@@ -117,20 +134,17 @@ export function DiaryScreen() {
   }, []);
 
   useEffect(() => {
-    // Clears the nav state so returning here via browser back/forward
-    // doesn't replay the toast for a visit that never happened
-    // (docs/design.md §1.1's exception is "immediately after logging a
-    // session", not "any time this route is entered").
     if (justLogged) {
-      navigate(location.pathname, { replace: true, state: null });
+      useLoggingSession.getState().clearJustLoggedASet();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const bulkActive = selectionActive;
 
-  function handlePressStart(sessionId: string) {
+  function handlePressStart(sessionId: string, x: number, y: number) {
     longPressFiredRef.current = false;
+    pressOriginRef.current = { x, y };
     pressTimerRef.current = setTimeout(() => {
       longPressFiredRef.current = true;
       setSelectionActive(true);
@@ -143,6 +157,28 @@ export function DiaryScreen() {
       clearTimeout(pressTimerRef.current);
       pressTimerRef.current = undefined;
     }
+    pressOriginRef.current = undefined;
+  }
+
+  /** A scroll gesture starts the same way a long-press does (finger down,
+   * held); only a scroll keeps moving. Cancels the pending timer once
+   * movement crosses a small threshold, so scrolling a row past never
+   * selects it. */
+  function handlePressMove(x: number, y: number) {
+    const origin = pressOriginRef.current;
+    if (!origin) return;
+    if (Math.hypot(x - origin.x, y - origin.y) > PRESS_MOVE_CANCEL_PX) {
+      handlePressEnd();
+    }
+  }
+
+  function toggleSelected(sessionId: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
+      return next;
+    });
   }
 
   function handleRowClick(event: MouseEvent, sessionId: string) {
@@ -153,12 +189,18 @@ export function DiaryScreen() {
     }
     if (bulkActive) {
       event.preventDefault();
-      setSelected((current) => {
-        const next = new Set(current);
-        if (next.has(sessionId)) next.delete(sessionId);
-        else next.add(sessionId);
-        return next;
-      });
+      toggleSelected(sessionId);
+    }
+  }
+
+  /** Enter already toggles via the native `click` a `<a>` dispatches for
+   * it; Space does not (it scrolls instead), so it needs its own handler
+   * while selection mode is active (FR-6: keyboard-operable). */
+  function handleRowKeyDown(event: KeyboardEvent, sessionId: string) {
+    if (!bulkActive) return;
+    if (event.key === ' ' || event.key === 'Spacebar') {
+      event.preventDefault();
+      toggleSelected(sessionId);
     }
   }
 
@@ -357,13 +399,31 @@ export function DiaryScreen() {
                   <Link
                     to={`/diary/${session.sessionId}`}
                     className={`diary-screen__session-link${isSelected ? ' diary-screen__session-link--selected' : ''}`}
-                    onMouseDown={() => handlePressStart(session.sessionId)}
-                    onMouseUp={handlePressEnd}
-                    onMouseLeave={handlePressEnd}
-                    onTouchStart={() => handlePressStart(session.sessionId)}
-                    onTouchEnd={handlePressEnd}
+                    // While a selection is active this row behaves as a
+                    // toggle, not a navigation link — expose that role/state
+                    // for assistive tech rather than leaving only the
+                    // visual `--selected` style to carry it.
+                    {...(bulkActive
+                      ? { role: 'button', 'aria-pressed': isSelected }
+                      : {})}
+                    onPointerDown={(event: PointerEvent) =>
+                      handlePressStart(
+                        session.sessionId,
+                        event.clientX,
+                        event.clientY,
+                      )
+                    }
+                    onPointerMove={(event: PointerEvent) =>
+                      handlePressMove(event.clientX, event.clientY)
+                    }
+                    onPointerUp={handlePressEnd}
+                    onPointerLeave={handlePressEnd}
+                    onPointerCancel={handlePressEnd}
                     onClick={(event) =>
                       handleRowClick(event, session.sessionId)
+                    }
+                    onKeyDown={(event) =>
+                      handleRowKeyDown(event, session.sessionId)
                     }
                   >
                     <span className="diary-screen__session-icon">

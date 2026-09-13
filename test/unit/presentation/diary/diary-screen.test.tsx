@@ -9,6 +9,7 @@ import {
 import { MemoryRouter } from 'react-router-dom';
 import { DiaryScreen } from '@/presentation/diary/diary-screen';
 import { useStorageAccess } from '@/application/storage-access';
+import { useLoggingSession } from '@/application/logging/logging-store';
 import { createSession } from '@/domain/session';
 import { createBlock } from '@/domain/block';
 import { createSet } from '@/domain/set';
@@ -171,12 +172,15 @@ describe('DiaryScreen (FR-001..006)', () => {
         expect(screen.getAllByRole('link', { name: /squat/i })).toHaveLength(2);
       });
 
+      // Captured before bulk-select activates: the row swaps to
+      // `role="button"` once selection mode is active, so a role query
+      // after that point would no longer find it as a "link".
       const links = screen.getAllByRole('link', { name: /squat/i });
-      fireEvent.mouseDown(links[0]!);
+      fireEvent.pointerDown(links[0]!);
       act(() => {
         vi.advanceTimersByTime(600);
       });
-      fireEvent.mouseUp(links[0]!);
+      fireEvent.pointerUp(links[0]!);
       fireEvent.click(links[0]!);
 
       expect(
@@ -188,7 +192,7 @@ describe('DiaryScreen (FR-001..006)', () => {
       ).not.toBeInTheDocument();
 
       // A normal (short) tap on the other row toggles it into the selection.
-      fireEvent.click(screen.getAllByRole('link', { name: /squat/i })[1]!);
+      fireEvent.click(links[1]!);
       expect(screen.getByText(/2 sessions selected/i)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -217,8 +221,10 @@ describe('DiaryScreen (FR-001..006)', () => {
       </MemoryRouter>,
     );
 
+    let sessionLink: HTMLElement;
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: /squat/i })).toBeInTheDocument();
+      sessionLink = screen.getByRole('link', { name: /squat/i });
+      expect(sessionLink).toBeInTheDocument();
     });
 
     expect(
@@ -236,8 +242,10 @@ describe('DiaryScreen (FR-001..006)', () => {
     ).not.toBeInTheDocument();
 
     // A plain click on the row (the same event a native <a>'s Enter/Space
-    // keypress dispatches) toggles it now that selection mode is active.
-    fireEvent.click(screen.getByRole('link', { name: /squat/i }));
+    // keypress dispatches) toggles it now that selection mode is active —
+    // the row itself is captured above, before it swapped to
+    // `role="button"` (which it exposes once selection mode is active).
+    fireEvent.click(sessionLink!);
     expect(screen.getByText(/1 session selected/i)).toBeInTheDocument();
   });
 
@@ -272,11 +280,11 @@ describe('DiaryScreen (FR-001..006)', () => {
       });
 
       const link = screen.getByRole('link', { name: /squat/i });
-      fireEvent.mouseDown(link);
+      fireEvent.pointerDown(link);
       act(() => {
         vi.advanceTimersByTime(600);
       });
-      fireEvent.mouseUp(link);
+      fireEvent.pointerUp(link);
       fireEvent.click(link);
 
       fireEvent.click(screen.getByRole('button', { name: /delete/i }));
@@ -310,5 +318,163 @@ describe('DiaryScreen (FR-001..006)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('a press that moves past the scroll threshold cancels the long press instead of selecting the row (scroll-vs-select regression)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await seedSession(storage, 's1', '2026-09-11T10:00:00.000Z', exerciseId);
+    useStorageAccess.getState().configure(storage);
+
+    vi.useFakeTimers();
+    try {
+      render(
+        <MemoryRouter>
+          <DiaryScreen />
+        </MemoryRouter>,
+      );
+
+      let link: HTMLElement;
+      await vi.waitFor(() => {
+        link = screen.getByRole('link', { name: /squat/i });
+        expect(link).toBeInTheDocument();
+      });
+
+      fireEvent.pointerDown(link!, { clientX: 0, clientY: 0 });
+      fireEvent.pointerMove(link!, { clientX: 0, clientY: 40 });
+      act(() => {
+        vi.advanceTimersByTime(600);
+      });
+      fireEvent.pointerUp(link!);
+      fireEvent.click(link!);
+
+      expect(
+        screen.queryByRole('toolbar', { name: /selected sessions/i }),
+      ).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('exposes the selected row as a pressed toggle button, not a link, once selection mode is active (accessible-selection-state regression)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await seedSession(storage, 's1', '2026-09-11T10:00:00.000Z', exerciseId);
+    useStorageAccess.getState().configure(storage);
+
+    render(
+      <MemoryRouter>
+        <DiaryScreen />
+      </MemoryRouter>,
+    );
+
+    let link: HTMLElement;
+    await waitFor(() => {
+      link = screen.getByRole('link', { name: /squat/i });
+      expect(link).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /select sessions/i }));
+    expect(screen.queryByRole('link', { name: /squat/i })).toBeNull();
+    const toggle = screen.getByRole('button', { name: /squat/i });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('Space toggles a focused row while selection mode is active (native <a> dispatches click for Enter but not Space)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await seedSession(storage, 's1', '2026-09-11T10:00:00.000Z', exerciseId);
+    useStorageAccess.getState().configure(storage);
+
+    render(
+      <MemoryRouter>
+        <DiaryScreen />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: /squat/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /select sessions/i }));
+    const toggle = screen.getByRole('button', { name: /squat/i });
+
+    fireEvent.keyDown(toggle, { key: ' ' });
+
+    expect(screen.getByText(/1 session selected/i)).toBeInTheDocument();
+  });
+
+  it('shows the save-acknowledgement toast once when justLoggedASet is set, and clears it so a remount does not replay it (ADR/design.md §1.1 regression)', async () => {
+    const storage = new InMemoryStorage();
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
+    const entryId =
+      useLoggingSession.getState().draft!.blocks[0]!.exercises[0]!.id;
+    await useLoggingSession.getState().addSet(entryId, {
+      volume: { kind: 'reps', count: 5 },
+      load: { kind: 'none' },
+      setKind: 'working',
+    });
+    expect(useLoggingSession.getState().justLoggedASet).toBe(true);
+
+    const { unmount } = render(
+      <MemoryRouter>
+        <DiaryScreen />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/session saved/i)).toBeInTheDocument();
+    });
+    // Consumed once — the store no longer thinks a fresh visit just
+    // recorded a set, so a later remount of this same route won't
+    // replay the toast for a visit that never happened.
+    expect(useLoggingSession.getState().justLoggedASet).toBe(false);
+    unmount();
+
+    render(
+      <MemoryRouter>
+        <DiaryScreen />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/no sessions logged yet/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/session saved/i)).not.toBeInTheDocument();
   });
 });
