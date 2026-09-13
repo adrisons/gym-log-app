@@ -5,7 +5,7 @@
  * `FileSystemStorageAdapter`) import it, so they can never disagree with
  * each other about what "current" means.
  */
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export type SchemaAction = 'migrate' | 'open' | 'refuse';
 

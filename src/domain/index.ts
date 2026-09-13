@@ -41,6 +41,7 @@ export {
   InvalidSetError,
   InvalidLoadError,
   InvalidVolumeError,
+  InvalidBlockError,
   ExerciseMergeError,
   ExerciseDeleteConfirmationRequiredError,
 } from './errors';

@@ -37,6 +37,16 @@ export class InvalidVolumeError extends DomainError {
 }
 
 /**
+ * A `Block`'s `rounds` was constructed with a non-positive or non-integer
+ * value (`docs/requirements.md` §3.1; ADR-0008). `rounds` itself being
+ * absent is always valid — this only guards a value that was actually
+ * given.
+ */
+export class InvalidBlockError extends DomainError {
+  override readonly name = 'InvalidBlockError';
+}
+
+/**
  * `mergeExerciseIdentities` was called with the same identifier as
  * survivor and loser, or with an identifier that does not resolve to an
  * existing `Exercise` (FR-019).

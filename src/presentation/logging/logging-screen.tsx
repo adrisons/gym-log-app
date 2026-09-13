@@ -88,6 +88,7 @@ export function LoggingScreen() {
   const saveBandLabels = useLoggingSession((s) => s.saveBandLabels);
   const addBlock = useLoggingSession((s) => s.addBlock);
   const renameBlock = useLoggingSession((s) => s.renameBlock);
+  const setBlockRounds = useLoggingSession((s) => s.setBlockRounds);
   const reorderBlockExercise = useLoggingSession((s) => s.reorderBlockExercise);
   const moveExerciseAcrossBlocks = useLoggingSession(
     (s) => s.moveExerciseAcrossBlocks,
@@ -185,7 +186,9 @@ export function LoggingScreen() {
             hasName={block.name !== undefined}
             bare={isBare}
             subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'} logged`}
+            rounds={block.rounds}
             onRename={(name) => void renameBlock(block.id, name)}
+            onSetRounds={(rounds) => void setBlockRounds(block.id, rounds)}
             onDelete={() => void deleteBlock(block.id)}
             footer={
               isBare ? undefined : (

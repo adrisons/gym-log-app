@@ -4,6 +4,7 @@ import { createBlock } from '@/domain/block';
 import { createSet } from '@/domain/set';
 import { createLoad } from '@/domain/load';
 import { createVolume } from '@/domain/volume';
+import { InvalidBlockError } from '@/domain/errors';
 import type { SessionId, ExerciseId } from '@/domain/ids';
 import type { ExerciseEntry } from '@/domain/exercise-entry';
 import * as domain from '@/domain';
@@ -106,6 +107,32 @@ describe('Order is list position only (§3.3; FR-018)', () => {
     expect(block.exercises.indexOf(entry)).toBe(0);
     expect(entry.sets.indexOf(set)).toBe(0);
   });
+});
+
+// ADR-0008: a Block's optional target round count.
+describe('Block.rounds (ADR-0008)', () => {
+  it('accepts a Block with no rounds specified (green)', () => {
+    const block = createBlock({ type: 'straightSets', exercises: [] });
+    expect(block.rounds).toBeUndefined();
+  });
+
+  it('accepts a positive integer rounds value', () => {
+    const block = createBlock({
+      type: 'circuit',
+      rounds: 3,
+      exercises: [],
+    });
+    expect(block.rounds).toBe(3);
+  });
+
+  it.each([0, -1, 1.5])(
+    'rejects a non-positive-integer rounds value (%s)',
+    (rounds) => {
+      expect(() =>
+        createBlock({ type: 'circuit', rounds, exercises: [] }),
+      ).toThrow(InvalidBlockError);
+    },
+  );
 });
 
 // FR-014: no synthesized/implied Exercise entry — a structural-absence

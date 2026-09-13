@@ -30,6 +30,7 @@ interface DraftBlock {
   id: string; // draft-local stable key (list reordering needs a key; Block itself has none)
   name?: string;
   type: 'straightSets' | 'superset' | 'circuit';
+  rounds?: number; // target round count for the whole block (ADR-0008); mirrors domain `Block.rounds`
   exercises: DraftExerciseEntry[];
 }
 
@@ -87,6 +88,7 @@ step and returns the updated value).
 | `discardDraft(storage)` | FR-024 | `discardDraft()` on the port; caller resets its in-memory draft state. |
 | `addBlock(draft, name?, type)` | FR-006 | Appends a `DraftBlock`; returns the updated draft. Pure — persistence is the caller's `saveDraft` call. |
 | `renameBlock` / `reorderBlockExercise` / `moveExerciseAcrossBlocks` | FR-006 | Pure draft transforms, list-position moves only (FR-018 — no separate order field). |
+| `setBlockRounds(draft, blockId, rounds?)` | FR-2 (ADR-0008) | Sets or clears (`undefined`) a block's target round count. Unvalidated at this layer — a draft may hold a transient, not-yet-valid value; domain `createBlock` rejects a non-positive-integer `rounds` at promotion time (`draftToSession`), the same point every other draft-only laxness is caught. |
 | `deleteBlock(draft, blockId)` | FR-004, FR-023 | Removes the block; returns `{ draft: updatedDraft, undo: UndoEntry }` (see Undo below) — cascades to the block's entries/sets by construction (they're nested, so removing the block removes them). |
 | `addExerciseEntry(draft, blockId, exerciseId)` | FR-002 | Appends a `DraftExerciseEntry` with `sets: []`. No implicit set creation (mirrors domain FR-014's "no synthesized entry" spirit one level up). |
 | `deleteExerciseEntry(draft, blockId, entryId)` | FR-004 | Same undo shape as `deleteBlock`, one level down. |

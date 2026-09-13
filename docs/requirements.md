@@ -139,7 +139,9 @@ One vocabulary, used identically in code, UI and documentation.
   keeps adding to or stops adding to. More than one session per day is
   allowed, and each is fully independent.
 - **Block.** An ordered grouping inside a session: optional name ("Superset A",
-  "Legs"), type (straight sets / superset / circuit), and an ordered list of
+  "Legs"), type (straight sets / superset / circuit), optional target rounds
+  (how many times the whole block — every exercise entry in it — is meant to
+  be repeated, e.g. "3 rounds" of a circuit; ADR-0008), and an ordered list of
   exercise entries.
 - **Exercise entry.** A reference to a catalogue exercise, its order within the
   block, notes, and its sets.
@@ -230,6 +232,12 @@ Create a session and add blocks, exercises and sets.
   name, position label, and summary counts (exercise/set totals) visible,
   and expanded again. Purely a display state: never persisted as part of
   the Session record, and never affects what FR-004's undo restores.
+- A block can optionally carry a target number of rounds (ADR-0008) — how
+  many times the whole block is meant to be repeated, independent of how
+  many sets each exercise entry in it actually has logged. Editing it is
+  immediate, with no confirm step (FR-1's "no Save button" extends here
+  too); left unset, a block has no round count and nothing about it implies
+  one.
 
 ### FR-3 — Sets and load `[v1]`
 
@@ -587,6 +595,7 @@ before code.
 | D12 | Whether recording a set requires an explicit confirm step | **Closed:** no — a set commits automatically the moment the user's own edit makes it valid (FR-3); the previous generic confirm control is retired, with a narrow "Repeat last set" control kept for the one case (an untouched, pre-filled row) an automatic trigger has nothing to anchor to. No schema change. → ADR-0007 |
 | D13 | Whether generating a shareable image for external platforms (e.g. Instagram) falls under the constitution's "social network" non-goal | **Closed:** no — it is a one-way, on-device export (render an image locally, hand off via the platform's native share sheet or a saved file), not a multi-user or in-app social feature. No account, no backend, no peer visibility, no third-party posting API; consistent with Invariant 1 (nothing leaves the device without the user explicitly choosing to send it). Targeted at the "Later" phase (§9), not MVP/v1/v1.1. → FR-14 |
 | D14 | Whether adding a field to Settings (per-device preference state, not a canonical entity) requires the §6/Principle III schema-version-bump-and-migration treatment | **Closed:** no — that treatment applies only to the canonical entities in §3.1 (Session, Block, Exercise entry, Set, Exercise catalogue). A Settings field defaults silently when absent: no version bump, no ADR, no migration. Matches the precedent already set in `specs/006-settings-data/spec.md`; §6 amended below with this scope note so future specs don't re-litigate it. |
+| D15 | Whether a Block can carry a target round count, and what it means | **Closed:** yes — an optional integer field on `Block` naming how many times the whole block is meant to be repeated (e.g. "3 rounds" of a circuit), independent of and never inferred from how many sets each exercise entry in it has actually logged. Additive, optional, no default value backfilled for existing blocks. Schema v3. → ADR-0008 |
 
 ---
 
