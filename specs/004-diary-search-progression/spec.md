@@ -95,9 +95,10 @@ field is editable and edits persist.
    (load, effort, volume) or adds/removes a set, **Then** the change
    persists via the existing `StoragePort.saveSession` path and is reflected
    the next time the diary or detail view is opened.
-5. **Given** the diary screen, **When** the user picks a specific date (jump
-   to date), **Then** the list scrolls or navigates to the sessions around
-   that date.
+5. _(superseded by ADR-0009)_ **Given** the diary screen, **When** the user
+   types an exercise name into the diary search field, **Then** the list
+   filters to sessions that logged a matching exercise (originally: jump to
+   a specific date).
 6. **Given** no sessions have ever been logged, **When** the diary screen
    opens, **Then** it shows an explicit empty state rather than an empty or
    blank list.
@@ -288,11 +289,13 @@ marked as personal records.
   referenced by its ExerciseEntries), its total Set count, and a kind-of-
   work label derived from the exercises logged (e.g. their movement
   patterns) — never a field entered separately when logging.
-- **FR-003**: The diary screen MUST let the user jump to a specific date,
-  navigating the list to the session at that date, or, if none exists, the
-  nearest session dated after it; if no session exists on or after that
-  date, the nearest session before it; if the diary has no sessions at all,
-  FR-006's empty state applies and jump-to-date has nothing to navigate to.
+- **FR-003** _(superseded by ADR-0009, `docs/requirements.md` FR-6)_: The
+  diary screen MUST let the user search by exercise name (substring and
+  typo-tolerant, per FR-009's own matching rules), filtering the list to
+  sessions that logged a matching exercise; a query with no matching
+  session shows an explicit empty result (consistent with FR-012), never
+  an empty list with no explanation. Originally specified as jump-to-a-
+  specific-date; ADR-0009 records why that was replaced.
 - **FR-004**: Selecting a Session from the diary list MUST open a session
   detail view showing every Block, ExerciseEntry and Set as logged.
 - **FR-005**: The session detail view MUST be editable after the fact — any
@@ -390,17 +393,23 @@ marked as personal records.
   progression computations) MUST be regenerated from `listSessions`/
   `listExercises` rather than persisted as a separate source of truth,
   consistent with `docs/requirements.md` §6.
-- **FR-024** _(added by this design-refinement pass, `docs/requirements.md`
-  FR-6)_: The diary screen MUST let the user select sessions in bulk via a
-  sustained press on a row, which marks that row selected and replaces the
-  screen's primary logging action with a floating bar offering Cancel and
-  Delete for the current selection. While a selection is active, a normal
-  tap on another row MUST toggle that row into or out of the selection
-  rather than opening its detail view. Deleting the selection MUST call
-  `StoragePort.deleteSession` for each selected id and MUST be undoable for
-  at least 5 seconds (the same guarantee `docs/requirements.md` FR-004
-  makes for a set/exercise/block), restoring every deleted session via
-  `StoragePort.saveSession` exactly as it was if undone within that window.
+- **FR-024** _(added by the elegant-refinement pass, `docs/requirements.md`
+  FR-6; entry mechanism amended by ADR-0009)_: The diary screen MUST let
+  the user select sessions in bulk via a sustained press on a row, or by
+  tapping the row's own leading icon (which both enters selection mode and
+  selects that row — Gmail's tap-the-avatar pattern; this replaces the
+  original separate "Select sessions" control, since the icon is itself a
+  real, always-present, keyboard/screen-reader-reachable button), which
+  marks that row selected and replaces the screen's primary logging action
+  with a floating bar offering Cancel and Delete for the current selection.
+  While a selection is active, a normal tap on another row MUST toggle that
+  row into or out of the selection rather than opening its detail view;
+  deselecting the last selected row MUST exit selection mode automatically.
+  Deleting the selection MUST call `StoragePort.deleteSession` for each
+  selected id and MUST be undoable for at least 5 seconds (the same
+  guarantee `docs/requirements.md` FR-004 makes for a set/exercise/block),
+  restoring every deleted session via `StoragePort.saveSession` exactly as
+  it was if undone within that window.
 
 ### Key Entities *(include if feature involves data)*
 
