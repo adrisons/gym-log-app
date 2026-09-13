@@ -193,6 +193,45 @@ describe('ExerciseSearchField (FR-002, FR-015, FR-016)', () => {
     expect(screen.getByText('Back squat')).toBeInTheDocument();
   });
 
+  it('Enter creates the exercise once "create" is offered', async () => {
+    const search = vi.fn(() => []);
+    const onCreateExercise = vi.fn();
+    render(
+      <ExerciseSearchField
+        search={search}
+        onSelectExercise={() => {}}
+        onCreateExercise={onCreateExercise}
+      />,
+    );
+
+    await userEvent.type(
+      screen.getByLabelText(/exercise/i),
+      'Hip thrust{Enter}',
+    );
+
+    expect(onCreateExercise).toHaveBeenCalledWith('Hip thrust');
+    expect(screen.queryByText('Create "Hip thrust"')).not.toBeInTheDocument();
+  });
+
+  it('Enter does nothing when the query already exactly matches an exercise (nothing to create)', async () => {
+    const search = vi.fn(() => [squat]);
+    const onCreateExercise = vi.fn();
+    render(
+      <ExerciseSearchField
+        search={search}
+        onSelectExercise={() => {}}
+        onCreateExercise={onCreateExercise}
+      />,
+    );
+
+    await userEvent.type(
+      screen.getByLabelText(/exercise/i),
+      'Back squat{Enter}',
+    );
+
+    expect(onCreateExercise).not.toHaveBeenCalled();
+  });
+
   it('closes on Escape from a focused result button too, and returns focus to the input (keyboard-escape regression)', async () => {
     const search = vi.fn(() => [squat]);
     render(
