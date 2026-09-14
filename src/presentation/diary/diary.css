@@ -134,7 +134,7 @@
 .session-detail-screen__header {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--space-3);
 }
 

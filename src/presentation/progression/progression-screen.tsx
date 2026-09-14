@@ -19,6 +19,7 @@ import type {
   ExerciseId,
   Session,
 } from '@/application/logging/use-cases';
+import { useSetScreenTitle } from '@/presentation/nav/screen-title';
 import { ProgressionList } from './progression-list';
 import { ProgressionChart } from './progression-chart';
 import './progression.css';
@@ -26,6 +27,7 @@ import './progression.css';
 export function ProgressionScreen() {
   const { exerciseId } = useParams<{ exerciseId: string }>();
   const [exercise, setExercise] = useState<Exercise | undefined>(undefined);
+  useSetScreenTitle(exercise?.canonicalName ?? 'Progression');
   const [exerciseSessions, setExerciseSessions] = useState<
     Session[] | undefined
   >(undefined);
@@ -98,7 +100,6 @@ export function ProgressionScreen() {
 
   return (
     <main className="progression-screen" aria-label="Progression">
-      <h1>{exercise?.canonicalName ?? 'Progression'}</h1>
       {exerciseSessions.length === 0 ? (
         <p>No sessions logged for this exercise yet.</p>
       ) : (

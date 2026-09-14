@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ProgressionScreen } from '@/presentation/progression/progression-screen';
+import { HeaderNav } from '@/presentation/nav/header-nav';
+import { ScreenTitleProvider } from '@/presentation/nav/screen-title';
 import { useStorageAccess } from '@/application/storage-access';
 import { createSession } from '@/domain/session';
 import { createBlock } from '@/domain/block';
@@ -67,15 +69,20 @@ describe('ProgressionScreen (FR-013..023)', () => {
 
     render(
       <MemoryRouter initialEntries={[`/exercises/${exerciseId}/progression`]}>
-        <Routes>
-          <Route
-            path="/exercises/:exerciseId/progression"
-            element={<ProgressionScreen />}
-          />
-        </Routes>
+        <ScreenTitleProvider>
+          <HeaderNav />
+          <Routes>
+            <Route
+              path="/exercises/:exerciseId/progression"
+              element={<ProgressionScreen />}
+            />
+          </Routes>
+        </ScreenTitleProvider>
       </MemoryRouter>,
     );
 
+    // The exercise name is the screen's title (design-refinement pass:
+    // moved into the navbar, left of the menu — `screen-title.tsx`).
     await waitFor(() => {
       expect(
         screen.getByRole('heading', { name: 'Bench Press' }),

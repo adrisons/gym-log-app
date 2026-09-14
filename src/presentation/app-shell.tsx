@@ -7,16 +7,19 @@
  */
 import { Outlet } from 'react-router-dom';
 import { HeaderNav } from './nav/header-nav';
+import { ScreenTitleProvider } from './nav/screen-title';
 import './app-shell.css';
 
 export function AppShell() {
   return (
-    <div className="app-shell">
-      <HeaderNav />
-      <div className="app-shell__content">
-        <Outlet />
+    <ScreenTitleProvider>
+      <div className="app-shell">
+        <HeaderNav />
+        <div className="app-shell__content">
+          <Outlet />
+        </div>
       </div>
-    </div>
+    </ScreenTitleProvider>
   );
 }
 
