@@ -468,12 +468,15 @@ window.__runV2ToV3MigrationTest = (adapterKind) =>
 
 export interface V3ToV4MigrationResult {
   storedSchemaVersion: number;
-  /** A genuine v3 record's `Block.rounds` value is left on disk exactly
-   * as stored — ADR-0013 removes the field going forward, but migrating
-   * old data needs no rewrite (no ADR-0013 backfill of its own to run,
-   * `#checkSchema`'s own comment) — read back through the domain-typed
-   * port, which no longer declares `rounds`, so it simply never surfaces. */
-  roundsNeverSurfaced: boolean;
+  /** ADR-0013 removes `Block.rounds` from the type going forward, but
+   * migrating old data needs no rewrite (no v3->v4 backfill of its own to
+   * run, `#checkSchema`'s own comment) — a v3 record's `rounds` value is
+   * left on disk exactly as stored, unread by any `Block`-typed code path
+   * (the type no longer declares it) but still structurally present on
+   * the plain object this port hands back. Checked here as "unchanged",
+   * not "gone" — a rewrite that silently dropped or altered it would be
+   * its own, separate bug this ADR never asked for. */
+  roundsLeftUnchangedOnDisk: boolean;
   blockNamePreserved: boolean;
 }
 
@@ -504,8 +507,9 @@ async function runV3ToV4MigrationTestIndexedDb(): Promise<V3ToV4MigrationResult>
 
   return {
     storedSchemaVersion,
-    roundsNeverSurfaced:
-      migrated?.blocks[0] !== undefined && !('rounds' in migrated.blocks[0]),
+    roundsLeftUnchangedOnDisk:
+      (migrated?.blocks[0] as unknown as { rounds?: number } | undefined)
+        ?.rounds === 3,
     blockNamePreserved: migrated?.blocks[0]?.name === 'Circuit A',
   };
 }
@@ -555,8 +559,9 @@ async function runV3ToV4MigrationTestFileSystem(): Promise<V3ToV4MigrationResult
 
   return {
     storedSchemaVersion,
-    roundsNeverSurfaced:
-      migrated?.blocks[0] !== undefined && !('rounds' in migrated.blocks[0]),
+    roundsLeftUnchangedOnDisk:
+      (migrated?.blocks[0] as unknown as { rounds?: number } | undefined)
+        ?.rounds === 3,
     blockNamePreserved: migrated?.blocks[0]?.name === 'Circuit A',
   };
 }

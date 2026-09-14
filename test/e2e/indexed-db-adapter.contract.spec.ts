@@ -64,7 +64,7 @@ test('ADR-0008 v2->v3: a Block with no `rounds` upgrades cleanly, with rounds le
   expect(outcome.storedSchemaVersion).toBe(4);
 });
 
-test('ADR-0013 v3->v4: a Block with `rounds` set upgrades cleanly, with rounds never surfacing through the port', async ({
+test('ADR-0013 v3->v4: a Block with `rounds` set upgrades cleanly, with rounds left unchanged on disk', async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -74,6 +74,6 @@ test('ADR-0013 v3->v4: a Block with `rounds` set upgrades cleanly, with rounds n
   );
 
   expect(outcome.blockNamePreserved).toBe(true);
-  expect(outcome.roundsNeverSurfaced).toBe(true);
+  expect(outcome.roundsLeftUnchangedOnDisk).toBe(true);
   expect(outcome.storedSchemaVersion).toBe(4);
 });
