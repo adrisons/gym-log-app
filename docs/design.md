@@ -325,13 +325,17 @@ prominent tap away, so the navigation never carries a tab that sits idle
 between sessions.
 
 Primary navigation (ADR-0009, superseding an earlier always-visible bottom
-tab bar) is a hamburger menu, right-aligned in a slim header at the top of
-every screen, opening a short list of the destinations the user returns to
-repeatedly: Diary, Insights, Exercises. Exercise search-by-catalogue stays
-reachable (from a session's own logged exercises, and from Insights' cards)
-but no longer occupies its own primary-nav entry — the diary's own search
-(FR-6) now covers "find a session by exercise", which was that entry's most
-common use.
+tab bar) is a hamburger menu in a slim header at the top of every screen,
+opening a short list of the destinations the user returns to repeatedly:
+Diary, Insights, Exercises. Exercise search-by-catalogue stays reachable
+(from a session's own logged exercises, and from Insights' cards) but no
+longer occupies its own primary-nav entry — the diary's own search (FR-6)
+now covers "find a session by exercise", which was that entry's most
+common use. **(ADR-0012)** That same header also carries the current
+screen's own title, to the left of the menu button — saving each screen
+the vertical space its own heading row used to take — so the hamburger
+button itself is the header's only fixed right-aligned element now, not
+the whole header.
 
 Text wraps; it never scrolls sideways to be read.
 
