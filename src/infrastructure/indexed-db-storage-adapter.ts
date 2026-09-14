@@ -75,10 +75,14 @@ export class IndexedDbStorageAdapter implements StoragePort {
     // v2 -> v3 (ADR-0008): Block.rounds was optional, and its absence in
     // every already-stored Session was itself valid v3 data — no stored
     // shape changes, so this step never had a backfill of its own to run.
-    // ADR-0013 removed `rounds` again (redundant with each exercise
-    // entry's own set count); a leftover `rounds` key on old v3 data is
-    // simply never read any more — no new version bump or migration for
-    // that either, same reasoning.
+    // v3 -> v4 (ADR-0013): removes `rounds` again (redundant with each
+    // exercise entry's own set count). Still no backfill: a v3 record's
+    // leftover `rounds` key is inert data `Block`'s own type no longer
+    // declares — nothing reads it, and nothing needs to strip it either,
+    // the same "additive/removal needs no data rewrite" reasoning v2 -> v3
+    // itself already relied on. `docs/requirements.md` §6 still requires
+    // the version bump itself for any change to a canonical persisted
+    // shape, even one with no backfill of its own (Copilot review, PR #30).
     if (action === 'migrate' || stored === 0) {
       // `stored === 0` (the never-initialized sentinel, itself decided
       // as 'open' since there is nothing to migrate) still needs this

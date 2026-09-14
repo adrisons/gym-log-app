@@ -42,11 +42,12 @@ test('ADR-0006 v1->v2 migration backfills a legacy Exercise and bumps the stored
   expect(outcome.defaultLoadTypePreserved).toBe(true);
   expect(outcome.defaultVolumeKind).toBe('reps');
   expect(outcome.trackEffort).toBe(false);
-  // CURRENT_SCHEMA_VERSION has since advanced to 3 (ADR-0008); a legacy v1
-  // record still runs this same v1->v2 backfill on its way up and lands at
-  // whatever the current version now is — there is no v2->v3 data rewrite
-  // to add (ADR-0008: `Block.rounds` needs none).
-  expect(outcome.storedSchemaVersion).toBe(3);
+  // CURRENT_SCHEMA_VERSION has since advanced to 4 (ADR-0008, ADR-0013); a
+  // legacy v1 record still runs this same v1->v2 backfill on its way up
+  // and lands at whatever the current version now is — there is no
+  // v2->v3 or v3->v4 data rewrite to add (neither `Block.rounds`'s
+  // addition nor its later removal needed one).
+  expect(outcome.storedSchemaVersion).toBe(4);
 });
 
 test('ADR-0008 v2->v3: a Block with no `rounds` upgrades cleanly, with rounds left absent', async ({
@@ -60,5 +61,19 @@ test('ADR-0008 v2->v3: a Block with no `rounds` upgrades cleanly, with rounds le
 
   expect(outcome.blockNamePreserved).toBe(true);
   expect(outcome.roundsStillAbsent).toBe(true);
-  expect(outcome.storedSchemaVersion).toBe(3);
+  expect(outcome.storedSchemaVersion).toBe(4);
+});
+
+test('ADR-0013 v3->v4: a Block with `rounds` set upgrades cleanly, with rounds never surfacing through the port', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const outcome = await page.evaluate(() =>
+    window.__runV3ToV4MigrationTest('indexed-db'),
+  );
+
+  expect(outcome.blockNamePreserved).toBe(true);
+  expect(outcome.roundsNeverSurfaced).toBe(true);
+  expect(outcome.storedSchemaVersion).toBe(4);
 });

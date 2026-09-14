@@ -16,12 +16,13 @@
  * underlying store (spec 003 quickstart.md's "a fresh script context, not
  * just a re-render").
  *
- * Schema-version scope note: `CURRENT_SCHEMA_VERSION` is 3 — v1->v2
+ * Schema-version scope note: `CURRENT_SCHEMA_VERSION` is 4 — v1->v2
  * (ADR-0006: Exercise gained `defaultVolumeKind`/`trackEffort`) backfills
  * every pre-existing Exercise; v2->v3 (ADR-0008: Block gained `rounds`)
- * needs no backfill at all, since `rounds` is optional everywhere it's
- * read and a pre-existing Block correctly has none — "not specified" *is*
- * its correct value, not a gap. So only v1->v2 has a real
+ * and v3->v4 (ADR-0013: `rounds` removed again) both need no backfill at
+ * all — optional-field addition and removal round-trip through storage
+ * with no rewrite either way (see `IndexedDbStorageAdapter#checkSchema`'s
+ * own comment for the full reasoning). So only v1->v2 has a real
  * `decideSchemaAction` "migrate" transition to exercise
  * (`#migrateExerciseTemplateDefaults`, in both real adapters). It has no
  * scenario in *this* suite: `setSchemaVersion` is the only public,
@@ -35,15 +36,16 @@
  * `test/unit/infrastructure/schema-version.test.ts`, against synthetic
  * current/stored fixtures. This suite proves the three adapter-level
  * cases reachable through the public port: never-initialized, same,
- * newer — plus (US1-1, below) that a Block's `rounds` round-trips through
- * both real adapters unchanged.
+ * newer.
  *
- * The actual v1->v2 migration — seeding a genuinely pre-migration record
- * below the port and confirming it comes back backfilled with the stored
- * version bumped (now landing at v3, the current version, not v2) — is
- * instead covered directly against each real adapter's own underlying
- * storage: see `window.__runMigrationTest` in
- * `test/e2e/fixtures/storage-harness.ts` and its callers in
+ * The actual migrations — seeding a genuinely pre-migration record below
+ * the port and confirming it comes back correctly shaped with the stored
+ * version bumped (now landing at v4, the current version) — are instead
+ * covered directly against each real adapter's own underlying storage:
+ * v1->v2 via `window.__runMigrationTest`, v2->v3 via
+ * `window.__runV2ToV3MigrationTest`, v3->v4 via
+ * `window.__runV3ToV4MigrationTest`, all in
+ * `test/e2e/fixtures/storage-harness.ts`, called from
  * `test/e2e/indexed-db-adapter.contract.spec.ts` /
  * `test/e2e/file-system-adapter.contract.spec.ts`.
  */
