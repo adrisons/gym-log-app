@@ -377,20 +377,19 @@ export function LoggingScreen() {
         </button>
       )}
 
-      {!pendingDraft && draftHasContent(draft) && (
-        <button
-          type="button"
-          className="logging-button logging-button--primary"
-          onClick={() => {
-            void (async () => {
-              await registerWorkout();
-              navigate('/diary');
-            })();
-          }}
-        >
-          Log workout
-        </button>
-      )}
+      <button
+        type="button"
+        className="logging-button logging-button--primary"
+        disabled={!!pendingDraft || !draftHasContent(draft)}
+        onClick={() => {
+          void (async () => {
+            await registerWorkout();
+            navigate('/diary');
+          })();
+        }}
+      >
+        Log workout
+      </button>
     </main>
   );
 }

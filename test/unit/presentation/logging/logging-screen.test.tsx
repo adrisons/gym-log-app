@@ -274,8 +274,8 @@ describe('LoggingScreen (FR-001)', () => {
   });
 });
 
-describe('LoggingScreen "Log workout" (FR-027; ADR-0008, ADR-0011)', () => {
-  it('is not offered while the active draft has no exercise (an empty default block is not content), and appears once one is added', async () => {
+describe('LoggingScreen "Log workout" (FR-027; ADR-0008, ADR-0011, ADR-0012)', () => {
+  it('stays visible but disabled while the active draft has no exercise (an empty default block is not content), and enables once one is added', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
     renderAtLog();
@@ -285,9 +285,7 @@ describe('LoggingScreen "Log workout" (FR-027; ADR-0008, ADR-0011)', () => {
         screen.getByRole('button', { name: 'Add exercise to Block 1' }),
       ).toBeInTheDocument();
     });
-    expect(
-      screen.queryByRole('button', { name: 'Log workout' }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Log workout' })).toBeDisabled();
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Add exercise to Block 1' }),
@@ -299,9 +297,7 @@ describe('LoggingScreen "Log workout" (FR-027; ADR-0008, ADR-0011)', () => {
     await userEvent.click(screen.getByText('Create "Back squat"'));
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: 'Log workout' }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Log workout' })).toBeEnabled();
     });
   });
 
@@ -378,6 +374,9 @@ describe('LoggingScreen pending-draft recovery banner (FR-024, FR-028; ADR-0008,
     expect(
       screen.queryByRole('button', { name: 'Add block' }),
     ).not.toBeInTheDocument();
+    // ADR-0012: "Log workout" itself stays visible, never hidden, but is
+    // disabled while the recovery banner is unresolved.
+    expect(screen.getByRole('button', { name: 'Log workout' })).toBeDisabled();
 
     await userEvent.click(screen.getByRole('button', { name: 'Recover' }));
 
