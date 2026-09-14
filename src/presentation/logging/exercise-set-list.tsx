@@ -128,22 +128,23 @@ export function ExerciseSetList({
         {sets.map((set) => {
           const vm = toSetSummaryViewModel(set);
           const isNewest = vm.id === newestSetId;
+          const className = [
+            'set-summary',
+            vm.effortTone && `set-summary--${vm.effortTone}`,
+            isNewest && 'set-summary--new',
+          ]
+            .filter(Boolean)
+            .join(' ');
           return (
             <li
               key={vm.id}
-              className={
-                isNewest ? 'set-summary set-summary--new' : 'set-summary'
-              }
+              className={className}
               {...(isNewest && onNewestSetAnimationEnd
                 ? { onAnimationEnd: () => onNewestSetAnimationEnd(vm.id) }
                 : {})}
             >
-              {vm.loadLabel && <span>{vm.loadLabel}</span>}
-              <span>{vm.volumeLabel}</span>
-              {vm.effortLabel && <span>{vm.effortLabel}</span>}
-              <OverflowMenu
-                label={`${vm.loadLabel ? `${vm.loadLabel} ` : ''}${vm.volumeLabel} actions`}
-              >
+              <span>{vm.summaryLine}</span>
+              <OverflowMenu label={`${vm.summaryLine} actions`}>
                 <button
                   type="button"
                   className="logging-button logging-button--icon-label"

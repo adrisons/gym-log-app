@@ -4,7 +4,7 @@
  * (FR-4), so the wheel's first position is an explicit "not recorded"
  * state rather than always resting on some level by default.
  */
-import { formatEffort } from '@/application/logging/view-models';
+import { effortTone, formatEffort } from '@/application/logging/view-models';
 import { WheelPicker } from './wheel-picker';
 import type { WheelPickerOption } from './wheel-picker';
 import './logging.css';
@@ -12,18 +12,12 @@ import './logging.css';
 const LEVELS = [1, 2, 3, 4, 5] as const;
 type EffortLevel = (typeof LEVELS)[number];
 
-function toneForLevel(level: EffortLevel): 'success' | 'warning' | 'danger' {
-  if (level <= 2) return 'success';
-  if (level <= 4) return 'warning';
-  return 'danger';
-}
-
 const OPTIONS: WheelPickerOption<EffortLevel | undefined>[] = [
   { value: undefined, label: 'Not recorded' },
   ...LEVELS.map((level) => ({
     value: level,
     label: formatEffort(level)!,
-    tone: toneForLevel(level),
+    tone: effortTone(level),
   })),
 ];
 

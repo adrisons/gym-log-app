@@ -34,21 +34,7 @@ import { ExerciseEntryCard } from '../logging/exercise-entry-card';
 import { ExerciseSetList } from '../logging/exercise-set-list';
 import { AddExerciseControl } from '../logging/add-exercise-control';
 import { ExerciseTemplatePanel } from '../logging/exercise-template-panel';
-import type { DraftBlock } from '@/application/logging/draft';
 import './diary.css';
-
-/** ADR-0008: rebuilds a block without `rounds`, for clearing it — mirrors
- * `application/logging/draft.ts`'s own `withoutRounds` (this screen edits
- * an `EditableSession` locally rather than going through that module's
- * actions, so it needs its own copy of the same shape-preserving rebuild). */
-function withoutRounds(block: DraftBlock): DraftBlock {
-  return {
-    id: block.id,
-    ...(block.name !== undefined ? { name: block.name } : {}),
-    type: block.type,
-    exercises: block.exercises,
-  };
-}
 
 export function SessionDetailScreen() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -180,6 +166,16 @@ export function SessionDetailScreen() {
     }));
   };
 
+  const moveBlock = (fromIndex: number, toIndex: number) => {
+    persist((current) => {
+      const blocks = [...current.blocks];
+      const [moved] = blocks.splice(fromIndex, 1);
+      if (!moved) return current;
+      blocks.splice(toIndex, 0, moved);
+      return { ...current, blocks };
+    });
+  };
+
   if (!sessionId) {
     return null;
   }
@@ -241,7 +237,10 @@ export function SessionDetailScreen() {
             displayName={blockVm.displayName}
             hasName={block.name !== undefined}
             subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'}`}
-            rounds={block.rounds}
+            canMoveUp={blockIndex > 0}
+            canMoveDown={blockIndex < editable.blocks.length - 1}
+            onMoveUp={() => moveBlock(blockIndex, blockIndex - 1)}
+            onMoveDown={() => moveBlock(blockIndex, blockIndex + 1)}
             onRename={(name) =>
               persist((editable) => ({
                 ...editable,
@@ -249,18 +248,6 @@ export function SessionDetailScreen() {
                   b.id === block.id
                     ? { ...b, ...(name !== undefined ? { name } : {}) }
                     : b,
-                ),
-              }))
-            }
-            onSetRounds={(rounds) =>
-              persist((editable) => ({
-                ...editable,
-                blocks: editable.blocks.map((b) =>
-                  b.id !== block.id
-                    ? b
-                    : rounds !== undefined
-                      ? { ...b, rounds }
-                      : withoutRounds(b),
                 ),
               }))
             }

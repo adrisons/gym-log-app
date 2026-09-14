@@ -73,10 +73,10 @@ describe('SessionDetailScreen (FR-004/005)', () => {
         screen.getByRole('heading', { name: 'Squat' }),
       ).toBeInTheDocument();
     });
-    expect(screen.getByText('100 kg')).toBeInTheDocument();
+    expect(screen.getByText('5 x 100kg')).toBeInTheDocument();
 
     await userEvent.click(
-      screen.getByRole('button', { name: /100 kg 5 reps actions/i }),
+      screen.getByRole('button', { name: /5 x 100kg actions/i }),
     );
     await userEvent.click(screen.getByText('Delete set'));
 
@@ -147,7 +147,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     });
 
     await userEvent.click(
-      screen.getByRole('button', { name: /100 kg 5 reps actions/i }),
+      screen.getByRole('button', { name: /5 x 100kg actions/i }),
     );
     await userEvent.click(screen.getByText('Edit'));
     const weightField = screen.getByRole('spinbutton', { name: /weight/i });
@@ -166,7 +166,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     });
   });
 
-  it("edits and clears a block's rounds, persisting each change via saveSession (ADR-0008, Copilot review regression)", async () => {
+  it("reorders blocks via a block's own Move up/Move down menu items, persisting the new order via saveSession (ADR-0013)", async () => {
     const storage = new InMemoryStorage();
     const exerciseId = 'ex-1' as ExerciseId;
     const sessionId = 's1' as SessionId;
@@ -187,10 +187,11 @@ describe('SessionDetailScreen (FR-004/005)', () => {
         notes: '',
         blocks: [
           createBlock({
-            type: 'circuit',
-            rounds: 3,
+            type: 'straightSets',
+            name: 'Push day',
             exercises: [{ exerciseId, notes: '', sets: [] }],
           }),
+          createBlock({ type: 'straightSets', name: 'Leg day', exercises: [] }),
         ],
       }),
     );
@@ -205,24 +206,18 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: 'Squat' }),
-      ).toBeInTheDocument();
-    });
-    const roundsInput = screen.getByLabelText('Rounds');
-    expect(roundsInput).toHaveValue(3);
-
-    await userEvent.clear(roundsInput);
-    await userEvent.type(roundsInput, '5');
-    await waitFor(async () => {
-      const saved = await storage.getSession(sessionId);
-      expect(saved?.blocks[0]?.rounds).toBe(5);
+      expect(screen.getByText('Push day')).toBeInTheDocument();
+      expect(screen.getByText('Leg day')).toBeInTheDocument();
     });
 
-    await userEvent.clear(roundsInput);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Push day actions' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Move down' }));
+
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
-      expect(saved?.blocks[0]).not.toHaveProperty('rounds');
+      expect(saved?.blocks.map((b) => b.name)).toEqual(['Leg day', 'Push day']);
     });
   });
 

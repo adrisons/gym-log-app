@@ -72,9 +72,7 @@ describe('ExerciseSetList (ADR-0010)', () => {
       />,
     );
 
-    expect(screen.getByText('100 kg')).toBeInTheDocument();
-    expect(screen.getByText('5 reps')).toBeInTheDocument();
-    expect(screen.getByText(/4 — Hard/)).toBeInTheDocument();
+    expect(screen.getByText('5 x 100kg - Hard')).toBeInTheDocument();
   });
 
   it('confirming the add form closes it back to the "+ Add set" button', async () => {
@@ -153,7 +151,7 @@ describe('ExerciseSetList (ADR-0010)', () => {
       />,
     );
 
-    expect(screen.getByText('12 reps')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.queryByText('—')).not.toBeInTheDocument();
   });
 
@@ -170,7 +168,7 @@ describe('ExerciseSetList (ADR-0010)', () => {
     );
 
     await userEvent.click(
-      screen.getByRole('button', { name: /100 kg 5 reps actions/i }),
+      screen.getByRole('button', { name: /5 x 100kg - Hard actions/i }),
     );
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Delete set' }));
@@ -190,7 +188,7 @@ describe('ExerciseSetList (ADR-0010)', () => {
     );
 
     await userEvent.click(
-      screen.getByRole('button', { name: /100 kg 5 reps actions/i }),
+      screen.getByRole('button', { name: /5 x 100kg - Hard actions/i }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
@@ -223,7 +221,7 @@ describe('ExerciseSetList (ADR-0010)', () => {
     );
 
     await userEvent.click(
-      screen.getByRole('button', { name: /100 kg 5 reps actions/i }),
+      screen.getByRole('button', { name: /5 x 100kg - Hard actions/i }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
     await userEvent.click(
@@ -259,7 +257,7 @@ describe('ExerciseSetList (ADR-0010)', () => {
     expect(screen.getByRole('button', { name: 'Add set' })).toBeInTheDocument();
 
     await userEvent.click(
-      screen.getByRole('button', { name: /100 kg 5 reps actions/i }),
+      screen.getByRole('button', { name: /5 x 100kg - Hard actions/i }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Delete set' }));
 
@@ -299,7 +297,7 @@ describe('ExerciseSetList (ADR-0010)', () => {
     // Edit the first set — its own row's menu stays visible below the
     // form, same as every other row.
     await userEvent.click(
-      screen.getByRole('button', { name: /100 kg 5 reps actions/i }),
+      screen.getByRole('button', { name: /5 x 100kg - Hard actions/i }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
     expect(

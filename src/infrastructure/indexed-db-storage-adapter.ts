@@ -72,9 +72,13 @@ export class IndexedDbStorageAdapter implements StoragePort {
       // for a backfill it no longer needs (Copilot review, PR #21).
       await this.#migrateExerciseTemplateDefaults();
     }
-    // v2 -> v3 (ADR-0008): Block.rounds is optional, and its absence in
-    // every already-stored Session is itself valid v3 data — no stored
-    // shape changes, so this step has no backfill of its own to run.
+    // v2 -> v3 (ADR-0008): Block.rounds was optional, and its absence in
+    // every already-stored Session was itself valid v3 data — no stored
+    // shape changes, so this step never had a backfill of its own to run.
+    // ADR-0013 removed `rounds` again (redundant with each exercise
+    // entry's own set count); a leftover `rounds` key on old v3 data is
+    // simply never read any more — no new version bump or migration for
+    // that either, same reasoning.
     if (action === 'migrate' || stored === 0) {
       // `stored === 0` (the never-initialized sentinel, itself decided
       // as 'open' since there is nothing to migrate) still needs this
