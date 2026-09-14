@@ -139,10 +139,9 @@ One vocabulary, used identically in code, UI and documentation.
   keeps adding to or stops adding to. More than one session per day is
   allowed, and each is fully independent.
 - **Block.** An ordered grouping inside a session: optional name ("Superset A",
-  "Legs"), type (straight sets / superset / circuit), optional target rounds
-  (how many times the whole block — every exercise entry in it — is meant to
-  be repeated, e.g. "3 rounds" of a circuit; ADR-0008), and an ordered list of
-  exercise entries.
+  "Legs"), type (straight sets / superset / circuit), and an ordered list of
+  exercise entries. No target-rounds field (ADR-0008 added one, ADR-0013
+  removed it again as redundant with each exercise entry's own set count).
 - **Exercise entry.** A reference to a catalogue exercise, its order within the
   block, notes, and its sets.
 - **Set.** One performed set: volume, load, effort, kind (warm-up / working / to
@@ -250,10 +249,10 @@ Create a session and add blocks, exercises and sets.
   Purely a display state: never persisted as part of the Session record,
   and never affects what FR-004's undo restores. _(Amended by ADR-0011:
   the visible summary count is exercises only, not sets.)_
-- **(ADR-0013, supersedes the bullet above)** A block's target round count
-  (ADR-0008) is removed — redundant with each exercise entry's own set
-  count, which already says how many times it was actually done. A block
-  has no round-related field of any kind any more.
+- **(ADR-0013, supersedes ADR-0008's target-round-count requirement)** A
+  block's target round count is removed — redundant with each exercise
+  entry's own set count, which already says how many times it was
+  actually done. A block has no round-related field of any kind any more.
 
 ### FR-3 — Sets and load `[v1]`
 

@@ -42,11 +42,19 @@ nothing else threw that error), `DraftBlock` (`application/ports/
 logging-draft.ts`), and every read/write site (`draft.ts`'s
 `setBlockRounds`/`withoutRounds`, `logging-store.ts`'s `setBlockRounds`
 action, `session-editing.ts`'s round-trip, `BlockCard`'s rounds `<input>`
-and its CSS). No schema version bump and no migration for the removal:
-the field was always optional, so a leftover `rounds` key on data stored
-before this ADR is simply never read again — the same "no stored shape
-change" reasoning ADR-0008's own v2→v3 migration already used for the
-field's *addition* (nothing to backfill either way).
+and its CSS). `docs/requirements.md` §6 requires a version bump and a
+tested migration for *any* change to a canonical persisted shape (§3.1),
+with no carve-out for a field's removal specifically (unlike Settings'
+own D14 exception) — `CURRENT_SCHEMA_VERSION` bumps to 4
+(`infrastructure/schema-version.ts`), with a v3→v4 step in both real
+adapters' `#checkSchema`. That step has no backfill of its own to run,
+the same "additive/removal needs no data rewrite" reasoning ADR-0008's
+own v2→v3 step already relied on for the field's *addition* — a v3
+record's leftover `rounds` key is simply inert data `Block`'s own type no
+longer declares, never stripped and never read again. New
+`window.__runV3ToV4MigrationTest` (`test/e2e/fixtures/storage-harness.ts`)
+tests this against both real adapters, mirroring the existing
+`__runV2ToV3MigrationTest` (Copilot review, PR #30).
 
 ### 2. The set summary is one compact "x"-joined line
 
@@ -105,11 +113,22 @@ word, so the label above it only needed "Move to."
   validation.
 - `SetSummaryViewModel.loadLabel`/`volumeLabel`/`effortLabel` are gone,
   replaced by `summaryLine`/`effortTone`; `ExerciseSetList` is the only
-  consumer, updated alongside.
-- `docs/requirements.md` FR-2 (rounds bullet removed, block-reorder-via-
-  menu noted), FR-3 (set summary format), and D15 (superseded by new
-  D20); `specs/001-log-a-session/spec.md` FR-003 and FR-006 — all
-  annotated as amended by this ADR, following the precedent already set
-  by ADR-0006 through ADR-0012 for amending FR text in place.
-- No schema change beyond the rounds field's removal covered in §1 above
-  — everything else in this ADR is presentation/application-layer only.
+  consumer, updated alongside. `summaryLine` "x"-joins volume and load
+  only when *both* are present — a valid load-only set (FR-019, no
+  volume) shows just its load, never a "—" standing in for the missing
+  half of a join with nothing on the other side (Copilot review, PR #30).
+- `CURRENT_SCHEMA_VERSION` is 4 (§1 above); both real adapters'
+  `#checkSchema` gain a v3→v4 step, and a new `__runV3ToV4MigrationTest`
+  harness function (mirroring `__runV2ToV3MigrationTest`) is exercised by
+  both `test/e2e/indexed-db-adapter.contract.spec.ts` and
+  `test/e2e/file-system-adapter.contract.spec.ts`.
+- `docs/requirements.md` §3.1 (Block entity description), FR-2 (rounds
+  bullet removed, block-reorder-via-menu noted), FR-3 (set summary
+  format), D15 (superseded by new D20); `specs/001-log-a-session/spec.md`
+  FR-003 and FR-006; `specs/001-log-a-session/data-model.md` (`DraftBlock`,
+  `setBlockRounds`/new `reorderBlock`, and the superseded three-field
+  `SetSummaryViewModel` shape); `specs/002-domain-and-ports/data-model.md`
+  (`Block.rounds`) — all annotated as amended by this ADR, following the
+  precedent already set by ADR-0006 through ADR-0012 for amending FR/
+  data-model text in place rather than deleting it outright (Copilot
+  review, PR #30, flagged these governing artifacts as originally missed).
