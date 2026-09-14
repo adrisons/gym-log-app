@@ -105,6 +105,17 @@ describe('view-models formatters (data-model.md "View models")', () => {
     expect(vm.summaryLine).toBe('8');
   });
 
+  it('toSetSummaryViewModel shows only the load, with no "x", for a valid load-only set with no volume (FR-3/FR-019, Copilot review)', () => {
+    const set: DraftSet = {
+      id: 'set-load-only',
+      load: { kind: 'weight', value: 70, unit: 'kg' },
+      setKind: 'working',
+      completed: true,
+    };
+    const vm = toSetSummaryViewModel(set);
+    expect(vm.summaryLine).toBe('70kg');
+  });
+
   it('toSetSummaryViewModel formats duration/distance volume compactly (no unit word)', () => {
     expect(
       toSetSummaryViewModel({

@@ -76,9 +76,12 @@ export function effortTone(effort: Effort): 'success' | 'warning' | 'danger' {
 
 /** Compact volume for the one-line set summary (ADR-0013) — a bare count,
  * not `formatVolume`'s word-suffixed form ("8", not "8 reps"): the
- * summary line's own "x" already reads as a rep/time/distance count. */
-function formatVolumeCompact(volume: Volume | undefined): string {
-  if (volume === undefined) return '—';
+ * summary line's own "x" already reads as a rep/time/distance count.
+ * `undefined` when volume itself is absent (a valid load-only set, FR-3/
+ * FR-019) — never a "—" placeholder standing in for the missing half of
+ * an "x" join that then has nothing on the other side to join with. */
+function formatVolumeCompact(volume: Volume | undefined): string | undefined {
+  if (volume === undefined) return undefined;
   switch (volume.kind) {
     case 'reps':
       return `${volume.count}`;
@@ -106,9 +109,11 @@ function formatLoadCompact(load: Load): string | undefined {
 
 export interface SetSummaryViewModel {
   id: string;
-  /** e.g. "8 x 70kg - Light" — volume and load combined ("x"-joined, or
-   * volume alone for a none-kind load), with " - <effort word>" appended
-   * when effort was recorded (ADR-0013). */
+  /** e.g. "8 x 70kg - Light" — volume and load combined ("x"-joined) when
+   * both are present, or whichever one alone is present (a none-kind load,
+   * or FR-019's valid load-only set with no volume) — never an "x" with
+   * only one real side. " - <effort word>" is appended when effort was
+   * recorded (ADR-0013). */
   summaryLine: string;
   effortTone?: 'success' | 'warning' | 'danger';
   setKind: 'warmUp' | 'working' | 'toFailure';
@@ -118,7 +123,9 @@ export function toSetSummaryViewModel(set: DraftSet): SetSummaryViewModel {
   const volumePart = formatVolumeCompact(set.volume);
   const loadPart = formatLoadCompact(set.load);
   const line =
-    loadPart !== undefined ? `${volumePart} x ${loadPart}` : volumePart;
+    volumePart !== undefined && loadPart !== undefined
+      ? `${volumePart} x ${loadPart}`
+      : (volumePart ?? loadPart ?? '—');
   const summaryLine =
     set.effort !== undefined ? `${line} - ${EFFORT_LABELS[set.effort]}` : line;
   return {
