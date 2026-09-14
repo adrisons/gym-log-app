@@ -108,6 +108,55 @@ describe('ExerciseSetList (ADR-0010)', () => {
     expect(screen.getByRole('button', { name: 'Add set' })).toBeInTheDocument();
   });
 
+  it('Cancel closes the add form without saving, back to the "+ Add set" button — even for an entry with zero sets', async () => {
+    const onAddSet = vi.fn();
+    render(
+      <ExerciseSetList
+        {...baseProps}
+        sets={[loggedSet]}
+        onAddSet={onAddSet}
+        onUpdateSet={() => {}}
+        onDeleteSet={() => {}}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
+    expect(
+      screen.getByRole('spinbutton', { name: /weight/i }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onAddSet).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole('spinbutton', { name: /weight/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add set' })).toBeInTheDocument();
+  });
+
+  it('shows no load column at all for a none-kind load, rather than a "—" placeholder (only entered data shows)', () => {
+    const noneLoadSet: DraftSet = {
+      id: 'set-none',
+      volume: { kind: 'reps', count: 12 },
+      load: { kind: 'none' },
+      setKind: 'working',
+      completed: true,
+    };
+    render(
+      <ExerciseSetList
+        {...baseProps}
+        loadKind="none"
+        sets={[noneLoadSet]}
+        onAddSet={() => {}}
+        onUpdateSet={() => {}}
+        onDeleteSet={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('12 reps')).toBeInTheDocument();
+    expect(screen.queryByText('—')).not.toBeInTheDocument();
+  });
+
   it("offers Edit and Delete set from a logged set's menu (replacing the old bare delete button)", async () => {
     const onDeleteSet = vi.fn();
     render(

@@ -16,11 +16,16 @@
  * close so a closed menu costs nothing. Focus returns to the hamburger
  * button on every close path except "chose a destination", where the
  * browser's own navigation already moves focus meaningfully elsewhere.
+ *
+ * Also renders the current screen's own title (`useScreenTitle`,
+ * `screen-title.tsx`) to the left of the menu button — design-refinement
+ * request to save the vertical space each screen's own `<h1>` used to take.
  */
 import { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Icon } from '@/presentation/design/icons';
 import type { IconName } from '@/presentation/design/icons';
+import { useScreenTitle } from './screen-title';
 import './header-nav.css';
 
 const DESTINATIONS: { to: string; label: string; icon: IconName }[] = [
@@ -33,6 +38,7 @@ export function HeaderNav() {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const title = useScreenTitle();
 
   useEffect(() => {
     if (!open) return;
@@ -61,6 +67,7 @@ export function HeaderNav() {
 
   return (
     <header className="header-nav">
+      {title && <h1 className="header-nav__title">{title}</h1>}
       <button
         ref={buttonRef}
         type="button"

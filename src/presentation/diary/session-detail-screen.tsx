@@ -28,6 +28,7 @@ import type {
   SessionId,
 } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
+import { useSetScreenTitle } from '@/presentation/nav/screen-title';
 import { BlockCard } from '../logging/block-card';
 import { ExerciseEntryCard } from '../logging/exercise-entry-card';
 import { ExerciseSetList } from '../logging/exercise-set-list';
@@ -75,6 +76,12 @@ export function SessionDetailScreen() {
   const [editingTemplateFor, setEditingTemplateFor] = useState<
     Exercise | undefined
   >(undefined);
+
+  useSetScreenTitle(
+    editable
+      ? `Session — ${new Date(editable.dateTime).toLocaleString()}`
+      : 'Session',
+  );
 
   // Guards the very first `editable` a load populates from re-triggering
   // the persist effect below with an unchanged snapshot — set right
@@ -184,7 +191,6 @@ export function SessionDetailScreen() {
   return (
     <main className="session-detail-screen" aria-label="Session detail">
       <div className="session-detail-screen__header">
-        <h1>Session — {new Date(editable.dateTime).toLocaleString()}</h1>
         <button
           type="button"
           className="logging-button session-detail-screen__close"

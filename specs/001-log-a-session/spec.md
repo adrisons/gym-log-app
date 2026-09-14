@@ -208,11 +208,14 @@ core value on its own.
 10. **Given** the active draft has at least one exercise, **When** the user
     presses "Log workout", **Then** the draft becomes a permanent Session in
     the diary, the stored draft (if any) is cleared, and the active form
-    resets to a fresh, empty, unsaved state; there is no such control while
-    the active draft has no exercise at all. _(Added by ADR-0008. Threshold
-    amended by ADR-0011: the form always seeds one empty block, so "at
-    least one block" stopped distinguishing an untouched draft from one
-    worth registering — the gate is the exercise itself.)_
+    resets to a fresh, empty, unsaved state; the control stays visible but
+    `disabled` while the active draft has no exercise at all. _(Added by
+    ADR-0008. Threshold amended by ADR-0011: the form always seeds one
+    empty block, so "at least one block" stopped distinguishing an
+    untouched draft from one worth registering — the gate is the exercise
+    itself. Visibility amended by ADR-0012: the control is always
+    rendered, disabled rather than removed, matching FR-019's own
+    disabled-not-hidden convention.)_
 11. **Given** the user opens the logging form and leaves without entering
     any data, **When** they close or navigate away, **Then** nothing is
     stored — there is no draft to recover on a later visit. _(Added by
@@ -601,13 +604,17 @@ result — independently verifiable without blocks, load types, or effort.
   unsaved state, and return the user to the diary with the save
   acknowledgement (`docs/design.md` §1.1's bounded exception) — the same
   acknowledgement spec.md previously showed on leaving the form after any
-  set, now tied to this explicit action instead. There MUST be no such
-  action while the active draft has no exercise at all (FR-019's
-  "unavailable rather than rejected" convention, applied one level up: an
-  empty draft has nothing worth registering, the same threshold FR-024
-  already uses to decide whether there is "at least one change" to
-  persist). This is the only way a Session is created from the logging
-  screen — there is no time- or day-based automatic promotion.
+  set, now tied to this explicit action instead. The control itself MUST
+  stay visible at all times on this form and be `disabled`, never removed
+  from the page, while the active draft has no exercise at all or while a
+  pending-draft recovery banner is unresolved (FR-019's own "unavailable"
+  convention, which already means disabled-not-hidden there — SetRow's
+  own Confirm control — applied one level up here too, replacing this
+  control's earlier show/hide behavior, ADR-0012): an empty draft has
+  nothing worth registering, the same threshold FR-024 already uses to
+  decide whether there is "at least one change" to persist. This is the
+  only way a Session is created from the logging screen — there is no
+  time- or day-based automatic promotion.
   _(Added by ADR-0008. Threshold amended by ADR-0011: the form always
   seeds one empty block, so "at least one block" is true from the moment
   the form opens and can no longer serve as the gate — the exercise

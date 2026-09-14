@@ -64,17 +64,25 @@ export function formatEffort(effort: Effort | undefined): string | undefined {
 
 export interface SetSummaryViewModel {
   id: string;
-  loadLabel: string;
+  loadLabel?: string;
   volumeLabel: string;
   effortLabel?: string;
   setKind: 'warmUp' | 'working' | 'toFailure';
 }
 
+/**
+ * `loadLabel` is omitted entirely for a `none`-kind load, not rendered as
+ * "—": a template with load type None has no load field to fill in the
+ * first place (ADR-0010's own reasoning for why Confirm doesn't require
+ * one), so there is no missing data to flag — only what was actually
+ * entered should show in the summary.
+ */
 export function toSetSummaryViewModel(set: DraftSet): SetSummaryViewModel {
   const effortLabel = formatEffort(set.effort);
+  const loadLabel = set.load.kind === 'none' ? undefined : formatLoad(set.load);
   return {
     id: set.id,
-    loadLabel: formatLoad(set.load),
+    ...(loadLabel !== undefined ? { loadLabel } : {}),
     volumeLabel: formatVolume(set.volume),
     ...(effortLabel !== undefined ? { effortLabel } : {}),
     setKind: set.setKind,

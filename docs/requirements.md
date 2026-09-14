@@ -309,6 +309,17 @@ Create a session and add blocks, exercises and sets.
   set in place (new — spec 001 never had this) uses the same form and the
   domain-minimum rule (a load or a volume present) rather than the fuller
   per-field requirement, since it starts from an already-valid set.
+- **(ADR-0012)** The Confirm button gets a Cancel button alongside it in
+  every mode, not only when editing an already-recorded set: opening the
+  add-set form (whether from "+ Add set" or an entry's own default-open
+  state) no longer commits the user to entering a value — Cancel closes it
+  back to the "+ Add set" button without saving, even for an exercise
+  entry that has no sets logged yet.
+- **(ADR-0012)** A set's summary shows only the data actually entered for
+  it: an exercise whose template's load type is None has no load field to
+  begin with, so its sets' summaries show no load placeholder at all
+  (previously a "—" dash, read as if a value were missing rather than
+  simply not applicable).
 
 ### FR-4 — Effort `[v1]`
 
@@ -474,6 +485,26 @@ instead of a data file.
 - Generation is entirely on-device; the only hand-off is the platform's
   native share sheet or a saved file — never a direct API call to a
   third-party platform (Principle IV, Invariant 1).
+
+### FR-15 — Exclude an exercise from progression/Insights `[later]`
+
+Let the user mark an Exercise (e.g. a warm-up or mobility movement) as one
+whose progress is never worth measuring, so FR-8 and FR-9 stop computing
+and offering a trend for it. Drafted, not yet built or scheduled —
+`specs/008-exercise-progression-opt-out/spec.md` (D19).
+
+- A new field on the catalogue `Exercise` (§3.1) marks it excluded from
+  progression tracking — additive, defaulting to "included" for every
+  existing exercise, so nothing already logged changes behavior on
+  upgrade. A schema change under §6/Principle III, not a display-only
+  toggle.
+- An excluded exercise is skipped by every FR-9 card computation (all six
+  types) and by FR-8's own personal-record marking; it can still be
+  logged normally (FR-1/FR-3) and still appears in the diary (FR-6) and
+  exercise search (FR-7) — exclusion only turns off progress *measurement*,
+  never recording.
+- Toggled from the exercise catalogue screen (FR-5), alongside its other
+  per-exercise management actions.
 
 ---
 
@@ -643,6 +674,7 @@ before code.
 | D16 | Whether a workout (the logging draft) becomes a Session automatically, or only when the user explicitly says so | **Closed:** explicitly — an explicit "Log workout" action is the only way a draft becomes a Session; the previous automatic day-rollover promotion is removed. Recording a *set* is unaffected — this decision is scoped to the session-level "commit to the diary" step only. A draft with no exercise at all is never persisted; a draft with at least one exercise persists and, if left unregistered, is offered (never auto-loaded) as a recovery banner the next time the logging form opens. No schema change: `LoggingDraft`'s shape and the storage port are unaffected. "One draft per training type" is not built by this decision — it collapses to the single existing draft, since only the Strength discipline is implemented today (D8). _(Threshold amended by ADR-0011 from "at least one block" to "at least one exercise": the form now always seeds one block, so a bare block is no longer a signal of intent.)_ → ADR-0009, ADR-0011 |
 | D17 | Whether recording a set requires an explicit confirm step (reopens D12); whether an already-recorded set can be edited in place; whether the per-exercise progression view (FR-013) stays reachable from a session detail view; whether the `/exercises` screen can create a new catalogue Exercise and edit an existing one's set-entry template | **Closed, all together (one design-refinement pass):** (1) Confirm is explicit again — a set commits only on an explicit "Add set"/"Save changes" tap, enabled only once every field the exercise's current template tracks is filled; the auto-commit-on-edit behavior and its "Repeat last set"/"Log this set" controls (D12/ADR-0007) are retired. (2) A `Set` can now be edited in place (load/volume/effort), not only added or deleted — new capability, still no schema change (`Set`'s shape is unaffected; only *how* one is produced changes). (3) A session detail view's per-exercise entries no longer link to the progression screen — for now, that stays reachable only from search results (spec 004 FR-013) and Insights (spec 005); FR-013 is amended accordingly, not removed (the progression screen itself, and its other two entry points, are unaffected). (4) The `/exercises` screen (spec 004 FR-5) gains "New exercise" (name + set-entry template together) alongside its existing rename/merge/delete, and its management panel gains "Edit tracked fields…" (ADR-0006) for an existing exercise — previously only reachable per-entry from the logging/session-detail screens. No schema change for (3) or (4) either — purely which screens link where, and use-cases (`createExercise`, `updateExerciseTemplate`) both already existed. → ADR-0010 |
 | D18 | Whether an exercise entry can exist without belonging to any block (the "loose" block) | **Closed:** no — every exercise entry always belongs to a real block; the draft-only "loose" flag that used to render a blockless exercise without block chrome is removed. It caused a real bug: the flag was never part of the persisted `Block` shape, so a blockless exercise silently gained block chrome the moment the session was saved and reopened. The logging form now opens with one empty block already present, and each block (including that first one) carries its own "add exercise" control; "Add block" below the last block still adds more. No schema change — `Block` never had a "loose" concept to begin with. → ADR-0011 |
+| D19 | Whether excluding an exercise (e.g. a warm-up) from FR-8/FR-9's progression and Insights computations warrants its own spec, rather than a quick change inside spec 004/005 | **Closed:** yes, its own spec — this is a new, additive field on the canonical `Exercise` entity (§3.1), so it needs the §6/Principle III schema-version-bump-and-migration treatment spec 004/005 themselves didn't need to reopen; it also changes eligibility filtering inside both FR-8 (personal records) and every one of FR-9's six card types, and has its own open questions (e.g. whether an excluded exercise's progression screen stays manually reachable) that deserve their own Acceptance Scenarios rather than being folded silently into either existing spec. Targeted at the "Later" phase (§9), pending its own scheduling decision — drafted, not yet built. → FR-15, `specs/008-exercise-progression-opt-out/spec.md` |
 
 ---
 
@@ -669,8 +701,9 @@ before code.
   open question (§8) pending its own future decision.
 - **Later, only with a recorded decision** — multi-device sync, import from
   other apps, report export, further exercise disciplines beyond the first
-  one added under v1.1, and sharing training content as an image for
-  external platforms (FR-14, D13).
+  one added under v1.1, sharing training content as an image for external
+  platforms (FR-14, D13), and excluding an exercise from progression/
+  Insights tracking (FR-15, D19).
 
 ---
 

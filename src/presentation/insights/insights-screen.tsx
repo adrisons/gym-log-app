@@ -10,6 +10,7 @@ import { buildInsights } from '@/application/insights/build-insights';
 import type { InsightsResult } from '@/application/insights/build-insights';
 import type { ProgressionMetric } from '@/application/progression/progression-series';
 import type { Exercise, Session } from '@/application/logging/use-cases';
+import { useSetScreenTitle } from '@/presentation/nav/screen-title';
 import { InsightCard } from './insight-card';
 import { MissingDataNotice } from './missing-data-notice';
 import './insights.css';
@@ -26,6 +27,7 @@ function progressionLink(exerciseId: string): string {
 }
 
 export function InsightsScreen() {
+  useSetScreenTitle('Insights');
   const [result, setResult] = useState<InsightsResult | undefined>(undefined);
 
   useEffect(() => {
@@ -45,8 +47,6 @@ export function InsightsScreen() {
 
   return (
     <main className="insights-screen" aria-label="Insights">
-      <h1>Insights</h1>
-
       <section aria-label="Per-exercise progress">
         <h2>Progress</h2>
         {result.perExerciseProgress.cards.length > 0 ? (

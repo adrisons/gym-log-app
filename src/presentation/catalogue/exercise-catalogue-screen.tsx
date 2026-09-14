@@ -19,12 +19,14 @@ import { allStoredDataRange } from '@/application/date-range';
 import { searchExercises } from '@/application/search/exercise-search';
 import type { Exercise, Session } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
+import { useSetScreenTitle } from '@/presentation/nav/screen-title';
 import { ExerciseCataloguePanel } from '../logging/exercise-catalogue-panel';
 import { ExerciseTemplatePanel } from '../logging/exercise-template-panel';
 import { CreateExercisePanel } from './create-exercise-panel';
 import './catalogue.css';
 
 export function ExerciseCatalogueScreen() {
+  useSetScreenTitle('Exercises');
   // Rename/merge/delete all go through the logging store's own actions,
   // not the bare use-case functions directly: those actions also re-sync
   // the store's in-memory `draft`/`catalogue` from storage afterward.
@@ -96,8 +98,6 @@ export function ExerciseCatalogueScreen() {
 
   return (
     <main className="catalogue-screen" aria-label="Manage exercises">
-      <h1>Exercises</h1>
-
       <button
         type="button"
         className="logging-button logging-button--icon-label"
