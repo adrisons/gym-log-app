@@ -67,9 +67,9 @@ export interface SetRowProps {
   bandLabels: string[];
   freeTextSuggestions: string[];
   onConfirm: (input: AddSetInput) => void;
-  /** Shown as a Cancel button alongside Confirm when given — the caller
-   * decides when that's appropriate (editing an existing set always wants
-   * one; adding a fresh set usually doesn't). */
+  /** Shown as a Cancel button alongside Confirm when given.
+   * `ExerciseSetList` passes this for both add and edit — closing the form
+   * without entering/changing anything. */
   onCancel?: (() => void) | undefined;
   onSaveBandLabels: (labels: string[]) => void;
 }

@@ -74,6 +74,23 @@ describe('view-models formatters (data-model.md "View models")', () => {
     const vm = toSetSummaryViewModel(set);
     expect(vm.effortLabel).toBe('3 — Moderate');
   });
+
+  it('toSetSummaryViewModel omits loadLabel entirely for a none-kind load, not as a "—" placeholder', () => {
+    const set: DraftSet = {
+      id: 'set-3',
+      load: { kind: 'none' },
+      volume: { kind: 'reps', count: 8 },
+      setKind: 'working',
+      completed: true,
+    };
+    const vm = toSetSummaryViewModel(set);
+    expect(vm).toEqual({
+      id: 'set-3',
+      volumeLabel: '8 reps',
+      setKind: 'working',
+    });
+    expect('loadLabel' in vm).toBe(false);
+  });
 });
 
 describe('toExerciseEntryViewModel / toBlockViewModel (FR-007)', () => {

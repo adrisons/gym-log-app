@@ -14,6 +14,10 @@
  *   "+ Add set" button until Save/Cancel.
  * - `'closed'` — neither: the "+ Add set" button shows.
  *
+ * Cancel closes the form without saving in either mode (add or edit),
+ * back to the "+ Add set" button — even for an entry with zero sets, so
+ * opening the form isn't a commitment to entering one.
+ *
  * Deleting an entry's last remaining set reopens the `'add'` form
  * automatically (there is once again "no data entered").
  */
@@ -134,10 +138,12 @@ export function ExerciseSetList({
                 ? { onAnimationEnd: () => onNewestSetAnimationEnd(vm.id) }
                 : {})}
             >
-              <span>{vm.loadLabel}</span>
+              {vm.loadLabel && <span>{vm.loadLabel}</span>}
               <span>{vm.volumeLabel}</span>
               {vm.effortLabel && <span>{vm.effortLabel}</span>}
-              <OverflowMenu label={`${vm.loadLabel} ${vm.volumeLabel} actions`}>
+              <OverflowMenu
+                label={`${vm.loadLabel ? `${vm.loadLabel} ` : ''}${vm.volumeLabel} actions`}
+              >
                 <button
                   type="button"
                   className="logging-button logging-button--icon-label"
@@ -214,7 +220,7 @@ export function ExerciseSetList({
             }
             closeForm();
           }}
-          {...(form === 'edit' ? { onCancel: closeForm } : {})}
+          onCancel={closeForm}
           onSaveBandLabels={onSaveBandLabels}
         />
       )}
