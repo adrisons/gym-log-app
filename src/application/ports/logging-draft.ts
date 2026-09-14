@@ -39,10 +39,6 @@ export interface DraftBlock {
   id: string;
   name?: string;
   type: 'straightSets' | 'superset' | 'circuit';
-  /** A target round count for the whole block (ADR-0008) — mirrors
-   * `domain/block.ts`'s `Block.rounds` exactly, including its "unset
-   * means not specified" semantics. */
-  rounds?: number;
   exercises: DraftExerciseEntry[];
 }
 

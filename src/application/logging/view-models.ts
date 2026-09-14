@@ -62,29 +62,76 @@ export function formatEffort(effort: Effort | undefined): string | undefined {
   return `${effort} — ${EFFORT_LABELS[effort]}`;
 }
 
+/**
+ * The success/warning/danger tone for an effort level (ADR-0003's
+ * graduated intensity, `docs/design.md`'s refinement note: 1–2 success,
+ * 3–4 warning, 5 danger) — the single source both `EffortPicker`'s wheel
+ * and a logged set's own summary row (ADR-0013) paint with.
+ */
+export function effortTone(effort: Effort): 'success' | 'warning' | 'danger' {
+  if (effort <= 2) return 'success';
+  if (effort <= 4) return 'warning';
+  return 'danger';
+}
+
+/** Compact volume for the one-line set summary (ADR-0013) — a bare count,
+ * not `formatVolume`'s word-suffixed form ("8", not "8 reps"): the
+ * summary line's own "x" already reads as a rep/time/distance count.
+ * `undefined` when volume itself is absent (a valid load-only set, FR-3/
+ * FR-019) — never a "—" placeholder standing in for the missing half of
+ * an "x" join that then has nothing on the other side to join with. */
+function formatVolumeCompact(volume: Volume | undefined): string | undefined {
+  if (volume === undefined) return undefined;
+  switch (volume.kind) {
+    case 'reps':
+      return `${volume.count}`;
+    case 'duration':
+      return `${volume.seconds}s`;
+    case 'distance':
+      return `${volume.metres}m`;
+  }
+}
+
+/** Compact load for the one-line set summary (ADR-0013) — `undefined` for
+ * a `none`-kind load (nothing to show, same reasoning `toSetSummaryViewModel`
+ * already applied to the old `loadLabel`), a tight "70kg" (no space) for
+ * Weight specifically; every other kind matches `formatLoad`'s own text. */
+function formatLoadCompact(load: Load): string | undefined {
+  switch (load.kind) {
+    case 'weight':
+      return `${load.value}${load.unit}`;
+    case 'none':
+      return undefined;
+    default:
+      return formatLoad(load);
+  }
+}
+
 export interface SetSummaryViewModel {
   id: string;
-  loadLabel?: string;
-  volumeLabel: string;
-  effortLabel?: string;
+  /** e.g. "8 x 70kg - Light" — volume and load combined ("x"-joined) when
+   * both are present, or whichever one alone is present (a none-kind load,
+   * or FR-019's valid load-only set with no volume) — never an "x" with
+   * only one real side. " - <effort word>" is appended when effort was
+   * recorded (ADR-0013). */
+  summaryLine: string;
+  effortTone?: 'success' | 'warning' | 'danger';
   setKind: 'warmUp' | 'working' | 'toFailure';
 }
 
-/**
- * `loadLabel` is omitted entirely for a `none`-kind load, not rendered as
- * "—": a template with load type None has no load field to fill in the
- * first place (ADR-0010's own reasoning for why Confirm doesn't require
- * one), so there is no missing data to flag — only what was actually
- * entered should show in the summary.
- */
 export function toSetSummaryViewModel(set: DraftSet): SetSummaryViewModel {
-  const effortLabel = formatEffort(set.effort);
-  const loadLabel = set.load.kind === 'none' ? undefined : formatLoad(set.load);
+  const volumePart = formatVolumeCompact(set.volume);
+  const loadPart = formatLoadCompact(set.load);
+  const line =
+    volumePart !== undefined && loadPart !== undefined
+      ? `${volumePart} x ${loadPart}`
+      : (volumePart ?? loadPart ?? '—');
+  const summaryLine =
+    set.effort !== undefined ? `${line} - ${EFFORT_LABELS[set.effort]}` : line;
   return {
     id: set.id,
-    ...(loadLabel !== undefined ? { loadLabel } : {}),
-    volumeLabel: formatVolume(set.volume),
-    ...(effortLabel !== undefined ? { effortLabel } : {}),
+    summaryLine,
+    ...(set.effort !== undefined ? { effortTone: effortTone(set.effort) } : {}),
     setKind: set.setKind,
   };
 }

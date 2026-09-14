@@ -248,8 +248,29 @@
   align-items: baseline;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
+  /* Reserved regardless of whether this set recorded an effort, so a set
+     that later gets one edited in doesn't shift its neighbors — the tone
+     modifiers below (ADR-0013) only ever repaint this same 3px, never add
+     it. */
+  border-left: 3px solid transparent;
   background: var(--color-surface-raised);
   font-family: var(--font-mono);
+}
+
+/* ADR-0013: a logged set's left edge reads its own effort at a glance —
+   the same success/warning/danger tone `EffortPicker`'s wheel already
+   uses for the same three effort bands (`view-models.ts`'s `effortTone`).
+   No effort recorded paints no color (the transparent border above). */
+.set-summary--success {
+  border-left-color: var(--color-success);
+}
+
+.set-summary--warning {
+  border-left-color: var(--color-warning);
+}
+
+.set-summary--danger {
+  border-left-color: var(--color-danger);
 }
 
 /* Pins the edit/delete menu to the row's end regardless of how many value
@@ -409,27 +430,6 @@
   .block-card__collapse {
     transition: none;
   }
-}
-
-/* ADR-0008: a block's target round count — compact and always visible,
-   never gated by the collapse toggle above (it's the block's own plan,
-   not the exercises/sets content that collapses). */
-.block-card__rounds {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  /* `.block-card` dropped its own flex `gap` in favor of the collapse
-     wrapper's collapsible `margin-top` (above) — this row sits between the
-     header and that wrapper and needs its own top margin, or it renders
-     flush against the header (Copilot review, PR #22). */
-  margin-top: var(--space-4);
-  font-size: 0.875rem;
-  color: var(--color-foreground-muted);
-}
-
-.block-card__rounds input {
-  width: 4.5rem;
-  padding: var(--space-1) var(--space-2);
 }
 
 .block-card__title {

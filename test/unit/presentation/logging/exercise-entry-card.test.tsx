@@ -52,7 +52,7 @@ describe('ExerciseEntryCard', () => {
       screen.getByRole('button', { name: /back squat actions/i }),
     );
     await userEvent.selectOptions(
-      screen.getByLabelText(/move to block/i),
+      screen.getByLabelText(/^move to$/i),
       'block-2',
     );
 

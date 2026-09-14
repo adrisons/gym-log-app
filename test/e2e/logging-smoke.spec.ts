@@ -52,8 +52,7 @@ test('logging a set requires an explicit Confirm tap and then appears instantly,
   await expect(confirm).toBeEnabled();
   await confirm.click();
 
-  await expect(page.getByText('60 kg')).toBeVisible();
-  await expect(page.getByText('5 reps')).toBeVisible();
+  await expect(page.getByText('5 x 60kg')).toBeVisible();
   // Confirming collapses the form to a compact "+ Add set" button
   // (ADR-0010) rather than leaving the full form open.
   await expect(page.getByRole('spinbutton', { name: /weight/i })).toHaveCount(

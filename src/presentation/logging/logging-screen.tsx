@@ -90,7 +90,7 @@ export function LoggingScreen() {
   const saveBandLabels = useLoggingSession((s) => s.saveBandLabels);
   const addBlock = useLoggingSession((s) => s.addBlock);
   const renameBlock = useLoggingSession((s) => s.renameBlock);
-  const setBlockRounds = useLoggingSession((s) => s.setBlockRounds);
+  const reorderBlock = useLoggingSession((s) => s.reorderBlock);
   const reorderBlockExercise = useLoggingSession((s) => s.reorderBlockExercise);
   const moveExerciseAcrossBlocks = useLoggingSession(
     (s) => s.moveExerciseAcrossBlocks,
@@ -254,9 +254,11 @@ export function LoggingScreen() {
             displayName={blockVm.displayName}
             hasName={block.name !== undefined}
             subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'}`}
-            rounds={block.rounds}
+            canMoveUp={blockIndex > 0}
+            canMoveDown={blockIndex < draft.blocks.length - 1}
+            onMoveUp={() => void reorderBlock(blockIndex, blockIndex - 1)}
+            onMoveDown={() => void reorderBlock(blockIndex, blockIndex + 1)}
             onRename={(name) => void renameBlock(block.id, name)}
-            onSetRounds={(rounds) => void setBlockRounds(block.id, rounds)}
             onDelete={() => void deleteBlock(block.id)}
             footer={
               // FR-028: adding an exercise to the active form must stay

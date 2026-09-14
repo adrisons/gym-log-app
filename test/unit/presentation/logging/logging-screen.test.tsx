@@ -223,6 +223,43 @@ describe('LoggingScreen (FR-001)', () => {
     expect(screen.getByText('Block 2')).toBeInTheDocument();
   });
 
+  it("reorders blocks via a block's own Move up/Move down menu items (ADR-0013)", async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    render(
+      <MemoryRouter>
+        <LoggingScreen />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Block 1')).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Add block' }));
+    await waitFor(() => {
+      expect(screen.getByText('Block 2')).toBeInTheDocument();
+    });
+    const [firstId, secondId] =
+      useLoggingSession.getState().draft?.blocks.map((b) => b.id) ?? [];
+
+    // Block 1 can't move up (it's already first).
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Block 1 actions' }),
+    );
+    expect(screen.getByRole('button', { name: 'Move up' })).toBeDisabled();
+    await userEvent.keyboard('{Escape}');
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Block 2 actions' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Move up' }));
+
+    await waitFor(() => {
+      const draft = useLoggingSession.getState().draft;
+      expect(draft?.blocks.map((b) => b.id)).toEqual([secondId, firstId]);
+    });
+  });
+
   it('the default block (Block 1) keeps its header/controls even after its only exercise is deleted (ADR-0011: no more chrome-less/"loose" rendering)', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);

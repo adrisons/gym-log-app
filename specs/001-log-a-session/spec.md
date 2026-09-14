@@ -473,7 +473,7 @@ result — independently verifiable without blocks, load types, or effort.
   action exposed anywhere in the logging flow. _(Amended by ADR-0010: a set
   specifically is the one exception now — it requires an explicit Confirm
   tap (see FR-019, FR-025 below); every other change in this list (block/
-  exercise creation, rename, rounds, etc.) is still saved automatically
+  exercise creation, rename, reorder, etc.) is still saved automatically
   with no confirm step, unchanged.)_
 - **FR-004**: The system MUST make every destructive action on the logging
   screen (deleting a set, an exercise entry, or a block) undoable for at
@@ -487,10 +487,13 @@ result — independently verifiable without blocks, load types, or effort.
   close even though it is not a stored Session.
 - **FR-006**: The system MUST let the user create, rename, reorder, and
   delete blocks within a session, and reorder exercises within a block and
-  across blocks. _(Amended by ADR-0008: a block may also carry an optional
-  target round count — e.g. "3 rounds" of a circuit — editable immediately
-  with no confirm step, independent of and never derived from how many
-  sets each exercise entry in it actually has logged.)_
+  across blocks. Block reordering (ADR-0013) is Move up/Move down menu
+  items on the block's own menu, mirroring the exercise-entry menu's own
+  Move up/Move down — not drag-and-drop. _(ADR-0008 amended this FR to add
+  an optional target round count on a block; ADR-0013 removed it again as
+  redundant with each exercise entry's own set count, which already says
+  how many times it was actually done — this FR's own reorder/rename/
+  delete text is unaffected either way.)_
 - **FR-007**: The system MUST display an unnamed block by its position
   (e.g. "Block 2"), never as "Untitled" or blank.
 - **FR-008**: The system MUST pre-fill a new set for an exercise with the

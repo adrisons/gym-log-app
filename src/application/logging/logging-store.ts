@@ -55,7 +55,7 @@ import {
   prefillNextSet as prefillNextSetFromDraft,
   addBlock as addBlockToDraft,
   renameBlock as renameBlockInDraft,
-  setBlockRounds as setBlockRoundsInDraft,
+  reorderBlock as reorderBlockInDraft,
   reorderBlockExercise as reorderBlockExerciseInDraft,
   moveExerciseAcrossBlocks as moveExerciseAcrossBlocksInDraft,
   deleteBlock as deleteBlockFromDraft,
@@ -181,10 +181,7 @@ export interface LoggingSessionState {
     type: DraftBlock['type'],
   ) => Promise<void>;
   renameBlock: (blockId: string, name: string | undefined) => Promise<void>;
-  setBlockRounds: (
-    blockId: string,
-    rounds: number | undefined,
-  ) => Promise<void>;
+  reorderBlock: (fromIndex: number, toIndex: number) => Promise<void>;
   reorderBlockExercise: (
     blockId: string,
     fromIndex: number,
@@ -660,10 +657,10 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       await persistDraft(storage, updated);
     },
 
-    setBlockRounds: async (blockId, rounds) => {
+    reorderBlock: async (fromIndex, toIndex) => {
       const { storage, draft: current } = get();
       if (!storage || !current) return;
-      const updated = touch(setBlockRoundsInDraft(current, blockId, rounds));
+      const updated = touch(reorderBlockInDraft(current, fromIndex, toIndex));
       set({ draft: updated });
       await persistDraft(storage, updated);
     },

@@ -33,18 +33,15 @@
  * two together are what a collapsed-but-still-technically-present region
  * actually needs.
  *
- * `rounds` (ADR-0008) is a target round count for the whole block — always
- * visible and editable, even while collapsed (it's the block's own plan,
- * not part of the exercises/sets content collapsing hides), and with no
- * separate edit-mode toggle: unlike the name field, one small always-shown
- * number input doesn't compete with the title for space. Commits
- * immediately on a valid change (FR-1's "no Save button" applies here
- * too); an empty field means "not specified", never `0`.
+ * Move up/down (ADR-0013) reorders this block among its session's other
+ * blocks — mirrors `ExerciseEntryCard`'s own move-within-list controls one
+ * level up, folded into the same `OverflowMenu`/inline-button pair as
+ * Rename/Delete below.
  *
  * Rename (ADR-0009) opens as a small popup dialog — a backdrop over the
  * rest of the screen, not an inline field swapped into the header — so
  * the edit can't be left half-open while the user goes on to edit
- * something else in this same block (add an exercise, change rounds) with
+ * something else in this same block (add an exercise, reorder it) with
  * the rename still pending in the background. Enter submits (the input
  * sits in a `<form>`); Escape, an explicit Cancel button, or a click on
  * the backdrop all discard the edit instead. Reuses `.block-card`'s own
@@ -62,9 +59,11 @@ export interface BlockCardProps {
   displayName: string;
   hasName: boolean;
   subtitle?: string;
-  rounds?: number | undefined;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   onRename: (name: string | undefined) => void;
-  onSetRounds: (rounds: number | undefined) => void;
   onDelete: () => void;
   children: ReactNode;
   footer?: ReactNode;
@@ -74,9 +73,11 @@ export function BlockCard({
   displayName,
   hasName,
   subtitle,
-  rounds,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
   onRename,
-  onSetRounds,
   onDelete,
   children,
   footer,
@@ -199,6 +200,26 @@ export function BlockCard({
             <button
               type="button"
               className="logging-button logging-button--icon-label"
+              disabled={!canMoveUp}
+              aria-disabled={!canMoveUp}
+              onClick={onMoveUp}
+            >
+              <Icon name="chevron-up" />
+              Move up
+            </button>
+            <button
+              type="button"
+              className="logging-button logging-button--icon-label"
+              disabled={!canMoveDown}
+              aria-disabled={!canMoveDown}
+              onClick={onMoveDown}
+            >
+              <Icon name="chevron-down" />
+              Move down
+            </button>
+            <button
+              type="button"
+              className="logging-button logging-button--icon-label"
               onClick={(event) => openRename(event.currentTarget)}
             >
               <Icon name="pencil" />
@@ -269,32 +290,6 @@ export function BlockCard({
           </form>
         </div>
       )}
-      <label className="block-card__rounds">
-        <span>Rounds</span>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={1}
-          step={1}
-          className="logging-field-input"
-          value={rounds ?? ''}
-          onChange={(event) => {
-            const raw = event.target.value;
-            if (raw === '') {
-              onSetRounds(undefined);
-              return;
-            }
-            // `Number`, not `parseInt` — a typed "2.5" must fail the
-            // integer check below and be rejected (reverting to whatever
-            // `rounds` already held), not get silently floor-truncated to
-            // a value the user never actually entered.
-            const parsed = Number(raw);
-            if (Number.isInteger(parsed) && parsed >= 1) {
-              onSetRounds(parsed);
-            }
-          }}
-        />
-      </label>
       <div
         className={`block-card__collapse${collapsed ? ' block-card__collapse--collapsed' : ''}${isTransitioning ? ' block-card__collapse--transitioning' : ''}`}
         inert={collapsed || isTransitioning}

@@ -30,7 +30,6 @@ interface DraftBlock {
   id: string; // draft-local stable key (list reordering needs a key; Block itself has none)
   name?: string;
   type: 'straightSets' | 'superset' | 'circuit';
-  rounds?: number; // target round count for the whole block (ADR-0008); mirrors domain `Block.rounds`
   exercises: DraftExerciseEntry[];
 }
 
@@ -51,6 +50,12 @@ interface DraftSet {
 }
 ```
 
+- **(ADR-0013)** `DraftBlock` no longer carries a `rounds` field — ADR-0008
+  added one (mirroring domain `Block.rounds`), ADR-0013 removed it again
+  as redundant with each exercise entry's own set count. `setBlockRounds`
+  (below) is removed with it; `reorderBlock(draft, fromIndex, toIndex)`
+  is new, letting a block itself reorder the same way `reorderBlockExercise`
+  already lets an exercise entry reorder within/across blocks.
 - `DraftBlock`/`DraftExerciseEntry`/`DraftSet` mirror `Block`/`ExerciseEntry`/`Set`
   field-for-field, plus one addition: a draft-local `id`. The domain
   entities themselves carry no `id` at that level (order = list position,
@@ -88,8 +93,7 @@ step and returns the updated value).
 | `discardDraft(storage)` | FR-024, FR-028 | `discardDraft()` on the port; caller resets its in-memory pending-draft state. |
 | `registerWorkout(storage, draft)` | FR-027 | _(Added by ADR-0008.)_ Converts `draft` to a `Session` (`draftToSession` + `saveSession`), clears the stored draft (`discardDraft`), and returns a brand-new, in-memory-only `LoggingDraft` for the caller to make the new active draft — mirrors `openLoggingForm`'s "fresh draft, not yet persisted" contract. |
 | `addBlock(draft, name?, type)` | FR-006 | Appends a `DraftBlock`; returns the updated draft. Pure — persistence is the caller's `saveDraft` call. |
-| `renameBlock` / `reorderBlockExercise` / `moveExerciseAcrossBlocks` | FR-006 | Pure draft transforms, list-position moves only (FR-018 — no separate order field). |
-| `setBlockRounds(draft, blockId, rounds?)` | FR-2 (ADR-0008) | Sets or clears (`undefined`) a block's target round count. Unvalidated at this layer — a draft may hold a transient, not-yet-valid value; domain `createBlock` rejects a non-positive-integer `rounds` at promotion time (`draftToSession`), the same point every other draft-only laxness is caught. |
+| `renameBlock` / `reorderBlock` / `reorderBlockExercise` / `moveExerciseAcrossBlocks` | FR-006 | Pure draft transforms, list-position moves only (FR-018 — no separate order field). `reorderBlock(draft, fromIndex, toIndex)` (ADR-0013) moves a block itself, mirroring `reorderBlockExercise`'s own splice-based move one level up. |
 | `deleteBlock(draft, blockId)` | FR-004, FR-023 | Removes the block; returns `{ draft: updatedDraft, undo: UndoEntry }` (see Undo below) — cascades to the block's entries/sets by construction (they're nested, so removing the block removes them). |
 | `addExerciseEntry(draft, blockId, exerciseId)` | FR-002 | Appends a `DraftExerciseEntry` with `sets: []`. No implicit set creation (mirrors domain FR-014's "no synthesized entry" spirit one level up). |
 | `deleteExerciseEntry(draft, blockId, entryId)` | FR-004 | Same undo shape as `deleteBlock`, one level down. |
@@ -135,6 +139,22 @@ i.e. its own undo entry, if still live, stays live and independent).
 Presentation-facing shapes so `presentation/` never touches `Load`/`Volume`'s
 raw discriminated unions directly for display formatting (keeps formatting
 logic — e.g. "kg", pluralizing "rep"/"reps" — out of components):
+
+**(ADR-0013, supersedes the shape below)** `SetSummaryViewModel` collapses
+`loadLabel`/`volumeLabel`/`effortLabel` into one compact, "x"-joined
+`summaryLine` (e.g. "8 x 70kg - Light"), plus an `effortTone` for the
+row's own left-border color:
+
+```ts
+interface SetSummaryViewModel {
+  id: string;
+  summaryLine: string; // e.g. "8 x 70kg - Light"; "70kg" alone for a valid load-only set, "8" alone for a none-kind load
+  effortTone?: 'success' | 'warning' | 'danger'; // present only when effort was recorded
+  setKind: 'warmUp' | 'working' | 'toFailure';
+}
+```
+
+Superseded shape (pre-ADR-0013, kept here for history):
 
 ```ts
 interface SetSummaryViewModel {

@@ -466,6 +466,111 @@ window.__runV2ToV3MigrationTest = (adapterKind) =>
     ? runV2ToV3MigrationTestIndexedDb()
     : runV2ToV3MigrationTestFileSystem();
 
+export interface V3ToV4MigrationResult {
+  storedSchemaVersion: number;
+  /** ADR-0013 removes `Block.rounds` from the type going forward, but
+   * migrating old data needs no rewrite (no v3->v4 backfill of its own to
+   * run, `#checkSchema`'s own comment) — a v3 record's `rounds` value is
+   * left on disk exactly as stored, unread by any `Block`-typed code path
+   * (the type no longer declares it) but still structurally present on
+   * the plain object this port hands back. Checked here as "unchanged",
+   * not "gone" — a rewrite that silently dropped or altered it would be
+   * its own, separate bug this ADR never asked for. */
+  roundsLeftUnchangedOnDisk: boolean;
+  blockNamePreserved: boolean;
+}
+
+/** A genuine pre-ADR-0013 v3 Session shape: a Block with `rounds` set. */
+const V3_SESSION = {
+  id: 'v3-session-1',
+  dateTime: '2026-01-01T10:00:00.000Z',
+  notes: '',
+  blocks: [
+    {
+      name: 'Circuit A',
+      type: 'circuit',
+      rounds: 3,
+      exercises: [],
+    },
+  ],
+};
+
+async function runV3ToV4MigrationTestIndexedDb(): Promise<V3ToV4MigrationResult> {
+  const db = new GymLogDatabase(uniqueName('migration-v3-idb'));
+  await db.sessions.put(V3_SESSION as unknown as Session);
+  await db.meta.put({ key: SCHEMA_VERSION_ROW_KEY, value: 3 });
+
+  const adapter = new IndexedDbStorageAdapter(db);
+  const migrated = await adapter.getSession('v3-session-1' as SessionId);
+  const storedSchemaVersion = await adapter.getSchemaVersion();
+  db.close();
+
+  return {
+    storedSchemaVersion,
+    roundsLeftUnchangedOnDisk:
+      (migrated?.blocks[0] as unknown as { rounds?: number } | undefined)
+        ?.rounds === 3,
+    blockNamePreserved: migrated?.blocks[0]?.name === 'Circuit A',
+  };
+}
+
+async function runV3ToV4MigrationTestFileSystem(): Promise<V3ToV4MigrationResult> {
+  const opfsRoot = await navigator.storage.getDirectory();
+  const dirName = uniqueName('migration-v3-fs');
+  const storeDir = await opfsRoot.getDirectoryHandle(dirName, {
+    create: true,
+  });
+
+  const sessionsDir = await storeDir.getDirectoryHandle(SESSIONS_DIR, {
+    create: true,
+  });
+  const sessionHandle = await sessionsDir.getFileHandle(
+    sessionFileName('v3-session-1' as SessionId),
+    { create: true },
+  );
+  const sessionWritable = await sessionHandle.createWritable();
+  await sessionWritable.write(JSON.stringify(V3_SESSION));
+  await sessionWritable.close();
+
+  const metaHandle = await storeDir.getFileHandle('_meta.json', {
+    create: true,
+  });
+  const metaWritable = await metaHandle.createWritable();
+  await metaWritable.write(JSON.stringify({ schemaVersion: 3 }));
+  await metaWritable.close();
+
+  const db = new GymLogDatabase(uniqueName('migration-v3-fs-handles'));
+  const adapter = new FileSystemStorageAdapter(
+    async () => storeDir,
+    db,
+    storeDir,
+  );
+
+  const migrated = await adapter.getSession('v3-session-1' as SessionId);
+  // A real write is what actually migrates the stored `_meta.json` version
+  // (see `runMigrationTestFileSystem`'s own doc comment).
+  await adapter.saveBandLabels([]);
+  const storedSchemaVersion = await adapter.getSchemaVersion();
+
+  db.close();
+  await opfsRoot
+    .removeEntry(dirName, { recursive: true })
+    .catch(() => undefined);
+
+  return {
+    storedSchemaVersion,
+    roundsLeftUnchangedOnDisk:
+      (migrated?.blocks[0] as unknown as { rounds?: number } | undefined)
+        ?.rounds === 3,
+    blockNamePreserved: migrated?.blocks[0]?.name === 'Circuit A',
+  };
+}
+
+window.__runV3ToV4MigrationTest = (adapterKind) =>
+  adapterKind === 'indexed-db'
+    ? runV3ToV4MigrationTestIndexedDb()
+    : runV3ToV4MigrationTestFileSystem();
+
 window.__runMigrationTest = (adapterKind) =>
   adapterKind === 'indexed-db'
     ? runMigrationTestIndexedDb()
@@ -648,6 +753,9 @@ declare global {
     __runV2ToV3MigrationTest: (
       adapterKind: AdapterKind,
     ) => Promise<V2ToV3MigrationResult>;
+    __runV3ToV4MigrationTest: (
+      adapterKind: AdapterKind,
+    ) => Promise<V3ToV4MigrationResult>;
     __runQueuedExerciseMergeTest: () => Promise<QueuedExerciseMergeResult>;
     __runQueuedMergeTombstoneTest: () => Promise<QueuedMergeTombstoneResult>;
   }

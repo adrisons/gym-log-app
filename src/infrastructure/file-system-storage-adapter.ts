@@ -394,8 +394,9 @@ export class FileSystemStorageAdapter implements StoragePort {
       // (Copilot review, PR #21).
       await this.#migrateExerciseTemplateDefaults();
     }
-    // v2 -> v3 (ADR-0008): see IndexedDbStorageAdapter's #checkSchema —
-    // nothing to backfill for this step.
+    // v2 -> v3 (ADR-0008) and v3 -> v4 (ADR-0013): see
+    // IndexedDbStorageAdapter's #checkSchema — nothing to backfill for
+    // either step.
     if (action === 'migrate' || stored === 0) {
       // See IndexedDbStorageAdapter's #checkSchema for the full rationale
       // — the never-initialized sentinel (stored === 0) needs the same

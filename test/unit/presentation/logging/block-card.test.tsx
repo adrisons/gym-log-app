@@ -3,14 +3,21 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BlockCard } from '@/presentation/logging/block-card';
 
+const baseProps = {
+  canMoveUp: false,
+  canMoveDown: false,
+  onMoveUp: () => {},
+  onMoveDown: () => {},
+};
+
 describe('BlockCard (FR-006, FR-007)', () => {
   it('an unnamed block renders its position label, never "Untitled"', () => {
     render(
       <BlockCard
+        {...baseProps}
         displayName="Block 2"
         hasName={false}
         onRename={() => {}}
-        onSetRounds={() => {}}
         onDelete={() => {}}
       >
         <p>content</p>
@@ -24,10 +31,10 @@ describe('BlockCard (FR-006, FR-007)', () => {
     const onRename = vi.fn();
     render(
       <BlockCard
+        {...baseProps}
         displayName="Block 1"
         hasName={false}
         onRename={onRename}
-        onSetRounds={() => {}}
         onDelete={() => {}}
       >
         <p>content</p>
@@ -47,10 +54,10 @@ describe('BlockCard (FR-006, FR-007)', () => {
     const onRename = vi.fn();
     render(
       <BlockCard
+        {...baseProps}
         displayName="Block 1"
         hasName={false}
         onRename={onRename}
-        onSetRounds={() => {}}
         onDelete={() => {}}
       >
         <p>content</p>
@@ -71,10 +78,10 @@ describe('BlockCard (FR-006, FR-007)', () => {
     const onRename = vi.fn();
     render(
       <BlockCard
+        {...baseProps}
         displayName="Legs"
         hasName={true}
         onRename={onRename}
-        onSetRounds={() => {}}
         onDelete={() => {}}
       >
         <p>content</p>
@@ -100,10 +107,10 @@ describe('BlockCard (FR-006, FR-007)', () => {
     const onDelete = vi.fn();
     render(
       <BlockCard
+        {...baseProps}
         displayName="Block 1"
         hasName={false}
         onRename={() => {}}
-        onSetRounds={() => {}}
         onDelete={onDelete}
       >
         <p>content</p>
@@ -120,27 +127,27 @@ describe('BlockCard (FR-006, FR-007)', () => {
   it('shows the given subtitle under the block name', () => {
     render(
       <BlockCard
+        {...baseProps}
         displayName="Legs"
         hasName={true}
-        subtitle="2 exercises · 5 sets logged"
+        subtitle="2 exercises"
         onRename={() => {}}
-        onSetRounds={() => {}}
         onDelete={() => {}}
       >
         <p>content</p>
       </BlockCard>,
     );
 
-    expect(screen.getByText('2 exercises · 5 sets logged')).toBeInTheDocument();
+    expect(screen.getByText('2 exercises')).toBeInTheDocument();
   });
 
   it('collapsing hides children and expanding shows them again (FR-2)', async () => {
     render(
       <BlockCard
+        {...baseProps}
         displayName="Block 1"
         hasName={false}
         onRename={() => {}}
-        onSetRounds={() => {}}
         onDelete={() => {}}
       >
         <p>content</p>
@@ -184,84 +191,18 @@ describe('BlockCard (FR-006, FR-007)', () => {
     expect(collapseWrap).not.toHaveAttribute('inert');
   });
 
-  it('shows an unset rounds field by default and reports a typed value (ADR-0008)', async () => {
-    const onSetRounds = vi.fn();
+  it('Move up/Move down are disabled at the respective ends and call onMoveUp/onMoveDown otherwise (ADR-0013)', async () => {
+    const onMoveUp = vi.fn();
+    const onMoveDown = vi.fn();
     render(
       <BlockCard
-        displayName="Block 1"
+        displayName="Block 2"
         hasName={false}
+        canMoveUp={true}
+        canMoveDown={false}
+        onMoveUp={onMoveUp}
+        onMoveDown={onMoveDown}
         onRename={() => {}}
-        onSetRounds={onSetRounds}
-        onDelete={() => {}}
-      >
-        <p>content</p>
-      </BlockCard>,
-    );
-
-    const roundsInput = screen.getByRole('spinbutton', { name: /rounds/i });
-    expect(roundsInput).toHaveValue(null);
-
-    await userEvent.type(roundsInput, '3');
-
-    expect(onSetRounds).toHaveBeenLastCalledWith(3);
-  });
-
-  it('rejects a non-integer rounds value rather than silently truncating it', async () => {
-    const onSetRounds = vi.fn();
-    render(
-      <BlockCard
-        displayName="Block 1"
-        hasName={false}
-        rounds={3}
-        onRename={() => {}}
-        onSetRounds={onSetRounds}
-        onDelete={() => {}}
-      >
-        <p>content</p>
-      </BlockCard>,
-    );
-
-    const roundsInput = screen.getByRole('spinbutton', { name: /rounds/i });
-    onSetRounds.mockClear();
-
-    fireEvent.change(roundsInput, { target: { value: '2.5' } });
-
-    // Never called with the floor-truncated 2 — a decimal is rejected
-    // outright, not silently rounded down to a value never entered.
-    expect(onSetRounds).not.toHaveBeenCalled();
-  });
-
-  it('clearing the rounds field reports undefined, not zero', async () => {
-    const onSetRounds = vi.fn();
-    render(
-      <BlockCard
-        displayName="Block 1"
-        hasName={false}
-        rounds={3}
-        onRename={() => {}}
-        onSetRounds={onSetRounds}
-        onDelete={() => {}}
-      >
-        <p>content</p>
-      </BlockCard>,
-    );
-
-    const roundsInput = screen.getByRole('spinbutton', { name: /rounds/i });
-    expect(roundsInput).toHaveValue(3);
-
-    await userEvent.clear(roundsInput);
-
-    expect(onSetRounds).toHaveBeenLastCalledWith(undefined);
-  });
-
-  it("rounds stays visible while the block is collapsed (it is the block's own plan, not its logged content)", async () => {
-    render(
-      <BlockCard
-        displayName="Block 1"
-        hasName={false}
-        rounds={3}
-        onRename={() => {}}
-        onSetRounds={() => {}}
         onDelete={() => {}}
       >
         <p>content</p>
@@ -269,9 +210,15 @@ describe('BlockCard (FR-006, FR-007)', () => {
     );
 
     await userEvent.click(
-      screen.getByRole('button', { name: /collapse block 1/i }),
+      screen.getByRole('button', { name: /block 2 actions/i }),
     );
+    const moveUp = screen.getByRole('button', { name: 'Move up' });
+    const moveDown = screen.getByRole('button', { name: 'Move down' });
+    expect(moveUp).toBeEnabled();
+    expect(moveDown).toBeDisabled();
 
-    expect(screen.getByRole('spinbutton', { name: /rounds/i })).toBeVisible();
+    await userEvent.click(moveUp);
+    expect(onMoveUp).toHaveBeenCalled();
+    expect(onMoveDown).not.toHaveBeenCalled();
   });
 });

@@ -139,10 +139,9 @@ One vocabulary, used identically in code, UI and documentation.
   keeps adding to or stops adding to. More than one session per day is
   allowed, and each is fully independent.
 - **Block.** An ordered grouping inside a session: optional name ("Superset A",
-  "Legs"), type (straight sets / superset / circuit), optional target rounds
-  (how many times the whole block — every exercise entry in it — is meant to
-  be repeated, e.g. "3 rounds" of a circuit; ADR-0008), and an ordered list of
-  exercise entries.
+  "Legs"), type (straight sets / superset / circuit), and an ordered list of
+  exercise entries. No target-rounds field (ADR-0008 added one, ADR-0013
+  removed it again as redundant with each exercise entry's own set count).
 - **Exercise entry.** A reference to a catalogue exercise, its order within the
   block, notes, and its sets.
 - **Set.** One performed set: volume, load, effort, kind (warm-up / working / to
@@ -235,7 +234,10 @@ Create a session and add blocks, exercises and sets.
 
 ### FR-2 — Blocks `[v1]`
 
-- Create, rename, reorder and delete blocks within a session.
+- Create, rename, reorder and delete blocks within a session — reordering
+  a block is Move up/Move down on its own menu (ADR-0013), mirroring how
+  an exercise entry already reorders within/across blocks below, not
+  drag-and-drop.
 - Reorder exercises within a block and across blocks.
 - An unnamed block is shown by its position, not as "Untitled".
 - Every exercise entry belongs to a block; there is no blockless exercise.
@@ -247,12 +249,10 @@ Create a session and add blocks, exercises and sets.
   Purely a display state: never persisted as part of the Session record,
   and never affects what FR-004's undo restores. _(Amended by ADR-0011:
   the visible summary count is exercises only, not sets.)_
-- A block can optionally carry a target number of rounds (ADR-0008) — how
-  many times the whole block is meant to be repeated, independent of how
-  many sets each exercise entry in it actually has logged. Editing it is
-  immediate, with no confirm step (FR-1's "no Save button" extends here
-  too); left unset, a block has no round count and nothing about it implies
-  one.
+- **(ADR-0013, supersedes ADR-0008's target-round-count requirement)** A
+  block's target round count is removed — redundant with each exercise
+  entry's own set count, which already says how many times it was
+  actually done. A block has no round-related field of any kind any more.
 
 ### FR-3 — Sets and load `[v1]`
 
@@ -320,6 +320,14 @@ Create a session and add blocks, exercises and sets.
   begin with, so its sets' summaries show no load placeholder at all
   (previously a "—" dash, read as if a value were missing rather than
   simply not applicable).
+- **(ADR-0013, restyles the bullet above)** A set's summary is one compact
+  line — volume and load combined (e.g. "8 x 70kg"), with the effort word
+  appended when recorded (e.g. "8 x 70kg - Light") — instead of separate
+  load/volume/effort fields, to fit more sets on screen at once. The row's
+  own left edge is painted in the same success/warning/danger tone as the
+  effort control already uses for its own graduated 1–5 scale
+  (`docs/design.md` §1.2's refinement note) when a set has an effort
+  recorded, and left plain when it doesn't.
 
 ### FR-4 — Effort `[v1]`
 
@@ -670,11 +678,12 @@ before code.
 | D12 | Whether recording a set requires an explicit confirm step | **Superseded by D17 below.** Originally closed as no — see ADR-0007's own text for that reasoning, no longer current. → ADR-0007, superseded by ADR-0010 |
 | D13 | Whether generating a shareable image for external platforms (e.g. Instagram) falls under the constitution's "social network" non-goal | **Closed:** no — it is a one-way, on-device export (render an image locally, hand off via the platform's native share sheet or a saved file), not a multi-user or in-app social feature. No account, no backend, no peer visibility, no third-party posting API; consistent with Invariant 1 (nothing leaves the device without the user explicitly choosing to send it). Targeted at the "Later" phase (§9), not MVP/v1/v1.1. → FR-14 |
 | D14 | Whether adding a field to Settings (per-device preference state, not a canonical entity) requires the §6/Principle III schema-version-bump-and-migration treatment | **Closed:** no — that treatment applies only to the canonical entities in §3.1 (Session, Block, Exercise entry, Set, Exercise catalogue). A Settings field defaults silently when absent: no version bump, no ADR, no migration. Matches the precedent already set in `specs/006-settings-data/spec.md`; §6 amended below with this scope note so future specs don't re-litigate it. |
-| D15 | Whether a Block can carry a target round count, and what it means | **Closed:** yes — an optional integer field on `Block` naming how many times the whole block is meant to be repeated (e.g. "3 rounds" of a circuit), independent of and never inferred from how many sets each exercise entry in it has actually logged. Additive, optional, no default value backfilled for existing blocks. Schema v3. → ADR-0008 |
+| D15 | Whether a Block can carry a target round count, and what it means | **Superseded by D20 below.** Originally closed as yes — see ADR-0008's own text for that reasoning, no longer current: the field is removed. → ADR-0008, superseded by ADR-0013 |
 | D16 | Whether a workout (the logging draft) becomes a Session automatically, or only when the user explicitly says so | **Closed:** explicitly — an explicit "Log workout" action is the only way a draft becomes a Session; the previous automatic day-rollover promotion is removed. Recording a *set* is unaffected — this decision is scoped to the session-level "commit to the diary" step only. A draft with no exercise at all is never persisted; a draft with at least one exercise persists and, if left unregistered, is offered (never auto-loaded) as a recovery banner the next time the logging form opens. No schema change: `LoggingDraft`'s shape and the storage port are unaffected. "One draft per training type" is not built by this decision — it collapses to the single existing draft, since only the Strength discipline is implemented today (D8). _(Threshold amended by ADR-0011 from "at least one block" to "at least one exercise": the form now always seeds one block, so a bare block is no longer a signal of intent.)_ → ADR-0009, ADR-0011 |
 | D17 | Whether recording a set requires an explicit confirm step (reopens D12); whether an already-recorded set can be edited in place; whether the per-exercise progression view (FR-013) stays reachable from a session detail view; whether the `/exercises` screen can create a new catalogue Exercise and edit an existing one's set-entry template | **Closed, all together (one design-refinement pass):** (1) Confirm is explicit again — a set commits only on an explicit "Add set"/"Save changes" tap, enabled only once every field the exercise's current template tracks is filled; the auto-commit-on-edit behavior and its "Repeat last set"/"Log this set" controls (D12/ADR-0007) are retired. (2) A `Set` can now be edited in place (load/volume/effort), not only added or deleted — new capability, still no schema change (`Set`'s shape is unaffected; only *how* one is produced changes). (3) A session detail view's per-exercise entries no longer link to the progression screen — for now, that stays reachable only from search results (spec 004 FR-013) and Insights (spec 005); FR-013 is amended accordingly, not removed (the progression screen itself, and its other two entry points, are unaffected). (4) The `/exercises` screen (spec 004 FR-5) gains "New exercise" (name + set-entry template together) alongside its existing rename/merge/delete, and its management panel gains "Edit tracked fields…" (ADR-0006) for an existing exercise — previously only reachable per-entry from the logging/session-detail screens. No schema change for (3) or (4) either — purely which screens link where, and use-cases (`createExercise`, `updateExerciseTemplate`) both already existed. → ADR-0010 |
 | D18 | Whether an exercise entry can exist without belonging to any block (the "loose" block) | **Closed:** no — every exercise entry always belongs to a real block; the draft-only "loose" flag that used to render a blockless exercise without block chrome is removed. It caused a real bug: the flag was never part of the persisted `Block` shape, so a blockless exercise silently gained block chrome the moment the session was saved and reopened. The logging form now opens with one empty block already present, and each block (including that first one) carries its own "add exercise" control; "Add block" below the last block still adds more. No schema change — `Block` never had a "loose" concept to begin with. → ADR-0011 |
 | D19 | Whether excluding an exercise (e.g. a warm-up) from FR-8/FR-9's progression and Insights computations warrants its own spec, rather than a quick change inside spec 004/005 | **Closed:** yes, its own spec — this is a new, additive field on the canonical `Exercise` entity (§3.1), so it needs the §6/Principle III schema-version-bump-and-migration treatment spec 004/005 themselves didn't need to reopen; it also changes eligibility filtering inside both FR-8 (personal records) and every one of FR-9's six card types, and has its own open questions (e.g. whether an excluded exercise's progression screen stays manually reachable) that deserve their own Acceptance Scenarios rather than being folded silently into either existing spec. Targeted at the "Later" phase (§9), pending its own scheduling decision — drafted, not yet built. → FR-15, `specs/008-exercise-progression-opt-out/spec.md` |
+| D20 | Whether a Block should still carry a target round count (reopens D15) | **Closed:** no — removed entirely. Redundant with each exercise entry's own set count, which already says how many times it was actually done; a separate block-level "planned rounds" number added nothing FR-2's exercise-level data didn't already show, and one less field to edit is one less thing to keep in sync with what was actually logged. No replacement field, no migration for the field's removal (an old stored `rounds` value, if any, is simply never read again — the same reasoning ADR-0008's own no-op v2→v3 migration already established for its *absence*). → ADR-0013 |
 
 ---
 
