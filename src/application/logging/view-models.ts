@@ -92,14 +92,19 @@ function formatVolumeCompact(volume: Volume | undefined): string | undefined {
   }
 }
 
-/** Compact load for the one-line set summary (ADR-0013) — `undefined` for
- * a `none`-kind load (nothing to show, same reasoning `toSetSummaryViewModel`
- * already applied to the old `loadLabel`), a tight "70kg" (no space) for
- * Weight specifically; every other kind matches `formatLoad`'s own text. */
+/** Compact load for the one-line set summary (ADR-0013/ADR-0014) —
+ * `undefined` for a `none`-kind load (nothing to show, same reasoning
+ * `toSetSummaryViewModel` already applied to the old `loadLabel`), a
+ * tight "70kg" (no space) for Weight, "BW"/"BW +10kg" for Bodyweight
+ * (the full "Bodyweight..." text was wide enough to wrap the row on a
+ * narrow phone); every other kind matches `formatLoad`'s own text. */
 function formatLoadCompact(load: Load): string | undefined {
   switch (load.kind) {
     case 'weight':
       return `${load.value}${load.unit}`;
+    case 'bodyweight':
+      if (load.addedOrAssistedKg === undefined) return 'BW';
+      return `BW ${load.addedOrAssistedKg > 0 ? '+' : ''}${load.addedOrAssistedKg}kg`;
     case 'none':
       return undefined;
     default:

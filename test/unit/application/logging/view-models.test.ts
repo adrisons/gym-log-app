@@ -137,7 +137,7 @@ describe('view-models formatters (data-model.md "View models")', () => {
     ).toBe('400m');
   });
 
-  it('toSetSummaryViewModel keeps non-weight load kinds as their full formatLoad text', () => {
+  it('toSetSummaryViewModel keeps non-weight, non-bodyweight load kinds as their full formatLoad text', () => {
     expect(
       toSetSummaryViewModel({
         id: 'set-6',
@@ -147,6 +147,36 @@ describe('view-models formatters (data-model.md "View models")', () => {
         completed: true,
       }).summaryLine,
     ).toBe('12 x Band: Red');
+  });
+
+  it('toSetSummaryViewModel abbreviates Bodyweight to "BW" (ADR-0014, avoids row wrap)', () => {
+    expect(
+      toSetSummaryViewModel({
+        id: 'set-7',
+        load: { kind: 'bodyweight' },
+        volume: { kind: 'reps', count: 10 },
+        setKind: 'working',
+        completed: true,
+      }).summaryLine,
+    ).toBe('10 x BW');
+    expect(
+      toSetSummaryViewModel({
+        id: 'set-8',
+        load: { kind: 'bodyweight', addedOrAssistedKg: 10 },
+        volume: { kind: 'reps', count: 10 },
+        setKind: 'working',
+        completed: true,
+      }).summaryLine,
+    ).toBe('10 x BW +10kg');
+    expect(
+      toSetSummaryViewModel({
+        id: 'set-9',
+        load: { kind: 'bodyweight', addedOrAssistedKg: -20 },
+        volume: { kind: 'reps', count: 10 },
+        setKind: 'working',
+        completed: true,
+      }).summaryLine,
+    ).toBe('10 x BW -20kg');
   });
 });
 
