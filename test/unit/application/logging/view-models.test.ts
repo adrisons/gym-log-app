@@ -56,6 +56,9 @@ describe('view-models formatters (data-model.md "View models")', () => {
     expect(vm).toEqual({
       id: 'set-1',
       summaryLine: '8 x 70kg',
+      volumeColumn: '8',
+      loadColumn: '70kg',
+      effortSuffix: undefined,
       setKind: 'working',
     });
     expect('effortTone' in vm).toBe(false);

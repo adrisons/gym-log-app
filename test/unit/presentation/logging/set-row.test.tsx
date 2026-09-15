@@ -29,8 +29,10 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
   it('stays disabled with only one of two required fields filled (the exact bug this design fixes)', async () => {
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
 
-    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
-    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /^reps$/i }),
+      '5',
+    );
 
     expect(confirmButton()).toBeDisabled();
   });
@@ -39,8 +41,10 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     const onConfirm = vi.fn();
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={onConfirm} />);
 
-    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
-    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /^reps$/i }),
+      '5',
+    );
     await userEvent.click(confirmButton());
 
     expect(onConfirm).not.toHaveBeenCalled();
@@ -124,8 +128,10 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
       screen.getByRole('spinbutton', { name: /weight/i }),
       '60',
     );
-    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
-    await userEvent.keyboard('{ArrowDown}'.repeat(8));
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /^reps$/i }),
+      '8',
+    );
     await userEvent.click(confirmButton());
 
     expect(onConfirm).toHaveBeenCalledTimes(1);
@@ -152,10 +158,7 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     expect(screen.getByRole('spinbutton', { name: /weight/i })).toHaveValue(
       100,
     );
-    expect(screen.getByRole('option', { name: '5' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
+    expect(screen.getByRole('spinbutton', { name: /^reps$/i })).toHaveValue(5);
     expect(confirmButton()).toBeEnabled();
 
     await userEvent.click(confirmButton());
@@ -200,10 +203,9 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
       />,
     );
 
-    // The wheel correctly shows nothing selected...
-    expect(screen.getByRole('option', { name: '—' })).toHaveAttribute(
-      'aria-selected',
-      'true',
+    // The reps field correctly shows nothing entered...
+    expect(screen.getByRole('spinbutton', { name: /^reps$/i })).toHaveValue(
+      null,
     );
     // ...so Confirm stays disabled until reps is re-entered.
     expect(confirmButton()).toBeDisabled();
@@ -335,8 +337,10 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
       screen.getByRole('spinbutton', { name: /weight/i }),
       '100',
     );
-    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
-    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /^reps$/i }),
+      '5',
+    );
     await userEvent.click(confirmButton());
 
     expect(onConfirm).toHaveBeenCalledWith(
@@ -366,6 +370,35 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     expect(screen.getByRole('spinbutton', { name: /duration/i })).toHaveValue(
       15,
     );
+  });
+
+  it('the compact reps field rejects 0 and fractional entries — Confirm stays disabled (Copilot review, PR #33: reps must be a positive integer)', async () => {
+    render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
+
+    const repsField = screen.getByRole('spinbutton', { name: /^reps$/i });
+    await userEvent.type(repsField, '0');
+    expect(repsField).toHaveValue(null);
+    expect(confirmButton()).toBeDisabled();
+
+    await userEvent.clear(repsField);
+    await userEvent.type(repsField, '5.5');
+    expect(repsField).toHaveValue(null);
+    expect(confirmButton()).toBeDisabled();
+  });
+
+  it('the compact reps/weight fields blur on wheel so a scroll gesture cannot silently change the value (Copilot review, PR #33)', async () => {
+    render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
+
+    const repsField = screen.getByRole('spinbutton', { name: /^reps$/i });
+    repsField.focus();
+    expect(repsField).toHaveFocus();
+
+    await userEvent.pointer({ target: repsField });
+    repsField.dispatchEvent(
+      new WheelEvent('wheel', { deltaY: -1, bubbles: true }),
+    );
+
+    expect(repsField).not.toHaveFocus();
   });
 });
 
@@ -527,14 +560,15 @@ describe('SetRow editing an existing set in place (ADR-0010)', () => {
       />,
     );
 
-    // The wheel can't represent 150 (it only offers 1..100), so it shows
-    // "—" selected...
-    expect(screen.getByRole('option', { name: '—' })).toHaveAttribute(
-      'aria-selected',
-      'true',
+    // The compact row's reps field still shows the true held value —
+    // editing preserves an out-of-range historical count (`preserveOutOfRange`
+    // in `initialVolumeValue`) rather than blanking it the way a fresh add's
+    // prefill does.
+    expect(screen.getByRole('spinbutton', { name: /^reps$/i })).toHaveValue(
+      150,
     );
 
-    // ...but the true held value is still 150 until the user explicitly
+    // ...and that held value is still 150 until the user explicitly
     // changes it, so saving without touching reps must not delete it.
     await userEvent.click(
       screen.getByRole('button', { name: /save changes/i }),

@@ -63,7 +63,7 @@ describe('ExerciseSetList (ADR-0010)', () => {
     expect(screen.getByRole('button', { name: 'Add set' })).toBeInTheDocument();
   });
 
-  it('shows every value already recorded for a set — load, volume, and effort — in its summary', () => {
+  it('shows the set’s reps and load in the table, plus its effort suffix', () => {
     render(
       <ExerciseSetList
         {...baseProps}
@@ -74,7 +74,12 @@ describe('ExerciseSetList (ADR-0010)', () => {
       />,
     );
 
-    expect(screen.getByText('5 x 100kg - Hard')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /edit 5 x 100kg - hard/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('5')).toBeInTheDocument();
+    expect(screen.getByText('100kg')).toBeInTheDocument();
+    expect(screen.getByText('- Hard')).toBeInTheDocument();
   });
 
   it('confirming the add form closes it back to the "+ Add set" button', async () => {
@@ -93,8 +98,10 @@ describe('ExerciseSetList (ADR-0010)', () => {
       screen.getByRole('spinbutton', { name: /weight/i }),
       '60',
     );
-    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
-    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /^reps$/i }),
+      '5',
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
 
     expect(onAddSet).toHaveBeenCalledWith({
@@ -157,7 +164,37 @@ describe('ExerciseSetList (ADR-0010)', () => {
     expect(screen.queryByText('—')).not.toBeInTheDocument();
   });
 
-  it("offers Edit and Delete set from a logged set's menu (replacing the old bare delete button)", async () => {
+  it('attaches the effort suffix to the volume cell, not an empty Load cell, for a none-kind load (Copilot review, PR #33)', () => {
+    const noneLoadWithEffort: DraftSet = {
+      id: 'set-none-effort',
+      volume: { kind: 'reps', count: 12 },
+      load: { kind: 'none' },
+      effort: 4,
+      setKind: 'working',
+      completed: true,
+    };
+    render(
+      <ExerciseSetList
+        {...baseProps}
+        loadKind="none"
+        sets={[noneLoadWithEffort]}
+        onAddSet={() => {}}
+        onUpdateSet={() => {}}
+        onDeleteSet={() => {}}
+      />,
+    );
+
+    // The effort word attaches to the reps cell (the only real value this
+    // set has) rather than being appended to an empty Load cell, which
+    // would otherwise read as a bare "— Hard" with nothing for the dash
+    // to follow.
+    expect(
+      screen.getByRole('button', { name: /edit 12 - hard/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^-\s*Hard$/)).toBeInTheDocument();
+  });
+
+  it("shows only a trailing delete (×) on a logged set's row — no menu — with Edit reached by tapping the row itself", async () => {
     const onDeleteSet = vi.fn();
     render(
       <ExerciseSetList
@@ -169,16 +206,21 @@ describe('ExerciseSetList (ADR-0010)', () => {
       />,
     );
 
+    expect(
+      screen.queryByRole('button', { name: /5 x 100kg - Hard actions/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Edit' }),
+    ).not.toBeInTheDocument();
+
     await userEvent.click(
-      screen.getByRole('button', { name: /5 x 100kg - Hard actions/i }),
+      screen.getByRole('button', { name: /delete 5 x 100kg - hard/i }),
     );
-    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Delete set' }));
 
     expect(onDeleteSet).toHaveBeenCalledWith('set-1');
   });
 
-  it('Edit opens the form pre-filled with that set\'s own values, replacing the "+ Add set" button, with a Cancel', async () => {
+  it('tapping a logged set\'s row opens the form pre-filled with its own values, replacing the "+ Add set" button, with a Cancel', async () => {
     render(
       <ExerciseSetList
         {...baseProps}
@@ -190,9 +232,8 @@ describe('ExerciseSetList (ADR-0010)', () => {
     );
 
     await userEvent.click(
-      screen.getByRole('button', { name: /5 x 100kg - Hard actions/i }),
+      screen.getByRole('button', { name: /edit 5 x 100kg - hard/i }),
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
     expect(
       screen.queryByRole('button', { name: 'Add set' }),
@@ -223,9 +264,8 @@ describe('ExerciseSetList (ADR-0010)', () => {
     );
 
     await userEvent.click(
-      screen.getByRole('button', { name: /5 x 100kg - Hard actions/i }),
+      screen.getByRole('button', { name: /edit 5 x 100kg - hard/i }),
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
     await userEvent.click(
       screen.getByRole('button', { name: /save changes/i }),
     );
@@ -259,9 +299,8 @@ describe('ExerciseSetList (ADR-0010)', () => {
     expect(screen.getByRole('button', { name: 'Add set' })).toBeInTheDocument();
 
     await userEvent.click(
-      screen.getByRole('button', { name: /5 x 100kg - Hard actions/i }),
+      screen.getByRole('button', { name: /delete 5 x 100kg - hard/i }),
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Delete set' }));
 
     expect(
       screen.getByRole('spinbutton', { name: /weight/i }),
@@ -296,21 +335,20 @@ describe('ExerciseSetList (ADR-0010)', () => {
     }
     render(<Wrapper />);
 
-    // Edit the first set — its own row's menu stays visible below the
-    // form, same as every other row.
+    // Edit the first set — its own row (with its own delete "×") stays
+    // visible below the form, same as every other row.
     await userEvent.click(
-      screen.getByRole('button', { name: /5 x 100kg - Hard actions/i }),
+      screen.getByRole('button', { name: /edit 5 x 100kg - hard/i }),
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
     expect(
       screen.getByRole('button', { name: /save changes/i }),
     ).toBeInTheDocument();
 
     // Delete that same set — the one currently open for editing — from
-    // its own row's menu, still open from the Edit click above (the menu
-    // only closes on Escape or an outside click, never on a click inside
-    // it — `overflow-menu.tsx`'s own doc comment).
-    await userEvent.click(screen.getByRole('button', { name: 'Delete set' }));
+    // its own row's "×", still rendered alongside the open edit form.
+    await userEvent.click(
+      screen.getByRole('button', { name: /delete 5 x 100kg - hard/i }),
+    );
 
     // The entry still has one set (set-2), so this must fall back to the
     // compact "+ Add set" button — not render neither a form nor a button.

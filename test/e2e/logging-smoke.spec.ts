@@ -23,7 +23,7 @@ test('logging a set requires an explicit Confirm tap and then appears instantly,
   await page.getByRole('link', { name: 'Log session' }).click();
 
   await expect(
-    page.getByRole('heading', { name: 'Log a session' }),
+    page.getByRole('heading', { name: 'New session' }),
   ).toBeVisible();
 
   await page.getByRole('button', { name: 'Add exercise' }).click();
@@ -39,14 +39,8 @@ test('logging a set requires an explicit Confirm tap and then appears instantly,
   // ADR-0010: filling in only one of the two fields the template tracks
   // (Weight + Reps by default) never commits anything on its own — the
   // Confirm button stays disabled until both are filled.
-  await page.getByRole('listbox', { name: 'Reps' }).click();
-  await page.keyboard.press('ArrowDown', { delay: 20 });
-  await page.keyboard.press('ArrowDown', { delay: 20 });
-  await page.keyboard.press('ArrowDown', { delay: 20 });
-  await page.keyboard.press('ArrowDown', { delay: 20 });
-  await page.keyboard.press('ArrowDown', { delay: 20 });
+  await page.getByRole('spinbutton', { name: 'Reps', exact: true }).fill('5');
 
-  await expect(page.getByText('5 reps')).toHaveCount(0);
   const confirm = page.getByRole('button', { name: 'Add set' });
   await expect(confirm).toBeDisabled();
 
@@ -54,7 +48,7 @@ test('logging a set requires an explicit Confirm tap and then appears instantly,
   await expect(confirm).toBeEnabled();
   await confirm.click();
 
-  await expect(page.getByText('5 x 60kg')).toBeVisible();
+  await expect(page.getByText('60kg')).toBeVisible();
   // Confirming collapses the form to a compact "+ Add set" button
   // (ADR-0010) rather than leaving the full form open.
   await expect(page.getByRole('spinbutton', { name: /weight/i })).toHaveCount(

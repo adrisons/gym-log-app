@@ -79,10 +79,14 @@ interface follows these:
 
 ### 1.2 Visual identity
 
-- **Type**: one legible, humanist typeface for everything read at length,
-  and one monospaced or tabular-figure treatment reserved for numbers that
-  need to align in a column (loads, reps, dates) so they don't visually
-  jitter as digits change. No more than two type roles.
+- **Type**: one legible, humanist typeface for everything read at length
+  (Geist), and one monospaced or tabular-figure treatment (JetBrains Mono)
+  reserved for numbers that need to align in a column (loads, reps, dates)
+  so they don't visually jitter as digits change. No more than two type
+  roles. Geist chosen over the earlier Space Grotesk pass in a Claude
+  Design canvas exploration, confirmed by the project owner — closer to
+  the "clean, modern, Notion-like" brief while still pairing naturally with
+  the mono numeral set.
 - **Icons**: line icons only, consistent stroke weight, on a fixed grid.
   Icons are never the only carrier of meaning — a state communicated by an
   icon is always also stated in a word (`docs/requirements.md` §7.4).
@@ -133,6 +137,16 @@ hues are unchanged. What did not change: the accent and status hues; the
 two type roles; "no imagery, no illustrations" (only the §1.1 bounded
 exception above); every rule in §2 through §6 below.
 
+**Refinement note (ADR-0015)**: the same canvas exploration carried a
+further pass over the logging screen's sets display — a two-column Reps/
+Load table (headers, aligned values, one trailing action per row) in
+place of the earlier one-line "x"-joined summary, and, for the common
+Weight+Reps case with no effort tracked, a compact single-line add-set
+row of plain numeric fields sharing the table's own columns, in place of
+the reps wheel-picker. Every other load/volume/effort combination keeps
+its existing stacked form and wheel unchanged — see ADR-0015 for the
+exact scope.
+
 ---
 
 ## 2. Design principles
@@ -151,12 +165,17 @@ options.
 tap should never be ambiguous. Secondary actions (edit, delete, reorder)
 are present but visually quieter.
 
-**Destructive actions read the same at every level.** Deleting a block, an
-exercise entry, or a set is offered through the same affordance (a
-secondary, visually quiet menu next to the thing it acts on) at every
-level of that hierarchy — a user who has found it once at one level has
-found it everywhere, rather than a block getting a menu and a set getting
-a bare button.
+**Destructive actions read the same at every level.** Deleting a block or
+an exercise entry is offered through the same affordance (a secondary,
+visually quiet menu next to the thing it acts on) — a user who has found
+it once at one of those two levels has found it at the other.
+_(Amended, ADR-0015: a set is the one level that departs from this — its
+row shows a bare trailing "×" instead of a menu, matching the sets
+table's own one-icon-per-row footprint, with Edit reached by tapping the
+row's values instead of a menu item. A single, dense list of sets per
+exercise entry made the per-row menu read as one interaction too many
+compared to the block/exercise level, where a menu holds several actions
+(rename, move, delete) rather than one.)_
 
 **Structure can be collapsed without being lost.** A block long enough to
 push the next one off-screen can be collapsed to its header (name,

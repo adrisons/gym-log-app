@@ -23,7 +23,6 @@
  */
 import { useState } from 'react';
 import { Icon } from '@/presentation/design/icons';
-import { OverflowMenu } from './overflow-menu';
 import { SetRow } from './set-row';
 import type { VolumeKind } from './volume-input';
 import { toSetSummaryViewModel } from '@/application/logging/view-models';
@@ -60,6 +59,16 @@ export interface ExerciseSetListProps {
 }
 
 type FormState = 'add' | 'edit' | 'closed';
+
+/** Sets table header label for the volume column (Copilot review, PR #33)
+ * — this component renders for every `VolumeKind`, not just reps, so a
+ * hard-coded "Reps" header misdescribed a Duration/Distance-tracked
+ * exercise's own column. */
+const VOLUME_COLUMN_LABEL: Record<VolumeKind, string> = {
+  reps: 'Reps',
+  duration: 'Duration',
+  distance: 'Distance',
+};
 
 export function ExerciseSetList({
   sets,
@@ -130,6 +139,16 @@ export function ExerciseSetList({
 
   return (
     <>
+      {sets.length > 0 && (
+        <div className="sets-header-row" aria-hidden="true">
+          <span className="sets-header-cell">
+            {VOLUME_COLUMN_LABEL[volumeKind]}
+          </span>
+          <span className="sets-header-cell">Load</span>
+          <span className="sets-header-cell" />
+          <span className="sets-header-cell" />
+        </div>
+      )}
       <ul className="set-list">
         {sets.map((set) => {
           const vm = toSetSummaryViewModel(set);
@@ -149,28 +168,61 @@ export function ExerciseSetList({
                 ? { onAnimationEnd: () => onNewestSetAnimationEnd(vm.id) }
                 : {})}
             >
-              <span>{vm.summaryLine}</span>
-              <OverflowMenu label={`${vm.summaryLine} actions`}>
-                <button
-                  type="button"
-                  className="logging-button logging-button--icon-label"
-                  onClick={() => {
-                    setEditingSetId(set.id);
-                    setForm('edit');
-                  }}
-                >
-                  <Icon name="pencil" />
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  className="logging-button logging-button--icon-label"
-                  onClick={() => onDeleteSet(set.id)}
-                >
-                  <Icon name="trash" />
-                  Delete set
-                </button>
-              </OverflowMenu>
+              {/* Tapping the row opens in-place edit (ExerciseSetList's
+                  existing 'edit' form state) — the approved design shows
+                  only a trailing "×" for delete, with no visible menu, so
+                  Edit is reached from the row itself instead of a dropped
+                  ⋮ menu item. A <button> wrapping the value cells (not the
+                  whole <li>, which also hosts the delete control) keeps
+                  this keyboard-operable without nesting an interactive
+                  element inside another. */}
+              <button
+                type="button"
+                className="set-summary__edit"
+                aria-label={`Edit ${vm.summaryLine}`}
+                onClick={() => {
+                  setEditingSetId(set.id);
+                  setForm('edit');
+                }}
+              >
+                {/* Empty, not a "—" placeholder, when this column's value
+                    is absent (a load-only set with no volume, or a
+                    none-kind load) — only entered data shows, a
+                    pre-existing product rule this table must not regress
+                    (test: "shows no load column at all for a none-kind
+                    load"). The effort suffix attaches to the Load cell
+                    when a load is present, or to the volume cell
+                    otherwise (Copilot review, PR #33) — appending it to
+                    an empty Load cell rendered a bare "— Hard" with
+                    nothing for the dash to follow. */}
+                <span className="set-summary__reps">
+                  {vm.volumeColumn}
+                  {vm.loadColumn === undefined && vm.effortSuffix && (
+                    <span className="set-summary__effort">
+                      {' '}
+                      - {vm.effortSuffix}
+                    </span>
+                  )}
+                </span>
+                <span className="set-summary__load">
+                  {vm.loadColumn}
+                  {vm.loadColumn !== undefined && vm.effortSuffix && (
+                    <span className="set-summary__effort">
+                      {' '}
+                      - {vm.effortSuffix}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <span className="set-summary__spacer" />
+              <button
+                type="button"
+                className="set-summary__delete"
+                aria-label={`Delete ${vm.summaryLine}`}
+                onClick={() => onDeleteSet(set.id)}
+              >
+                <Icon name="close" />
+              </button>
             </li>
           );
         })}

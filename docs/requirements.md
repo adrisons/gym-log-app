@@ -274,6 +274,11 @@ Create a session and add blocks, exercises and sets.
   unset position for a load-only set); the wheel itself is the quick-increment
   mechanism, so it carries no separate ± buttons either. Duration and distance
   keep a numeric field with quick increments (configurable defaults).
+  _(ADR-0015: for the common case — a plain Weight load, Reps volume, no
+  effort tracking — the add-set form instead renders as one compact line
+  of plain numeric fields sharing the sets table's own columns, with no
+  wheel; every other load/volume/effort combination keeps the wheel and
+  this bullet's stacked form unchanged.)_
 - A set has no confirm step: it is recorded the moment the user's own edit
   to the load, volume, or effort control makes it valid (§3.3's "either load
   or volume present" rule) — there is nothing to tap for a freshly-entered
@@ -333,6 +338,12 @@ Create a session and add blocks, exercises and sets.
   abbreviates to "BW" in this compact line specifically — e.g.
   "10 x BW +10kg" — since the full word was wide enough to wrap the row
   on a narrow phone; every other load kind's text is unchanged.)_
+  _(ADR-0015: the logging/session-detail sets list renders this same data
+  as a two-column table — a Reps/Duration/Distance column and a Load
+  column, aligned under shared headers, with the effort word appended to
+  the load column — rather than literally as one "x"-joined string; the
+  "x"-joined `summaryLine` is kept only as a computed convenience for any
+  future single-line consumer, not the rendered shape.)_
 
 ### FR-4 — Effort `[v1]`
 
@@ -689,6 +700,7 @@ before code.
 | D18 | Whether an exercise entry can exist without belonging to any block (the "loose" block) | **Closed:** no — every exercise entry always belongs to a real block; the draft-only "loose" flag that used to render a blockless exercise without block chrome is removed. It caused a real bug: the flag was never part of the persisted `Block` shape, so a blockless exercise silently gained block chrome the moment the session was saved and reopened. The logging form now opens with one empty block already present, and each block (including that first one) carries its own "add exercise" control; "Add block" below the last block still adds more. No schema change — `Block` never had a "loose" concept to begin with. → ADR-0011 |
 | D19 | Whether excluding an exercise (e.g. a warm-up) from FR-8/FR-9's progression and Insights computations warrants its own spec, rather than a quick change inside spec 004/005 | **Closed:** yes, its own spec — this is a new, additive field on the canonical `Exercise` entity (§3.1), so it needs the §6/Principle III schema-version-bump-and-migration treatment spec 004/005 themselves didn't need to reopen; it also changes eligibility filtering inside both FR-8 (personal records) and every one of FR-9's six card types, and has its own open questions (e.g. whether an excluded exercise's progression screen stays manually reachable) that deserve their own Acceptance Scenarios rather than being folded silently into either existing spec. Targeted at the "Later" phase (§9), pending its own scheduling decision — drafted, not yet built. → FR-15, `specs/008-exercise-progression-opt-out/spec.md` |
 | D20 | Whether a Block should still carry a target round count (reopens D15) | **Closed:** no — removed entirely. Redundant with each exercise entry's own set count, which already says how many times it was actually done; a separate block-level "planned rounds" number added nothing FR-2's exercise-level data didn't already show, and one less field to edit is one less thing to keep in sync with what was actually logged. No replacement field, no migration for the field's removal (an old stored `rounds` value, if any, is simply never read again — the same reasoning ADR-0008's own no-op v2→v3 migration already established for its *absence*). → ADR-0013 |
+| D21 | Whether the sets list still renders as one "x"-joined compact line (reopens the ADR-0013/ADR-0014 wording), and whether Reps still requires a scrollable wheel in every case (reopens FR-3's wheel binding) | **Closed, both together (one design-refinement pass):** (1) The sets list renders as a two-column Reps/Duration/Distance + Load table with shared column headers, instead of literally one "x"-joined string — `summaryLine` is kept only as a computed convenience, not the rendered shape; each row's "⋮" Edit/Delete menu is replaced by a bare trailing "×" (delete only) plus tap-the-row-to-edit. (2) For the common Weight+Reps, no-effort case only, the add-set form renders as one compact line of plain numeric fields sharing the table's own columns, with no wheel; every other load/volume/effort combination is unaffected and keeps the reps wheel-picker and stacked form exactly as before. No schema change either way — purely how already-recorded/in-progress `Set` data is displayed and entered. → ADR-0015 |
 
 ---
 

@@ -178,224 +178,254 @@ export function LoggingScreen() {
   }
 
   return (
-    <main className="logging-screen" aria-label="Log a session">
-      <Link to="/diary" className="logging-button logging-button--icon-label">
-        <Icon name="chevron-right" style={{ transform: 'rotate(180deg)' }} />
-        Diary
-      </Link>
-      <h1>Log a session</h1>
-
-      {pendingDraft && (
-        <div
-          className="logging-screen__draft-banner"
-          role="status"
-          aria-label="Unregistered workout found"
+    // `.app-shell__content > *` (app-shell.css) expects exactly one flex
+    // child per screen and sizes it `flex: 1 0 auto` — this single wrapper
+    // is that one child, so `LoggingShell`'s content column doesn't also
+    // try to grow the header alongside `.logging-screen` (Copilot review,
+    // PR #33: that double-stretch made the header-less-than-full route
+    // root taller than the viewport, producing a blank scroll region).
+    // The header stays a fixed-size flex item; `.logging-screen` is the
+    // one part that scrolls.
+    <div className="logging-screen__root">
+      {/* Matches `HeaderNav`'s own bar (`header-nav.css`) so the logging
+          screen — the one screen with no `HeaderNav`, ADR-0009 — still
+          reads as the same chrome as every other screen's header, rather
+          than a visually distinct one-off. */}
+      <header className="logging-screen__header">
+        <Link
+          to="/diary"
+          className="logging-screen__back"
+          aria-label="Back to diary"
         >
-          <p>You have an unregistered workout from a previous visit.</p>
-          <div className="logging-screen__draft-banner-actions">
-            <button
-              type="button"
-              className="logging-button logging-button--primary"
-              onClick={() => void recoverPendingDraft()}
-            >
-              Recover
-            </button>
-            <button
-              type="button"
-              className="logging-button"
-              onClick={() => void discardPendingDraft()}
-            >
-              Discard
-            </button>
-          </div>
-        </div>
-      )}
-
-      <SessionDateTimeField
-        value={draft.dateTime}
-        onChange={(iso) => void setSessionDateTime(iso)}
-      />
-
-      {editingTemplateFor && (
-        <ExerciseTemplatePanel
-          key={editingTemplateFor.id}
-          exercise={editingTemplateFor}
-          onSave={(template) => {
-            // Closes immediately either way (every logging interaction
-            // responds immediately — docs/requirements.md §7.1): the store
-            // action already rolls its own optimistic update back on a
-            // storage failure, so this only needs to keep that rejection
-            // from surfacing as an unhandled one.
-            updateExerciseTemplate(editingTemplateFor.id, template).catch(
-              (error: unknown) => {
-                console.error('Failed to save exercise template', error);
-              },
-            );
-            setEditingTemplateFor(undefined);
-          }}
-          onClose={() => setEditingTemplateFor(undefined)}
-        />
-      )}
-
-      {draft.blocks.map((block, blockIndex) => {
-        const blockVm = toBlockViewModel(block, blockIndex, catalogue);
-        const otherBlocks = draft.blocks
-          .filter((b) => b.id !== block.id)
-          .map((b) =>
-            toBlockViewModel(
-              b,
-              draft.blocks.findIndex((x) => x.id === b.id),
-              catalogue,
-            ),
-          )
-          .map((vm) => ({ id: vm.id, displayName: vm.displayName }));
-
-        return (
-          <BlockCard
-            key={block.id}
-            displayName={blockVm.displayName}
-            hasName={block.name !== undefined}
-            subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'}`}
-            canMoveUp={blockIndex > 0}
-            canMoveDown={blockIndex < draft.blocks.length - 1}
-            onMoveUp={() => void reorderBlock(blockIndex, blockIndex - 1)}
-            onMoveDown={() => void reorderBlock(blockIndex, blockIndex + 1)}
-            onRename={(name) => void renameBlock(block.id, name)}
-            onDelete={() => void deleteBlock(block.id)}
-            footer={
-              // FR-028: adding an exercise to the active form must stay
-              // unavailable while a pendingDraft is unresolved — the
-              // default seeded block (ADR-0011) always exists and renders
-              // regardless, so its own footer control needs this same
-              // gate the bottom-of-screen controls already have.
-              !pendingDraft ? (
-                <AddExerciseControl
-                  buttonLabel={`Add exercise to ${blockVm.displayName}`}
-                  fieldLabel={`Add exercise to ${blockVm.displayName}`}
-                  search={searchExercises}
-                  onSelectExercise={(exercise) =>
-                    void addExerciseEntry(exercise.id, block.id)
-                  }
-                  onCreateExercise={(name) => {
-                    void (async () => {
-                      const exercise = await createExercise({
-                        canonicalName: name,
-                      });
-                      await addExerciseEntry(exercise.id, block.id);
-                    })();
-                  }}
-                />
-              ) : undefined
-            }
+          <Icon name="chevron-right" style={{ transform: 'rotate(180deg)' }} />
+        </Link>
+        <h1 className="logging-screen__title">New session</h1>
+      </header>
+      <main className="logging-screen" aria-label="Log a session">
+        {pendingDraft && (
+          <div
+            className="logging-screen__draft-banner"
+            role="status"
+            aria-label="Unregistered workout found"
           >
-            {block.exercises.map((entry, entryIndex) => {
-              const entryVm = blockVm.entries[entryIndex]!;
-              const exercise = catalogue.find((e) => e.id === entry.exerciseId);
-              return (
-                <ExerciseEntryCard
-                  key={entry.id}
-                  exerciseName={entryVm.exerciseName}
-                  canMoveUp={entryIndex > 0}
-                  canMoveDown={entryIndex < block.exercises.length - 1}
-                  onMoveUp={() =>
-                    void reorderBlockExercise(
-                      block.id,
-                      entryIndex,
-                      entryIndex - 1,
-                    )
-                  }
-                  onMoveDown={() =>
-                    void reorderBlockExercise(
-                      block.id,
-                      entryIndex,
-                      entryIndex + 1,
-                    )
-                  }
-                  otherBlocks={otherBlocks}
-                  onMoveToBlock={(toBlockId) =>
-                    void moveExerciseAcrossBlocks(block.id, entry.id, toBlockId)
-                  }
-                  onDelete={() => void deleteExerciseEntry(block.id, entry.id)}
-                  onEditTemplate={
-                    exercise ? () => setEditingTemplateFor(exercise) : undefined
-                  }
-                >
-                  <ExerciseSetList
-                    sets={entry.sets}
-                    loadKind={exercise?.defaultLoadType ?? 'none'}
-                    volumeKind={exercise?.defaultVolumeKind ?? 'reps'}
-                    trackEffort={exercise?.trackEffort ?? false}
-                    bandLabels={bandLabels}
-                    freeTextSuggestions={suggestFreeTextLoads(entry.exerciseId)}
-                    prefill={prefillNextSet(block.id, entry.id)}
-                    unit={settings.defaultUnit}
-                    quickIncrements={settings.quickIncrements}
-                    onAddSet={(input) => void addSet(entry.id, input)}
-                    onUpdateSet={(setId, input) =>
-                      void updateSet(entry.id, setId, input)
+            <p>You have an unregistered workout from a previous visit.</p>
+            <div className="logging-screen__draft-banner-actions">
+              <button
+                type="button"
+                className="logging-button logging-button--primary"
+                onClick={() => void recoverPendingDraft()}
+              >
+                Recover
+              </button>
+              <button
+                type="button"
+                className="logging-button"
+                onClick={() => void discardPendingDraft()}
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
+
+        <SessionDateTimeField
+          value={draft.dateTime}
+          onChange={(iso) => void setSessionDateTime(iso)}
+        />
+
+        {editingTemplateFor && (
+          <ExerciseTemplatePanel
+            key={editingTemplateFor.id}
+            exercise={editingTemplateFor}
+            onSave={(template) => {
+              // Closes immediately either way (every logging interaction
+              // responds immediately — docs/requirements.md §7.1): the store
+              // action already rolls its own optimistic update back on a
+              // storage failure, so this only needs to keep that rejection
+              // from surfacing as an unhandled one.
+              updateExerciseTemplate(editingTemplateFor.id, template).catch(
+                (error: unknown) => {
+                  console.error('Failed to save exercise template', error);
+                },
+              );
+              setEditingTemplateFor(undefined);
+            }}
+            onClose={() => setEditingTemplateFor(undefined)}
+          />
+        )}
+
+        {draft.blocks.map((block, blockIndex) => {
+          const blockVm = toBlockViewModel(block, blockIndex, catalogue);
+          const otherBlocks = draft.blocks
+            .filter((b) => b.id !== block.id)
+            .map((b) =>
+              toBlockViewModel(
+                b,
+                draft.blocks.findIndex((x) => x.id === b.id),
+                catalogue,
+              ),
+            )
+            .map((vm) => ({ id: vm.id, displayName: vm.displayName }));
+
+          return (
+            <BlockCard
+              key={block.id}
+              displayName={blockVm.displayName}
+              hasName={block.name !== undefined}
+              subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'}`}
+              canMoveUp={blockIndex > 0}
+              canMoveDown={blockIndex < draft.blocks.length - 1}
+              onMoveUp={() => void reorderBlock(blockIndex, blockIndex - 1)}
+              onMoveDown={() => void reorderBlock(blockIndex, blockIndex + 1)}
+              onRename={(name) => void renameBlock(block.id, name)}
+              onDelete={() => void deleteBlock(block.id)}
+              footer={
+                // FR-028: adding an exercise to the active form must stay
+                // unavailable while a pendingDraft is unresolved — the
+                // default seeded block (ADR-0011) always exists and renders
+                // regardless, so its own footer control needs this same
+                // gate the bottom-of-screen controls already have.
+                !pendingDraft ? (
+                  <AddExerciseControl
+                    buttonLabel={`Add exercise to ${blockVm.displayName}`}
+                    fieldLabel={`Add exercise to ${blockVm.displayName}`}
+                    search={searchExercises}
+                    onSelectExercise={(exercise) =>
+                      void addExerciseEntry(exercise.id, block.id)
                     }
-                    onDeleteSet={(setId) =>
-                      void deleteSet(block.id, entry.id, setId)
-                    }
-                    onSaveBandLabels={(labels) => void saveBandLabels(labels)}
-                    newestSetId={lastAddedSetId}
-                    onNewestSetAnimationEnd={(setId) => {
-                      // Guards against a stale closure: if a second set
-                      // committed (moving the marker on) before this row's
-                      // own animation ended, only *that* row's handler
-                      // should consume it — this one clearing a marker
-                      // that has already moved on would strand the newer
-                      // row's own entrance animation mid-flight (Copilot
-                      // review, PR #22).
-                      if (
-                        useLoggingSession.getState().lastAddedSetId === setId
-                      ) {
-                        clearLastAddedSetId();
-                      }
+                    onCreateExercise={(name) => {
+                      void (async () => {
+                        const exercise = await createExercise({
+                          canonicalName: name,
+                        });
+                        await addExerciseEntry(exercise.id, block.id);
+                      })();
                     }}
                   />
-                </ExerciseEntryCard>
-              );
-            })}
-          </BlockCard>
-        );
-      })}
+                ) : undefined
+              }
+            >
+              {block.exercises.map((entry, entryIndex) => {
+                const entryVm = blockVm.entries[entryIndex]!;
+                const exercise = catalogue.find(
+                  (e) => e.id === entry.exerciseId,
+                );
+                return (
+                  <ExerciseEntryCard
+                    key={entry.id}
+                    exerciseName={entryVm.exerciseName}
+                    canMoveUp={entryIndex > 0}
+                    canMoveDown={entryIndex < block.exercises.length - 1}
+                    onMoveUp={() =>
+                      void reorderBlockExercise(
+                        block.id,
+                        entryIndex,
+                        entryIndex - 1,
+                      )
+                    }
+                    onMoveDown={() =>
+                      void reorderBlockExercise(
+                        block.id,
+                        entryIndex,
+                        entryIndex + 1,
+                      )
+                    }
+                    otherBlocks={otherBlocks}
+                    onMoveToBlock={(toBlockId) =>
+                      void moveExerciseAcrossBlocks(
+                        block.id,
+                        entry.id,
+                        toBlockId,
+                      )
+                    }
+                    onDelete={() =>
+                      void deleteExerciseEntry(block.id, entry.id)
+                    }
+                    onEditTemplate={
+                      exercise
+                        ? () => setEditingTemplateFor(exercise)
+                        : undefined
+                    }
+                  >
+                    <ExerciseSetList
+                      sets={entry.sets}
+                      loadKind={exercise?.defaultLoadType ?? 'none'}
+                      volumeKind={exercise?.defaultVolumeKind ?? 'reps'}
+                      trackEffort={exercise?.trackEffort ?? false}
+                      bandLabels={bandLabels}
+                      freeTextSuggestions={suggestFreeTextLoads(
+                        entry.exerciseId,
+                      )}
+                      prefill={prefillNextSet(block.id, entry.id)}
+                      unit={settings.defaultUnit}
+                      quickIncrements={settings.quickIncrements}
+                      onAddSet={(input) => void addSet(entry.id, input)}
+                      onUpdateSet={(setId, input) =>
+                        void updateSet(entry.id, setId, input)
+                      }
+                      onDeleteSet={(setId) =>
+                        void deleteSet(block.id, entry.id, setId)
+                      }
+                      onSaveBandLabels={(labels) => void saveBandLabels(labels)}
+                      newestSetId={lastAddedSetId}
+                      onNewestSetAnimationEnd={(setId) => {
+                        // Guards against a stale closure: if a second set
+                        // committed (moving the marker on) before this row's
+                        // own animation ended, only *that* row's handler
+                        // should consume it — this one clearing a marker
+                        // that has already moved on would strand the newer
+                        // row's own entrance animation mid-flight (Copilot
+                        // review, PR #22).
+                        if (
+                          useLoggingSession.getState().lastAddedSetId === setId
+                        ) {
+                          clearLastAddedSetId();
+                        }
+                      }}
+                    />
+                  </ExerciseEntryCard>
+                );
+              })}
+            </BlockCard>
+          );
+        })}
 
-      <div aria-live="polite">
-        {undoStack.map((entry) => (
-          <UndoToast
-            key={entry.id}
-            message={UNDO_MESSAGES[entry.kind]}
-            expiresAt={entry.expiresAt}
-            onUndo={() => void undo(entry.id)}
-          />
-        ))}
-      </div>
+        <div aria-live="polite">
+          {undoStack.map((entry) => (
+            <UndoToast
+              key={entry.id}
+              message={UNDO_MESSAGES[entry.kind]}
+              expiresAt={entry.expiresAt}
+              onUndo={() => void undo(entry.id)}
+            />
+          ))}
+        </div>
 
-      {!pendingDraft && (
+        {!pendingDraft && (
+          <button
+            type="button"
+            className="logging-button logging-button--icon-label"
+            onClick={() => void addBlock(undefined, 'straightSets')}
+          >
+            <Icon name="plus" />
+            Add block
+          </button>
+        )}
+
         <button
           type="button"
-          className="logging-button logging-button--icon-label"
-          onClick={() => void addBlock(undefined, 'straightSets')}
+          className="logging-button logging-button--primary"
+          disabled={!!pendingDraft || !draftHasContent(draft)}
+          onClick={() => {
+            void (async () => {
+              await registerWorkout();
+              navigate('/diary');
+            })();
+          }}
         >
-          <Icon name="plus" />
-          Add block
+          Log workout
         </button>
-      )}
-
-      <button
-        type="button"
-        className="logging-button logging-button--primary"
-        disabled={!!pendingDraft || !draftHasContent(draft)}
-        onClick={() => {
-          void (async () => {
-            await registerWorkout();
-            navigate('/diary');
-          })();
-        }}
-      >
-        Log workout
-      </button>
-    </main>
+      </main>
+    </div>
   );
 }

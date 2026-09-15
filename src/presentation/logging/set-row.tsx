@@ -39,6 +39,7 @@
  * this exact set, not a guess forwarded from a different one.
  */
 import { useState } from 'react';
+import type { WheelEvent } from 'react';
 import { WeightLoadInput } from './weight-load-input';
 import { BandLoadInput } from './band-load-input';
 import { BodyweightLoadInput } from './bodyweight-load-input';
@@ -297,6 +298,111 @@ export function SetRow({
   function handleConfirm() {
     const input = buildInput(currentFields);
     if (input) onConfirm(input);
+  }
+
+  // The compact single-line layout (design refinement — matches the sets
+  // table's own Reps/Load columns, Claude Design canvas exploration) only
+  // covers the common case this app was originally tuned for: a plain
+  // Weight load, reps volume, no effort tracking. Every other combination
+  // (band/bodyweight/freeText loads, duration/distance volume, effort)
+  // keeps the fuller stacked form below — collapsing those into one line
+  // would either drop a real field or force horizontal scrolling on a
+  // narrow phone, which the compact row is specifically trying to avoid.
+  const isCompactRow =
+    effectiveLoadKind === 'weight' &&
+    effectiveVolumeKind === 'reps' &&
+    !trackEffort;
+
+  if (isCompactRow) {
+    // Hiding the native spinner (logging.css) doesn't stop a focused
+    // `type="number"` field from still responding to a mouse-wheel/
+    // trackpad scroll gesture over it — exactly the scroll-to-change
+    // interaction this compact row exists to avoid (Copilot review,
+    // PR #33). Blurring on wheel is the standard workaround: the browser
+    // only adjusts the value of the currently-focused number input, so an
+    // immediate blur (then refocus is still one tap away) makes a stray
+    // scroll over the field inert instead of silently changing it.
+    const blurOnWheel = (event: WheelEvent<HTMLInputElement>) => {
+      event.currentTarget.blur();
+    };
+
+    return (
+      <div className="set-row set-row--compact">
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          step={1}
+          max={MAX_REPS}
+          className="set-row__compact-input"
+          placeholder="15"
+          aria-label="Reps"
+          value={volumeValue ?? ''}
+          onWheel={blurOnWheel}
+          onChange={(event) => {
+            const raw = event.target.value;
+            if (raw === '') {
+              setVolumeValue(undefined);
+              return;
+            }
+            const parsed = Number(raw);
+            // Reps must be a positive integer (`domain/volume.ts`'s
+            // `createVolume`) — the old wheel only ever exposed 1..100, so
+            // this plain field must reject 0 and fractional entries the
+            // same way rather than letting `Add set` pass them through to
+            // a domain error (Copilot review, PR #33).
+            setVolumeValue(
+              Number.isInteger(parsed) && parsed >= 1 && parsed <= MAX_REPS
+                ? parsed
+                : undefined,
+            );
+          }}
+        />
+        <input
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step={0.5}
+          className="set-row__compact-input"
+          placeholder={effectiveUnit}
+          aria-label={`Weight (${effectiveUnit})`}
+          value={weightKg ?? ''}
+          onWheel={blurOnWheel}
+          onChange={(event) => {
+            const raw = event.target.value;
+            if (raw === '') {
+              setWeightKg(undefined);
+              return;
+            }
+            const parsed = Number(raw);
+            setWeightKg(Number.isFinite(parsed) && parsed >= 0 ? parsed : 0);
+          }}
+        />
+        <span className="set-summary__spacer" />
+        <div className="set-row__compact-actions">
+          <button
+            type="button"
+            className="set-row__compact-confirm"
+            disabled={!canConfirm}
+            aria-disabled={!canConfirm}
+            aria-label={editingSet ? 'Save changes' : 'Add set'}
+            onClick={handleConfirm}
+          >
+            <Icon name={editingSet ? 'check' : 'plus'} />
+          </button>
+          {onCancel && (
+            <button
+              type="button"
+              className="set-row__compact-cancel"
+              aria-label="Cancel"
+              onClick={onCancel}
+            >
+              <Icon name="close" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return (
