@@ -6,8 +6,9 @@ rules: return `Promise`, reject with `StorageError`, no infrastructure
 vocabulary.
 
 ```ts
-// Settings (FR-001/002 — non-canonical singleton, mirrors band labels)
-getSettings(): Promise<Settings>;   // never undefined — defaults filled (data-model.md)
+// Settings (FR-001/002 — non-canonical singleton, mirrors getDraft()'s
+// presence semantics exactly: undefined = never saved on this device)
+getSettings(): Promise<Settings | undefined>;
 saveSettings(settings: Settings): Promise<void>;
 
 // Bulk atomic write (FR-011) — the import/delete-everything dependency
@@ -44,9 +45,10 @@ constrains the observable guarantee.
 three adapters (`InMemoryStorageAdapter`, `IndexedDbStorageAdapter`,
 `FileSystemStorageAdapter`):
 
-1. `getSettings()` on a never-written device returns the documented
-   defaults (data-model.md).
-2. `saveSettings()` then `getSettings()` round-trips exactly.
+1. `getSettings()` on a never-written device returns `undefined` (mirrors
+   `getDraft()`'s existing presence contract).
+2. `saveSettings()` then `getSettings()` round-trips exactly (defined, not
+   `undefined`).
 3. `importBulk` with new sessions/exercises and no singleton fields adds
    them and leaves existing band labels/settings/draft untouched.
 4. `importBulk` with a session/exercise sharing an existing id replaces
@@ -57,8 +59,10 @@ three adapters (`InMemoryStorageAdapter`, `IndexedDbStorageAdapter`,
    `schemaVersion`.
 7. `resetToFreshInstall` leaves `listExercises()` returning exactly the
    passed `seedExercises`, `listSessions()` empty, `getDraft()`
-   `undefined`, `listBandLabels()` `[]`, `getSettings()` back to defaults,
-   and the stored schema version at `CURRENT_SCHEMA_VERSION`.
+   `undefined`, `listBandLabels()` `[]`, `getSettings()` back to
+   `undefined` (so the settings store's own defaults apply on next read,
+   same as a genuinely fresh install), and the stored schema version at
+   `CURRENT_SCHEMA_VERSION`.
 8. (File System adapter only, or a dedicated infra-level test) an
    `importBulk`/`resetToFreshInstall` call interrupted after the journal
    is written but before every target file is written is fully completed
