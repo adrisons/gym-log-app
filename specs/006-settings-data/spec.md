@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-12
 
-**Status**: Planned
+**Status**: Implemented — PR [#31](https://github.com/adrisons/gym-log-app/pull/31) open, pending CI/review and merge
 
 **Input**: User description: "Settings, export and import (FR-11, FR-12) —
 v1, Phase 6 per docs/agent-brief.md §3. Build the Settings screen (default
