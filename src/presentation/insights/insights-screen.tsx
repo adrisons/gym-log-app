@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { requireStorage } from '@/application/storage-access';
 import { allStoredDataRange } from '@/application/date-range';
+import { withSettingsDefaults } from '@/application/settings-store';
 import { buildInsights } from '@/application/insights/build-insights';
 import type { InsightsResult } from '@/application/insights/build-insights';
 import type { ProgressionMetric } from '@/application/progression/progression-series';
@@ -33,11 +34,19 @@ export function InsightsScreen() {
   useEffect(() => {
     void (async () => {
       const storage = requireStorage();
-      const [exercises, sessions] = await Promise.all([
+      const [exercises, sessions, settings] = await Promise.all([
         storage.listExercises(),
         storage.listSessions(allStoredDataRange()),
+        storage.getSettings(),
       ]);
-      setResult(buildInsights(sessions as Session[], exercises as Exercise[]));
+      const { firstDayOfWeek } = withSettingsDefaults(settings);
+      setResult(
+        buildInsights(
+          sessions as Session[],
+          exercises as Exercise[],
+          firstDayOfWeek,
+        ),
+      );
     })();
   }, []);
 

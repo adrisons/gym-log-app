@@ -4,5 +4,9 @@
  * files, so there is one place to look and one place to add the next one.
  */
 export { InMemoryStorage } from './in-memory-storage';
+export {
+  InMemoryFileExchange,
+  type SavedFile,
+} from './in-memory-file-exchange';
 export { createHarness } from './integration-harness';
 export type { Harness } from './integration-harness';

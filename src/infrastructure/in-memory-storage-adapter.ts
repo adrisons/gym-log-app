@@ -2,11 +2,14 @@ import type {
   StoragePort,
   DateRange,
   LoggingDraft,
+  BulkImportInput,
 } from '../application/ports/storage-port';
+import type { Settings } from '../application/ports/settings';
 import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
 import type { SessionId, ExerciseId } from '../domain/ids';
 import { StorageError } from '../application/errors';
+import { CURRENT_SCHEMA_VERSION } from './schema-version';
 
 /**
  * In-memory implementation of `StoragePort` (spec 000 FR-014; spec 002
@@ -38,6 +41,7 @@ export class InMemoryStorageAdapter implements StoragePort {
   #exercises = new Map<ExerciseId, Exercise>();
   #draft: LoggingDraft | undefined;
   #bandLabels: string[] = [];
+  #settings: Settings | undefined;
   #schemaVersion = 0;
 
   async saveSession(session: Session): Promise<void> {
@@ -175,12 +179,57 @@ export class InMemoryStorageAdapter implements StoragePort {
     this.#schemaVersion = version;
   }
 
+  async getSettings(): Promise<Settings | undefined> {
+    return this.#settings;
+  }
+
+  async saveSettings(settings: Settings): Promise<void> {
+    this.#settings = settings;
+  }
+
+  /**
+   * Trivially atomic: synchronous `Map`/field mutations inside one `async`
+   * method body, no `await` between them, so nothing else can observe a
+   * partial state (spec 006 research.md §2).
+   */
+  async importBulk(input: BulkImportInput): Promise<void> {
+    for (const exercise of input.exercises) {
+      this.#exercises.set(exercise.id, exercise);
+    }
+    for (const session of input.sessions) {
+      this.#sessions.set(session.id, session);
+    }
+    if (input.bandLabels !== undefined) {
+      this.#bandLabels = [...input.bandLabels];
+    }
+    if (input.settings !== undefined) {
+      this.#settings = input.settings;
+    }
+    if (input.loggingDraft !== undefined) {
+      this.#draft = input.loggingDraft;
+    }
+    this.#schemaVersion = input.schemaVersion;
+  }
+
+  async resetToFreshInstall(seedExercises: Exercise[]): Promise<void> {
+    this.#sessions.clear();
+    this.#exercises.clear();
+    for (const exercise of seedExercises) {
+      this.#exercises.set(exercise.id, exercise);
+    }
+    this.#draft = undefined;
+    this.#bandLabels = [];
+    this.#settings = undefined;
+    this.#schemaVersion = CURRENT_SCHEMA_VERSION;
+  }
+
   /** Test isolation: clears all state between tests. */
   reset(): void {
     this.#sessions.clear();
     this.#exercises.clear();
     this.#draft = undefined;
     this.#bandLabels = [];
+    this.#settings = undefined;
     this.#schemaVersion = 0;
   }
 

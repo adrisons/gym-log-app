@@ -10,6 +10,8 @@ const baseProps = {
   bandLabels: ['Red', 'Blue'],
   freeTextSuggestions: [],
   onSaveBandLabels: () => {},
+  unit: 'kg' as const,
+  quickIncrements: { durationSeconds: 5, distanceMetres: 50 },
 };
 
 function confirmButton() {
@@ -318,6 +320,58 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
       expect.objectContaining({ effort: 3 }),
     );
   });
+
+  it('labels the Weight field with Settings’ defaultUnit and tags a new Weight load with it (spec 006 FR-001/SC-003)', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        unit="lb"
+        prefill={undefined}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    expect(
+      screen.getByRole('spinbutton', { name: /weight \(lb\)/i }),
+    ).toBeInTheDocument();
+
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /weight/i }),
+      '100',
+    );
+    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
+    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.click(confirmButton());
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        load: { kind: 'weight', value: 100, unit: 'lb' },
+      }),
+    );
+  });
+
+  it('uses Settings’ quickIncrements for the Duration/Distance +/- step sizes (spec 006 FR-001/SC-003)', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        volumeKind="duration"
+        quickIncrements={{ durationSeconds: 15, distanceMetres: 200 }}
+        prefill={undefined}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    const increase = screen.getByRole('button', {
+      name: /increase duration \(s\) by 15/i,
+    });
+    await userEvent.click(increase);
+
+    expect(screen.getByRole('spinbutton', { name: /duration/i })).toHaveValue(
+      15,
+    );
+  });
 });
 
 describe('SetRow editing an existing set in place (ADR-0010)', () => {
@@ -347,6 +401,37 @@ describe('SetRow editing an existing set in place (ADR-0010)', () => {
     expect(screen.getByRole('option', { name: '4 — Hard' })).toHaveAttribute(
       'aria-selected',
       'true',
+    );
+  });
+
+  it('keeps an already-recorded Weight load’s own unit, not Settings’ current default (spec 006 FR-001/SC-003)', async () => {
+    const onConfirm = vi.fn();
+    render(
+      <SetRow
+        {...baseProps}
+        unit="kg"
+        prefill={undefined}
+        editingSet={{ load: { kind: 'weight', value: 80, unit: 'lb' } }}
+        onConfirm={onConfirm}
+        onCancel={() => {}}
+      />,
+    );
+
+    // The set was recorded in lb; the current Settings default has since
+    // moved to kg. The field must still show — and, unchanged, still
+    // save as — lb: `domain/load.ts` stores a Weight load's number
+    // exactly as entered, so relabeling it kg here would silently change
+    // what the already-recorded 80 means without the user touching it.
+    expect(
+      screen.getByRole('spinbutton', { name: /weight \(lb\)/i }),
+    ).toHaveValue(80);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        load: { kind: 'weight', value: 80, unit: 'lb' },
+      }),
     );
   });
 

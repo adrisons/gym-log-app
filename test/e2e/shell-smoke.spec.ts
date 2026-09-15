@@ -15,6 +15,8 @@ import { expect, test } from '@playwright/test';
 //
 // Spec 005 adds "/insights" alongside the others — same pattern.
 //
+// Spec 006 adds "/settings" alongside the others — same pattern.
+//
 // Design-refinement pass (docs/requirements.md FR-1): "/" now redirects to
 // "/diary" — the diary is the app's home, and the logging form moved to
 // "/log", reached from a floating action there rather than a nav tab. This
@@ -55,4 +57,14 @@ test('the insights route is reachable and shows missing-data notices with no ses
   await expect(
     page.getByText(/log an exercise a few more times/i),
   ).toBeVisible();
+});
+
+test('the settings route is reachable and shows the Data section (spec 006 FR-001/006)', async ({
+  page,
+}) => {
+  await page.goto('/settings');
+
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Data' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Export data' })).toBeVisible();
 });

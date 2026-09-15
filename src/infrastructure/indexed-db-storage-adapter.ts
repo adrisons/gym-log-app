@@ -2,15 +2,19 @@ import type {
   StoragePort,
   DateRange,
   LoggingDraft,
+  BulkImportInput,
 } from '../application/ports/storage-port';
+import type { Settings } from '../application/ports/settings';
 import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
 import type { SessionId, ExerciseId } from '../domain/ids';
 import { StorageError } from '../application/errors';
+import { migrateExerciseCatalogue } from '../application/schema-migration';
 import {
   GymLogDatabase,
   DRAFT_ROW_KEY,
   BAND_LABELS_ROW_KEY,
+  SETTINGS_ROW_KEY,
   SCHEMA_VERSION_ROW_KEY,
 } from './indexed-db/schema';
 import { CURRENT_SCHEMA_VERSION, decideSchemaAction } from './schema-version';
@@ -102,17 +106,13 @@ export class IndexedDbStorageAdapter implements StoragePort {
     return row?.value ?? 0;
   }
 
-  /** ADR-0006's v1->v2 migration: see the call site's comment. */
+  /** ADR-0006's v1->v2 migration: see the call site's comment. Delegates to
+   * the shared `migrateExerciseCatalogue` (spec 006 research.md §3) rather
+   * than its own copy of the backfill logic. */
   async #migrateExerciseTemplateDefaults(): Promise<void> {
     const exercises = await this.#db.exercises.toArray();
     await this.#run(() =>
-      this.#db.exercises.bulkPut(
-        exercises.map((exercise) => ({
-          ...exercise,
-          defaultVolumeKind: exercise.defaultVolumeKind ?? 'reps',
-          trackEffort: exercise.trackEffort ?? false,
-        })),
-      ),
+      this.#db.exercises.bulkPut(migrateExerciseCatalogue(exercises, 1)),
     );
   }
 
@@ -304,6 +304,102 @@ export class IndexedDbStorageAdapter implements StoragePort {
   async setSchemaVersion(version: number): Promise<void> {
     await this.#run(() =>
       this.#db.meta.put({ key: SCHEMA_VERSION_ROW_KEY, value: version }),
+    );
+  }
+
+  // Settings (spec 006 FR-001/002)
+
+  async getSettings(): Promise<Settings | undefined> {
+    await this.#ensureSchemaChecked();
+    const row = await this.#db.settings.get(SETTINGS_ROW_KEY);
+    return row?.value;
+  }
+
+  async saveSettings(settings: Settings): Promise<void> {
+    await this.#ensureSchemaChecked();
+    await this.#run(() =>
+      this.#db.settings.put({ key: SETTINGS_ROW_KEY, value: settings }),
+    );
+  }
+
+  // Bulk atomic write (spec 006 FR-011/FR-015-016)
+
+  async importBulk(input: BulkImportInput): Promise<void> {
+    await this.#ensureSchemaChecked();
+    await this.#run(() =>
+      this.#db.transaction(
+        'rw',
+        [
+          this.#db.sessions,
+          this.#db.exercises,
+          this.#db.draft,
+          this.#db.bandLabels,
+          this.#db.settings,
+          this.#db.meta,
+        ],
+        async () => {
+          if (input.exercises.length > 0) {
+            await this.#db.exercises.bulkPut(input.exercises);
+          }
+          if (input.sessions.length > 0) {
+            await this.#db.sessions.bulkPut(input.sessions);
+          }
+          if (input.bandLabels !== undefined) {
+            await this.#db.bandLabels.put({
+              key: BAND_LABELS_ROW_KEY,
+              value: [...input.bandLabels],
+            });
+          }
+          if (input.settings !== undefined) {
+            await this.#db.settings.put({
+              key: SETTINGS_ROW_KEY,
+              value: input.settings,
+            });
+          }
+          if (input.loggingDraft !== undefined) {
+            await this.#db.draft.put({
+              key: DRAFT_ROW_KEY,
+              value: input.loggingDraft,
+            });
+          }
+          await this.#db.meta.put({
+            key: SCHEMA_VERSION_ROW_KEY,
+            value: input.schemaVersion,
+          });
+        },
+      ),
+    );
+  }
+
+  async resetToFreshInstall(seedExercises: Exercise[]): Promise<void> {
+    await this.#ensureSchemaChecked();
+    await this.#run(() =>
+      this.#db.transaction(
+        'rw',
+        [
+          this.#db.sessions,
+          this.#db.exercises,
+          this.#db.draft,
+          this.#db.bandLabels,
+          this.#db.settings,
+          this.#db.meta,
+        ],
+        async () => {
+          await this.#db.sessions.clear();
+          await this.#db.exercises.clear();
+          await this.#db.exercises.bulkPut(seedExercises);
+          await this.#db.draft.delete(DRAFT_ROW_KEY);
+          await this.#db.bandLabels.put({
+            key: BAND_LABELS_ROW_KEY,
+            value: [],
+          });
+          await this.#db.settings.delete(SETTINGS_ROW_KEY);
+          await this.#db.meta.put({
+            key: SCHEMA_VERSION_ROW_KEY,
+            value: CURRENT_SCHEMA_VERSION,
+          });
+        },
+      ),
     );
   }
 

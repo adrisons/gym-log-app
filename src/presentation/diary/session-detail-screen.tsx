@@ -22,6 +22,7 @@ import {
 import type { EditableSession } from '@/application/diary/session-editing';
 import { searchExercises } from '@/application/search/exercise-search';
 import { toBlockViewModel } from '@/application/logging/view-models';
+import { useSettingsStore } from '@/application/settings-store';
 import type {
   Exercise,
   Session,
@@ -59,6 +60,7 @@ export function SessionDetailScreen() {
   );
   const [catalogue, setCatalogue] = useState<Exercise[]>([]);
   const [bandLabels, setBandLabels] = useState<string[]>([]);
+  const settings = useSettingsStore((s) => s.settings);
   const [editingTemplateFor, setEditingTemplateFor] = useState<
     Exercise | undefined
   >(undefined);
@@ -319,6 +321,8 @@ export function SessionDetailScreen() {
                       bandLabels={bandLabels}
                       freeTextSuggestions={[]}
                       prefill={undefined}
+                      unit={settings.defaultUnit}
+                      quickIncrements={settings.quickIncrements}
                       onAddSet={(input) =>
                         persist((editable) => ({
                           ...editable,

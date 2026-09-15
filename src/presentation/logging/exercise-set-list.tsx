@@ -45,6 +45,10 @@ export interface ExerciseSetListProps {
   /** Add-mode prefill (FR-008) — the previous set's load/volume, or
    * `undefined` when there's none or the caller doesn't offer one. */
   prefill: SetPrefill | undefined;
+  /** Settings' `defaultUnit` and `quickIncrements` (spec 006 FR-001/
+   * SC-003), threaded down to `SetRow`. */
+  unit: 'kg' | 'lb';
+  quickIncrements: { durationSeconds: number; distanceMetres: number };
   onAddSet: (input: AddSetInput) => void;
   onUpdateSet: (setId: string, input: AddSetInput) => void;
   onDeleteSet: (setId: string) => void;
@@ -65,6 +69,8 @@ export function ExerciseSetList({
   bandLabels,
   freeTextSuggestions,
   prefill,
+  unit,
+  quickIncrements,
   onAddSet,
   onUpdateSet,
   onDeleteSet,
@@ -213,6 +219,8 @@ export function ExerciseSetList({
           trackEffort={trackEffort}
           bandLabels={bandLabels}
           freeTextSuggestions={freeTextSuggestions}
+          unit={unit}
+          quickIncrements={quickIncrements}
           onConfirm={(input) => {
             if (form === 'edit' && editingSetId) {
               onUpdateSet(editingSetId, input);

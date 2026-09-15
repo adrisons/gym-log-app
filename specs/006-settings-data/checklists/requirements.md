@@ -61,6 +61,18 @@
   distance and the Set to carry only `Volume: Duration`, since `Volume` is
   an exclusive union and cannot hold both at once — the original "no
   rework" phrasing overstated what the current model already supports.
+- **2026-09-15 — `/speckit-clarify` pass, three product-owner-directed
+  clarifications encoded.** Added a `## Clarifications` session recording
+  three answers already decided by the project owner rather than
+  open questions: (1) the interchange format must stay additive-compatible
+  for future disciplines/parameters via the existing schema-version
+  mechanism (FR-021); (2) the primary JSON export is explicitly designed
+  to be directly interpretable by a general-purpose AI assistant for
+  progression analysis, not just device-to-device migration (FR-022,
+  SC-008); (3) the export must exclude device/installation/browser
+  identifying metadata while still including the user's own free-text
+  notes as their own training data, not scanned or redacted (FR-023,
+  SC-009). No existing FR was contradicted; all three are additive.
 - **2026-09-12 — `spec-reviewer` and `schema-guardian` subagent review,
   findings applied, Status → Reviewed.** `schema-guardian` gave a sound
   verdict on the "Settings doesn't bump the schema" claim (Principle III's

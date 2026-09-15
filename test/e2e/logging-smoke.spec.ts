@@ -27,12 +27,14 @@ test('logging a set requires an explicit Confirm tap and then appears instantly,
   ).toBeVisible();
 
   await page.getByRole('button', { name: 'Add exercise' }).click();
-  await page
-    .getByPlaceholder('Search or create an exercise')
-    .fill('Back squat');
-  await page.getByText('Create "Back squat"').click();
+  await page.getByPlaceholder('Search or create an exercise').fill('Cable Fly');
+  // Not one of the seed catalogue's entries (spec 006 D9/ADR-0005 — a
+  // fresh install now ships with a starter set of common exercises), so
+  // "Create …" genuinely offers to create a new one rather than matching
+  // an existing seeded exercise.
+  await page.getByText('Create "Cable Fly"').click();
 
-  await expect(page.getByRole('heading', { name: 'Back squat' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Cable Fly' })).toBeVisible();
 
   // ADR-0010: filling in only one of the two fields the template tracks
   // (Weight + Reps by default) never commits anything on its own — the

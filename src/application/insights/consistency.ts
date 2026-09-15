@@ -1,11 +1,18 @@
 /**
- * FR-010/011: how many of the trailing 12 ISO weeks (or the person's
- * full history, if shorter) included at least one logged Session.
- * ISO week (Monday-start) is a documented provisional default — see
- * spec.md Assumptions — pending `docs/requirements.md` FR-11's future
- * first-day-of-week setting.
+ * FR-010/011: how many of the trailing 12 weeks (or the person's full
+ * history, if shorter) included at least one logged Session. Week
+ * boundaries follow the `firstDayOfWeek` setting (`specs/006-settings-data`
+ * FR-018) — spec 005's own Monday-start (ISO) default was a documented
+ * provisional value pending that setting, which this parameter now closes.
  */
 import type { Session } from '@/domain/session';
+
+type FirstDayOfWeek = 'monday' | 'sunday';
+
+const FIRST_DAY_INDEX: Record<FirstDayOfWeek, number> = {
+  sunday: 0,
+  monday: 1,
+};
 
 const MIN_HISTORY_WEEKS = 4;
 const MAX_REPORTED_WEEKS = 12;
@@ -19,12 +26,13 @@ export interface ConsistencyResult {
   periodEnd: string;
 }
 
-/** The Monday (local date, "YYYY-MM-DD") of the ISO week containing `date`. */
-function isoWeekStart(date: Date): Date {
+/** The first day (local date) of the week containing `date`, per `firstDayOfWeek`. */
+function weekStart(date: Date, firstDayOfWeek: FirstDayOfWeek): Date {
   const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const day = result.getDay(); // 0 = Sunday, 1 = Monday, ...
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  result.setDate(result.getDate() + diffToMonday);
+  const startIndex = FIRST_DAY_INDEX[firstDayOfWeek];
+  const diff = (day - startIndex + 7) % 7;
+  result.setDate(result.getDate() - diff);
   return result;
 }
 
@@ -37,6 +45,7 @@ function dateKey(date: Date): string {
 
 export function computeConsistency(
   sessions: Session[],
+  firstDayOfWeek: FirstDayOfWeek = 'monday',
   asOf: Date = new Date(),
 ): ConsistencyResult | undefined {
   if (sessions.length === 0) return undefined;
@@ -60,7 +69,7 @@ export function computeConsistency(
   const trainedWeekKeys = new Set<string>();
   for (const date of sessionDates) {
     if (date < windowStart || date > asOf) continue;
-    trainedWeekKeys.add(dateKey(isoWeekStart(date)));
+    trainedWeekKeys.add(dateKey(weekStart(date, firstDayOfWeek)));
   }
 
   return {

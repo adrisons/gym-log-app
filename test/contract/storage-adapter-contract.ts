@@ -52,8 +52,10 @@
 import type {
   StoragePort,
   DateRange,
+  BulkImportInput,
 } from '../../src/application/ports/storage-port';
 import type { LoggingDraft } from '../../src/application/ports/storage-port';
+import type { Settings } from '../../src/application/ports/settings';
 import type { Session } from '../../src/domain/session';
 import type { Exercise } from '../../src/domain/exercise';
 import type { SessionId, ExerciseId } from '../../src/domain/ids';
@@ -61,6 +63,7 @@ import { createSet } from '../../src/domain/set';
 import { createLoad } from '../../src/domain/load';
 import { createVolume } from '../../src/domain/volume';
 import { StorageError } from '../../src/application/errors';
+import { CURRENT_SCHEMA_VERSION } from '../../src/infrastructure/schema-version';
 
 export interface ContractFailure {
   scenario: string;
@@ -115,6 +118,16 @@ function makeSession(overrides: Partial<Session> = {}): Session {
     dateTime: '2026-09-10T18:00:00.000Z',
     blocks: [],
     notes: '',
+    ...overrides,
+  };
+}
+
+function makeSettings(overrides: Partial<Settings> = {}): Settings {
+  return {
+    defaultUnit: 'kg',
+    quickIncrements: { durationSeconds: 5, distanceMetres: 5 },
+    theme: 'dark',
+    firstDayOfWeek: 'sunday',
     ...overrides,
   };
 }
@@ -292,6 +305,198 @@ const crossAdapterScenarios: Scenario[] = [
       assert(
         deepEqual(await reader.listBandLabels(), ['Red', 'Blue', 'Green']),
         'listBandLabels preserves order after restart',
+      );
+    },
+  },
+];
+
+// Settings (spec 006 contracts/storage-port-additions.md, cases 1-2)
+
+const settingsScenarios: Scenario[] = [
+  {
+    name: 'settings-1: getSettings on a never-written device returns undefined',
+    async run(makeAdapter) {
+      const adapter = await makeAdapter();
+      assert(
+        (await adapter.getSettings()) === undefined,
+        'getSettings is undefined before any saveSettings call (mirrors getDraft())',
+      );
+    },
+  },
+  {
+    name: 'settings-2: saveSettings then getSettings round-trips exactly, durably',
+    async run(makeAdapter) {
+      const writer = await makeAdapter();
+      const settings = makeSettings();
+      await writer.saveSettings(settings);
+
+      const reader = await makeAdapter();
+      assert(
+        deepEqual(await reader.getSettings(), settings),
+        'getSettings returns the saved Settings unchanged after restart',
+      );
+    },
+  },
+];
+
+// Bulk atomic write: importBulk / resetToFreshInstall (spec 006
+// contracts/storage-port-additions.md, cases 3-7)
+
+const bulkWriteScenarios: Scenario[] = [
+  {
+    name: 'bulk-1: importBulk with no singleton fields adds sessions/exercises and leaves band labels/settings/draft untouched',
+    async run(makeAdapter) {
+      const writer = await makeAdapter();
+      await writer.saveBandLabels(['Red']);
+      await writer.saveSettings(makeSettings());
+      await writer.saveDraft(makeDraft());
+
+      const newSession = makeSession({ id: 'bulk-new-sess' as SessionId });
+      const newExercise = makeExercise({ id: 'bulk-new-ex' as ExerciseId });
+      const input: BulkImportInput = {
+        sessions: [newSession],
+        exercises: [newExercise],
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+      };
+      await writer.importBulk(input);
+
+      const reader = await makeAdapter();
+      assert(
+        deepEqual(await reader.getSession(newSession.id), newSession),
+        'the new session is added',
+      );
+      assert(
+        deepEqual(await reader.getExercise(newExercise.id), newExercise),
+        'the new exercise is added',
+      );
+      assert(
+        deepEqual(await reader.listBandLabels(), ['Red']),
+        'band labels are untouched when absent from the import input',
+      );
+      assert(
+        deepEqual(await reader.getSettings(), makeSettings()),
+        'settings are untouched when absent from the import input',
+      );
+      assert(
+        deepEqual(await reader.getDraft(), makeDraft()),
+        'the draft is untouched when absent from the import input',
+      );
+    },
+  },
+  {
+    name: 'bulk-2: importBulk replaces a session/exercise sharing an existing id, exactly',
+    async run(makeAdapter) {
+      const writer = await makeAdapter();
+      const original = makeSession({
+        id: 'bulk-replace-sess' as SessionId,
+        notes: 'before',
+      });
+      await writer.saveSession(original);
+      const originalExercise = makeExercise({
+        id: 'bulk-replace-ex' as ExerciseId,
+        canonicalName: 'Before name',
+      });
+      await writer.saveExercise(originalExercise);
+
+      const replacementSession = { ...original, notes: 'after' };
+      const replacementExercise = {
+        ...originalExercise,
+        canonicalName: 'After name',
+      };
+      await writer.importBulk({
+        sessions: [replacementSession],
+        exercises: [replacementExercise],
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+      });
+
+      const reader = await makeAdapter();
+      assert(
+        (await reader.getSession(original.id))?.notes === 'after',
+        'the session is replaced, not merged',
+      );
+      assert(
+        (await reader.getExercise(originalExercise.id))?.canonicalName ===
+          'After name',
+        'the exercise is replaced, not merged',
+      );
+    },
+  },
+  {
+    name: 'bulk-3: importBulk including bandLabels/settings/loggingDraft replaces each; sets the stored schema version',
+    async run(makeAdapter) {
+      const writer = await makeAdapter();
+      await writer.saveBandLabels(['Old']);
+      await writer.saveSettings(makeSettings({ theme: 'light' }));
+
+      const importedSettings = makeSettings({ theme: 'dark' });
+      const importedDraft = makeDraft({ id: 'imported-draft' });
+      await writer.importBulk({
+        sessions: [],
+        exercises: [],
+        bandLabels: ['New', 'Labels'],
+        settings: importedSettings,
+        loggingDraft: importedDraft,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+      });
+
+      const reader = await makeAdapter();
+      assert(
+        deepEqual(await reader.listBandLabels(), ['New', 'Labels']),
+        'band labels are replaced when present in the import input',
+      );
+      assert(
+        deepEqual(await reader.getSettings(), importedSettings),
+        'settings are replaced when present in the import input',
+      );
+      assert(
+        deepEqual(await reader.getDraft(), importedDraft),
+        'the draft is replaced when present in the import input',
+      );
+      assert(
+        (await reader.getSchemaVersion()) === CURRENT_SCHEMA_VERSION,
+        'importBulk sets the stored schema version to the input value',
+      );
+    },
+  },
+  {
+    name: 'reset-1: resetToFreshInstall wipes sessions/draft/bandLabels/settings and replaces the catalogue with exactly the seed set',
+    async run(makeAdapter) {
+      const writer = await makeAdapter();
+      await writer.saveSession(makeSession({ id: 'to-be-wiped' as SessionId }));
+      await writer.saveExercise(
+        makeExercise({ id: 'user-added' as ExerciseId }),
+      );
+      await writer.saveDraft(makeDraft());
+      await writer.saveBandLabels(['Red']);
+      await writer.saveSettings(makeSettings());
+
+      const seed = [makeExercise({ id: 'seed-1' as ExerciseId })];
+      await writer.resetToFreshInstall(seed);
+
+      const reader = await makeAdapter();
+      assert(
+        deepEqual(await reader.listSessions(ALL_TIME), []),
+        'every session is gone after reset',
+      );
+      assert(
+        deepEqual(await reader.listExercises(), seed),
+        'the catalogue is replaced with exactly the passed seed exercises',
+      );
+      assert(
+        (await reader.getDraft()) === undefined,
+        'the draft is discarded after reset',
+      );
+      assert(
+        deepEqual(await reader.listBandLabels(), []),
+        'band labels are cleared to [] after reset',
+      );
+      assert(
+        (await reader.getSettings()) === undefined,
+        'settings are cleared (undefined, same as a fresh install) after reset',
+      );
+      assert(
+        (await reader.getSchemaVersion()) === CURRENT_SCHEMA_VERSION,
+        'the stored schema version is CURRENT_SCHEMA_VERSION after reset, never a stale literal',
       );
     },
   },
@@ -548,6 +753,8 @@ export const CONTRACT_SCENARIOS: Scenario[] = [
   ...sessionScenarios,
   ...draftScenarios,
   ...crossAdapterScenarios,
+  ...settingsScenarios,
+  ...bulkWriteScenarios,
   ...schemaVersionScenarios,
   ...cascadeScenarios,
 ];

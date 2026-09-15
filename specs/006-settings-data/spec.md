@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-12
 
-**Status**: Reviewed
+**Status**: Implemented — PR [#31](https://github.com/adrisons/gym-log-app/pull/31) open, pending CI/review and merge
 
 **Input**: User description: "Settings, export and import (FR-11, FR-12) —
 v1, Phase 6 per docs/agent-brief.md §3. Build the Settings screen (default
@@ -47,6 +47,42 @@ version number and is migrated with the same rules before anything is
 merged into local storage. This is manual, file-based, one-shot transfer;
 continuous multi-device sync is explicitly future work
 (`docs/requirements.md` §9) and is not attempted here.
+
+## Clarifications
+
+### Session 2026-09-15
+
+- Q: Should the interchange (JSON) export format be explicitly designed to
+  tolerate future additive fields (new exercise disciplines, new
+  parameters) without breaking existing readers or requiring a redesign? →
+  A: Yes. The format is JSON, not a fixed-width table — matching the
+  domain's own nested, sum-type shape (Load, Volume, Effort — §3.2) — so a
+  future optional field, catalogue discipline value (§1.4/D8), or record
+  kind is added the same way any other persisted-schema change already is:
+  through the existing schema-version-bump-and-migration mechanism
+  (`docs/requirements.md` §6), never through a separate interchange-only
+  versioning scheme or a rework of the file's shape. See FR-021.
+- Q: Should the export be explicitly designed so a user can hand it to a
+  general-purpose AI assistant (e.g., pasting it into ChatGPT) to analyze
+  their training progression? → A: Yes — for the primary JSON export
+  specifically (FR-007/FR-008), not as a fourth format. FR-008 already
+  requires readable references (an exercise's name, not an opaque ID) and
+  a documented, versioned shape; this clarification makes "interpretable
+  by a general-purpose LLM with no extra tooling or context" an explicit,
+  first-class requirement of that same file rather than an incidental
+  property that could erode later. See FR-022.
+- Q: Should the export exclude personal or sensitive information? → A:
+  Yes, explicitly, though the domain (§3.1) carries no identity data to
+  begin with — no name, email, or account exists anywhere in this
+  single-user, local-first app (Invariant 1). This clarification's
+  practical effect is: (a) the export must never smuggle in device-,
+  installation-, or browser-identifying metadata (file-system paths,
+  user-agent strings, per-install random identifiers) alongside the
+  domain data FR-007 already documents, and (b) it must be explicit about
+  the one place genuinely free-form content does appear — user-authored
+  notes and free-text load labels — which are exported as entered because
+  they are the user's own training data under their control, not
+  something this feature scans or redacts. See FR-023.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -430,6 +466,35 @@ just the seed set, and the app otherwise behaves like a fresh install.
   that is confirmed at `/speckit-plan` time, alongside whichever concrete
   representative data-set size is chosen.
 
+- **FR-021**: The exported interchange file's structure MUST remain
+  additive-compatible across future schema versions: a later version MAY
+  add optional fields, new enum values (e.g., a non-Strength discipline
+  per §1.4/D8), or new record kinds without altering or removing any field
+  this spec defines. Such changes MUST go through the existing
+  schema-version-bump-and-migration mechanism (`docs/requirements.md` §6)
+  already governing the rest of this feature (FR-012, FR-017) — never
+  through a separate, interchange-only versioning scheme, and never
+  requiring a redesign of the file's overall shape.
+- **FR-022**: The primary JSON export (FR-007) MUST remain plain,
+  self-describing JSON — human- and general-purpose-LLM-legible field
+  names, no proprietary or binary encoding, interpretable from the raw
+  file content alone with no supplementary documentation required — so a
+  user can hand it to a general-purpose AI assistant (e.g., to analyze
+  their training progression) and have it interpreted correctly, relying
+  on nothing beyond what FR-008 already guarantees (readable references
+  over opaque identifiers wherever one exists).
+- **FR-023**: The exported file MUST NOT include any device-,
+  installation-, or browser-identifying metadata (e.g., file-system
+  paths, user-agent strings, or per-install random identifiers) beyond
+  the documented domain records FR-007 names. Free-form text the user
+  themselves entered (session notes, exercise-entry notes, free-text load
+  labels) IS included as recorded — it is the user's own training data
+  under their control (Invariant 1, §1.2) and material to the
+  progression-analysis use case FR-022 supports; the system MUST NOT
+  scan, classify, or redact user-authored free text, consistent with this
+  feature being user-directed data movement, not automated content
+  moderation.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Settings.** The user's own preferences: default unit, quick
@@ -486,6 +551,15 @@ just the seed set, and the app otherwise behaves like a fresh install.
   `docs/agent-brief.md`'s Phase 6 performance-measurement requirement even
   though `docs/requirements.md` §7.1 sets no number specific to these
   three operations (FR-020).
+- **SC-008**: Given the primary JSON export and no other context, a
+  general-purpose AI assistant can correctly state, for a spot-checked
+  session, its date, the exercises logged, and the load/reps recorded per
+  set (FR-022) — verified manually during implementation as a qualitative
+  check, not an automated or CI-gated test.
+- **SC-009**: A manual review of the export file's field list against
+  `docs/requirements.md` §3.1's canonical entities and this feature's own
+  Settings/band-label/draft state finds zero fields carrying device,
+  installation, or browser identity (FR-023).
 
 ## Assumptions
 

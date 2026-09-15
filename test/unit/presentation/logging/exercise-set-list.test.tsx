@@ -13,6 +13,8 @@ const baseProps = {
   freeTextSuggestions: [],
   prefill: undefined,
   onSaveBandLabels: () => {},
+  unit: 'kg' as const,
+  quickIncrements: { durationSeconds: 5, distanceMetres: 50 },
 };
 
 const loggedSet: DraftSet = {
