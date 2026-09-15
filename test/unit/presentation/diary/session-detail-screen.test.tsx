@@ -3,6 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { SessionDetailScreen } from '@/presentation/diary/session-detail-screen';
+import { HeaderNav } from '@/presentation/nav/header-nav';
+import { ScreenTitleProvider } from '@/presentation/nav/screen-title';
 import { useStorageAccess } from '@/application/storage-access';
 import { useLoggingSession } from '@/application/logging/logging-store';
 import { createSession } from '@/domain/session';
@@ -946,5 +948,37 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     // (and could offer to create a duplicate).
     const catalogue = useLoggingSession.getState().catalogue;
     expect(catalogue.some((e) => e.canonicalName === 'Deadlift')).toBe(true);
+  });
+
+  it('registers a back arrow to /diary in the navbar, replacing the old floating close button (ADR-0014)', async () => {
+    const storage = new InMemoryStorage();
+    const sessionId = 's1' as SessionId;
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <ScreenTitleProvider>
+          <HeaderNav />
+          <Routes>
+            <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+          </Routes>
+        </ScreenTitleProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute(
+        'href',
+        '/diary',
+      );
+    });
   });
 });

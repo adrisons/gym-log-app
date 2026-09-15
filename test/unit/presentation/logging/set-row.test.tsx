@@ -19,25 +19,20 @@ function confirmButton() {
 }
 
 describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, ADR-0010)', () => {
-  it('the Confirm button is disabled and a reason is shown until every field the template asks for is filled (FR-019, ADR-0010)', () => {
+  it('the Confirm button is disabled until every field the template asks for is filled, with no status text explaining why (FR-019, ADR-0010, ADR-0014)', () => {
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
 
     expect(confirmButton()).toBeDisabled();
-    expect(
-      screen.getByText(/enter a weight and a rep count/i),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('names only the still-missing field once the other is filled, not both (the exact bug this design fixes)', async () => {
+  it('stays disabled with only one of two required fields filled (the exact bug this design fixes)', async () => {
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
 
     await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
     await userEvent.keyboard('{ArrowDown}'.repeat(5));
 
     expect(confirmButton()).toBeDisabled();
-    expect(
-      screen.getByText(/^enter a weight to record this set\.$/i),
-    ).toBeInTheDocument();
   });
 
   it('filling only reps never confirms a Weight-tracked set on its own — the button stays disabled (regression: used to silently save load "none")', async () => {
@@ -552,7 +547,7 @@ describe('SetRow editing an existing set in place (ADR-0010)', () => {
     });
   });
 
-  it('describes the controls actually shown in the disabled-state message — Duration, not "a rep count" (Copilot review, PR #27)', () => {
+  it('stays disabled editing a none-load set with no volume entered yet (Copilot review, PR #27)', () => {
     render(
       <SetRow
         {...baseProps}
@@ -564,11 +559,8 @@ describe('SetRow editing an existing set in place (ADR-0010)', () => {
       />,
     );
 
-    // `loadKind: 'none'` has no load control to fill, so the message
-    // never offers an impossible "a load" alternative either.
     expect(
-      screen.getByText(/^enter a duration to record this set\.$/i),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/a load/i)).not.toBeInTheDocument();
+      screen.getByRole('button', { name: /save changes/i }),
+    ).toBeDisabled();
   });
 });

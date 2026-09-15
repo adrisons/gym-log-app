@@ -11,7 +11,7 @@
  * (ADR-0006) is editable through its own menu.
  */
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { requireStorage } from '@/application/storage-access';
 import { useLoggingSession } from '@/application/logging/logging-store';
 import {
@@ -39,7 +39,6 @@ import './diary.css';
 
 export function SessionDetailScreen() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const navigate = useNavigate();
   // Routed through the logging store's own action, not the bare use-case
   // directly: LoggingScreen reads its exercise templates from
   // `useLoggingSession.catalogue`, an independent in-memory copy that
@@ -69,6 +68,7 @@ export function SessionDetailScreen() {
     editable
       ? `Session — ${new Date(editable.dateTime).toLocaleString()}`
       : 'Session',
+    '/diary',
   );
 
   // Guards the very first `editable` a load populates from re-triggering
@@ -178,6 +178,51 @@ export function SessionDetailScreen() {
     });
   };
 
+  const moveExerciseWithinBlock = (
+    blockId: string,
+    fromIndex: number,
+    toIndex: number,
+  ) => {
+    persist((current) => ({
+      ...current,
+      blocks: current.blocks.map((b) => {
+        if (b.id !== blockId) return b;
+        const exercises = [...b.exercises];
+        const [moved] = exercises.splice(fromIndex, 1);
+        if (!moved) return b;
+        exercises.splice(toIndex, 0, moved);
+        return { ...b, exercises };
+      }),
+    }));
+  };
+
+  const moveExerciseAcrossBlocks = (
+    fromBlockId: string,
+    entryId: string,
+    toBlockId: string,
+  ) => {
+    persist((current) => {
+      const fromBlock = current.blocks.find((b) => b.id === fromBlockId);
+      const entry = fromBlock?.exercises.find((e) => e.id === entryId);
+      if (!entry) return current;
+      return {
+        ...current,
+        blocks: current.blocks.map((b) => {
+          if (b.id === fromBlockId) {
+            return {
+              ...b,
+              exercises: b.exercises.filter((e) => e.id !== entryId),
+            };
+          }
+          if (b.id === toBlockId) {
+            return { ...b, exercises: [...b.exercises, entry] };
+          }
+          return b;
+        }),
+      };
+    });
+  };
+
   if (!sessionId) {
     return null;
   }
@@ -188,17 +233,6 @@ export function SessionDetailScreen() {
 
   return (
     <main className="session-detail-screen" aria-label="Session detail">
-      <div className="session-detail-screen__header">
-        <button
-          type="button"
-          className="logging-button session-detail-screen__close"
-          aria-label="Close"
-          onClick={() => navigate('/diary')}
-        >
-          <Icon name="close" />
-        </button>
-      </div>
-
       {editingTemplateFor && (
         <ExerciseTemplatePanel
           key={editingTemplateFor.id}
@@ -232,6 +266,16 @@ export function SessionDetailScreen() {
 
       {editable.blocks.map((block, blockIndex) => {
         const blockVm = toBlockViewModel(block, blockIndex, catalogue);
+        const otherBlocks = editable.blocks
+          .filter((b) => b.id !== block.id)
+          .map((b) =>
+            toBlockViewModel(
+              b,
+              editable.blocks.findIndex((x) => x.id === b.id),
+              catalogue,
+            ),
+          )
+          .map((vm) => ({ id: vm.id, displayName: vm.displayName }));
 
         return (
           <BlockCard
@@ -286,12 +330,26 @@ export function SessionDetailScreen() {
                 <div key={entry.id}>
                   <ExerciseEntryCard
                     exerciseName={entryVm.exerciseName}
-                    canMoveUp={false}
-                    canMoveDown={false}
-                    onMoveUp={() => {}}
-                    onMoveDown={() => {}}
-                    otherBlocks={[]}
-                    onMoveToBlock={() => {}}
+                    canMoveUp={entryIndex > 0}
+                    canMoveDown={entryIndex < block.exercises.length - 1}
+                    onMoveUp={() =>
+                      moveExerciseWithinBlock(
+                        block.id,
+                        entryIndex,
+                        entryIndex - 1,
+                      )
+                    }
+                    onMoveDown={() =>
+                      moveExerciseWithinBlock(
+                        block.id,
+                        entryIndex,
+                        entryIndex + 1,
+                      )
+                    }
+                    otherBlocks={otherBlocks}
+                    onMoveToBlock={(toBlockId) =>
+                      moveExerciseAcrossBlocks(block.id, entry.id, toBlockId)
+                    }
                     onEditTemplate={
                       exercise
                         ? () => setEditingTemplateFor(exercise)

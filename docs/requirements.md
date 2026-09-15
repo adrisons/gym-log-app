@@ -297,11 +297,13 @@ Create a session and add blocks, exercises and sets.
   set"), never a generic "confirm"/"Add set" action offered on every set.
 - **(ADR-0010, supersedes both bullets above)** Adding a set has an explicit
   Confirm ("Add set") button again — no field edit, alone, records anything.
-  The button stays disabled, with a status line naming exactly what is
-  still missing, until every field the exercise's *current* template
-  actually tracks is filled (not merely "a load or a volume" — the loosest
-  case a `Set` can legally hold, per §3.3, which is no longer enough to
-  enable Confirm when the template tracks both a load and a volume kind).
+  The button stays disabled until every field the exercise's *current*
+  template actually tracks is filled (not merely "a load or a volume" —
+  the loosest case a `Set` can legally hold, per §3.3, which is no longer
+  enough to enable Confirm when the template tracks both a load and a
+  volume kind). _(ADR-0014: the status line that used to name exactly
+  what was still missing is removed — disabled-with-no-explanation reads
+  clearer than a short-lived sentence that changes with every keystroke.)_
   "Repeat last set"/"Log this set" are retired: a pre-filled row is simply
   already valid, so Confirm is enabled immediately and one tap still
   suffices for an identical repeat, matching this FR's original "one tap"
@@ -327,7 +329,10 @@ Create a session and add blocks, exercises and sets.
   own left edge is painted in the same success/warning/danger tone as the
   effort control already uses for its own graduated 1–5 scale
   (`docs/design.md` §1.2's refinement note) when a set has an effort
-  recorded, and left plain when it doesn't.
+  recorded, and left plain when it doesn't. _(ADR-0014: Bodyweight
+  abbreviates to "BW" in this compact line specifically — e.g.
+  "10 x BW +10kg" — since the full word was wide enough to wrap the row
+  on a narrow phone; every other load kind's text is unchanged.)_
 
 ### FR-4 — Effort `[v1]`
 
