@@ -179,7 +179,9 @@ describe('ExerciseSetList (ADR-0010)', () => {
     expect(
       screen.queryByRole('button', { name: /5 x 100kg - Hard actions/i }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Edit' }),
+    ).not.toBeInTheDocument();
 
     await userEvent.click(
       screen.getByRole('button', { name: /delete 5 x 100kg - hard/i }),

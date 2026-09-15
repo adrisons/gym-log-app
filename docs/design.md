@@ -137,6 +137,16 @@ hues are unchanged. What did not change: the accent and status hues; the
 two type roles; "no imagery, no illustrations" (only the §1.1 bounded
 exception above); every rule in §2 through §6 below.
 
+**Refinement note (ADR-0015)**: the same canvas exploration carried a
+further pass over the logging screen's sets display — a two-column Reps/
+Load table (headers, aligned values, one trailing action per row) in
+place of the earlier one-line "x"-joined summary, and, for the common
+Weight+Reps case with no effort tracked, a compact single-line add-set
+row of plain numeric fields sharing the table's own columns, in place of
+the reps wheel-picker. Every other load/volume/effort combination keeps
+its existing stacked form and wheel unchanged — see ADR-0015 for the
+exact scope.
+
 ---
 
 ## 2. Design principles

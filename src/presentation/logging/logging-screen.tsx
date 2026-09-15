@@ -178,13 +178,19 @@ export function LoggingScreen() {
   }
 
   return (
-    <>
+    // `.app-shell__content > *` (app-shell.css) expects exactly one flex
+    // child per screen and sizes it `flex: 1 0 auto` — this single wrapper
+    // is that one child, so `LoggingShell`'s content column doesn't also
+    // try to grow the header alongside `.logging-screen` (Copilot review,
+    // PR #33: that double-stretch made the header-less-than-full route
+    // root taller than the viewport, producing a blank scroll region).
+    // The header stays a fixed-size flex item; `.logging-screen` is the
+    // one part that scrolls.
+    <div className="logging-screen__root">
       {/* Matches `HeaderNav`'s own bar (`header-nav.css`) so the logging
           screen — the one screen with no `HeaderNav`, ADR-0009 — still
           reads as the same chrome as every other screen's header, rather
-          than a visually distinct one-off. Kept as its own element outside
-          `.logging-screen`'s padded content column, same as `HeaderNav`
-          sits outside `.app-shell__content` (design refinement request). */}
+          than a visually distinct one-off. */}
       <header className="logging-screen__header">
         <Link
           to="/diary"
@@ -420,6 +426,6 @@ export function LoggingScreen() {
           Log workout
         </button>
       </main>
-    </>
+    </div>
   );
 }

@@ -60,6 +60,16 @@ export interface ExerciseSetListProps {
 
 type FormState = 'add' | 'edit' | 'closed';
 
+/** Sets table header label for the volume column (Copilot review, PR #33)
+ * — this component renders for every `VolumeKind`, not just reps, so a
+ * hard-coded "Reps" header misdescribed a Duration/Distance-tracked
+ * exercise's own column. */
+const VOLUME_COLUMN_LABEL: Record<VolumeKind, string> = {
+  reps: 'Reps',
+  duration: 'Duration',
+  distance: 'Distance',
+};
+
 export function ExerciseSetList({
   sets,
   loadKind,
@@ -131,7 +141,9 @@ export function ExerciseSetList({
     <>
       {sets.length > 0 && (
         <div className="sets-header-row" aria-hidden="true">
-          <span className="sets-header-cell">Reps</span>
+          <span className="sets-header-cell">
+            {VOLUME_COLUMN_LABEL[volumeKind]}
+          </span>
           <span className="sets-header-cell">Load</span>
           <span className="sets-header-cell" />
           <span className="sets-header-cell" />

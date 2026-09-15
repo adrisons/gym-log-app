@@ -5,8 +5,22 @@
    feature area rather than one per tiny form control: these are simple,
    visually-related controls, not independent design surfaces. */
 
+/* The one flex child `.app-shell__content > *` (app-shell.css) expects and
+   sizes `flex: 1 0 auto` — holds the header and the scrollable
+   `.logging-screen` body as its own flex column, so only ONE element
+   stretches to fill `LoggingShell`'s content area rather than both the
+   header and `.logging-screen` trying to (Copilot review, PR #33). */
+.logging-screen__root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
 .logging-screen {
-  min-height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   background: var(--color-canvas);
   color: var(--color-foreground);
   padding: var(--space-4);
@@ -332,19 +346,29 @@
   gap: var(--space-1);
 }
 
+/* 44px hit target (the app's own generous-minimum, matching every other
+   tappable control) even though the visible glyph stays small — Copilot
+   review, PR #33: these lost both the size and the shared focus-visible
+   state `.logging-button` gives every other button in this file. */
 .set-row__compact-confirm,
 .set-row__compact-cancel {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
   cursor: pointer;
+}
+
+.set-row__compact-confirm:focus-visible,
+.set-row__compact-cancel:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
 
 .set-row__compact-confirm {
@@ -493,8 +517,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  /* 44px hit target (the app's own generous-minimum) even though the
+     visible "×" glyph stays small. */
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: none;
   border-radius: var(--radius-sm);
@@ -613,10 +639,20 @@
    block-level wrapper lost its box. */
 .block-card--collapsible {
   gap: 0;
-  padding: 0;
   border: none;
   border-radius: 0;
   background: transparent;
+  /* Still full-bleed (ADR-0011, `docs/design.md` §1.2's scoped exception —
+     required, not optional: this card spans the full screen width with
+     square corners to reclaim horizontal space on a surface that repeats
+     once per block). Negative inline margins exactly cancel
+     `.logging-screen`'s own side padding so the background spans the full
+     viewport width instead of sitting in a gutter; `padding` keeps the
+     content readably inset regardless — dropping both together (as an
+     earlier revision of this rule did) silently lost the full-bleed
+     expansion along with the card's border/fill. */
+  margin-inline: calc(-1 * var(--space-4));
+  padding: 0 var(--space-4);
 }
 
 .block-card__header {

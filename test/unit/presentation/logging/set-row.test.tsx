@@ -29,7 +29,10 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
   it('stays disabled with only one of two required fields filled (the exact bug this design fixes)', async () => {
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
 
-    await userEvent.type(screen.getByRole('spinbutton', { name: /^reps$/i }), '5');
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /^reps$/i }),
+      '5',
+    );
 
     expect(confirmButton()).toBeDisabled();
   });
@@ -38,7 +41,10 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     const onConfirm = vi.fn();
     render(<SetRow {...baseProps} prefill={undefined} onConfirm={onConfirm} />);
 
-    await userEvent.type(screen.getByRole('spinbutton', { name: /^reps$/i }), '5');
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /^reps$/i }),
+      '5',
+    );
     await userEvent.click(confirmButton());
 
     expect(onConfirm).not.toHaveBeenCalled();
@@ -152,9 +158,7 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     expect(screen.getByRole('spinbutton', { name: /weight/i })).toHaveValue(
       100,
     );
-    expect(screen.getByRole('spinbutton', { name: /^reps$/i })).toHaveValue(
-      5,
-    );
+    expect(screen.getByRole('spinbutton', { name: /^reps$/i })).toHaveValue(5);
     expect(confirmButton()).toBeEnabled();
 
     await userEvent.click(confirmButton());
