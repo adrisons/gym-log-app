@@ -23,6 +23,7 @@ import type { Session } from '../../domain/session';
 import type { Exercise } from '../../domain/exercise';
 import type { SessionId, ExerciseId } from '../../domain/ids';
 import type { LoggingDraft } from './logging-draft';
+import type { Settings } from './settings';
 
 /** A closed date-time range, both bounds inclusive, ISO 8601 strings. */
 export interface DateRange {
@@ -103,4 +104,52 @@ export interface StoragePort {
   /** The schema version that travels with the data (`docs/requirements.md` §6). */
   getSchemaVersion(): Promise<number>;
   setSchemaVersion(version: number): Promise<void>;
+
+  /**
+   * The user's own preferences (spec 006 FR-001/002). `undefined` means no
+   * Settings record has ever been saved on this device — mirrors
+   * `getDraft()`'s presence contract exactly (not a canonical entity,
+   * D14; see `./settings.ts`). Application code that wants an
+   * always-defined `Settings` applies `withSettingsDefaults()` over this
+   * raw result rather than the port doing so itself, so export/import
+   * (FR-010) can tell "never saved" from "saved with default values"
+   * apart.
+   */
+  getSettings(): Promise<Settings | undefined>;
+  saveSettings(settings: Settings): Promise<void>;
+
+  /**
+   * Atomically applies a multi-record import (spec 006 FR-011): either
+   * every one of `input`'s writes lands, or — if interrupted — none of
+   * them is left half-applied. `sessions`/`exercises` are upserted by id
+   * (added if new, replaced if an existing id matches); `bandLabels`/
+   * `settings`/`loggingDraft` each replace the device's own singleton
+   * record when present in `input` and are left completely untouched when
+   * absent. `schemaVersion` becomes the new stored schema version (the
+   * caller has already migrated `input`'s data to it, spec 006 FR-012 —
+   * this method performs no migration of its own).
+   */
+  importBulk(input: BulkImportInput): Promise<void>;
+
+  /**
+   * Atomically resets the device to a fresh-install state (spec 006
+   * FR-015/016): every Session gone, the Exercise catalogue replaced with
+   * exactly `seedExercises`, the draft discarded, band labels cleared to
+   * `[]`, Settings cleared (a later `getSettings()` returns `undefined`,
+   * same as a genuine fresh install), and the stored schema version set to
+   * `CURRENT_SCHEMA_VERSION` (`src/infrastructure/schema-version.ts` — the
+   * caller passes the concrete number, this port has no notion of that
+   * constant). Same all-or-nothing guarantee as `importBulk`.
+   */
+  resetToFreshInstall(seedExercises: Exercise[]): Promise<void>;
+}
+
+/** Input to `StoragePort.importBulk` (spec 006 contracts/storage-port-additions.md). */
+export interface BulkImportInput {
+  sessions: Session[];
+  exercises: Exercise[];
+  bandLabels?: string[];
+  settings?: Settings;
+  loggingDraft?: LoggingDraft;
+  schemaVersion: number;
 }

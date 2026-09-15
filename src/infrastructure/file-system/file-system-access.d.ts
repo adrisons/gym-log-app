@@ -42,8 +42,35 @@ interface DirectoryPickerOptions {
   startIn?: FileSystemHandle | string;
 }
 
+/**
+ * `showSaveFilePicker`/`showOpenFilePicker` (`specs/006-settings-data`
+ * contracts/file-exchange-port.md — `FileExchangeAdapter`). Scoped to
+ * exactly the members that adapter uses, same convention as the rest of
+ * this file.
+ */
+interface FilePickerAcceptType {
+  description?: string;
+  accept: Record<string, string | string[]>;
+}
+
+interface SaveFilePickerOptions {
+  suggestedName?: string;
+  types?: FilePickerAcceptType[];
+}
+
+interface OpenFilePickerOptions {
+  multiple?: boolean;
+  types?: FilePickerAcceptType[];
+}
+
 interface Window {
   showDirectoryPicker(
     options?: DirectoryPickerOptions,
   ): Promise<FileSystemDirectoryHandle>;
+  showSaveFilePicker(
+    options?: SaveFilePickerOptions,
+  ): Promise<FileSystemFileHandle>;
+  showOpenFilePicker(
+    options?: OpenFilePickerOptions,
+  ): Promise<FileSystemFileHandle[]>;
 }

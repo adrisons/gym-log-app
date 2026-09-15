@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { InMemoryStorage } from '../support';
-import type { LoggingDraft } from '../../src/application/ports/storage-port';
+import type {
+  LoggingDraft,
+  BulkImportInput,
+} from '../../src/application/ports/storage-port';
+import type { Settings } from '../../src/application/ports/settings';
 import type { Session } from '../../src/domain/session';
 import type { Exercise } from '../../src/domain/exercise';
 import type { SessionId, ExerciseId } from '../../src/domain/ids';
@@ -8,6 +12,7 @@ import { StorageError } from '../../src/application/errors';
 import { createSet } from '../../src/domain/set';
 import { createLoad } from '../../src/domain/load';
 import { createVolume } from '../../src/domain/volume';
+import { CURRENT_SCHEMA_VERSION } from '../../src/infrastructure/schema-version';
 
 // Spec 002 FR-023..FR-027 / contracts/storage-port.md "Verification", plus
 // spec 001's contracts/storage-port-extension.md: for every StoragePort
@@ -45,6 +50,16 @@ function makeDraft(overrides: Partial<LoggingDraft> = {}): LoggingDraft {
     lastEditedAt: '2026-09-11T09:00:00.000Z',
     blocks: [],
     notes: '',
+    ...overrides,
+  };
+}
+
+function makeSettings(overrides: Partial<Settings> = {}): Settings {
+  return {
+    defaultUnit: 'kg',
+    quickIncrements: { durationSeconds: 5, distanceMetres: 5 },
+    theme: 'dark',
+    firstDayOfWeek: 'sunday',
     ...overrides,
   };
 }
@@ -366,12 +381,108 @@ describe('InMemoryStorage (StoragePort fake)', () => {
     });
   });
 
+  describe('Settings (spec 006 FR-001/002)', () => {
+    it('getSettings is undefined before any saveSettings call, mirroring getDraft()', async () => {
+      expect(await storage.getSettings()).toBeUndefined();
+    });
+
+    it('round-trips Settings through saveSettings/getSettings', async () => {
+      const settings = makeSettings();
+      await storage.saveSettings(settings);
+      expect(await storage.getSettings()).toEqual(settings);
+    });
+  });
+
+  describe('importBulk (spec 006 FR-011)', () => {
+    it('adds sessions/exercises and leaves band labels/settings/draft untouched when absent from the input', async () => {
+      await storage.saveBandLabels(['Red']);
+      await storage.saveSettings(makeSettings());
+      await storage.saveDraft(makeDraft());
+
+      const newSession = makeSession({ id: 'bulk-new' as SessionId });
+      const newExercise = makeExercise({ id: 'bulk-new-ex' as ExerciseId });
+      const input: BulkImportInput = {
+        sessions: [newSession],
+        exercises: [newExercise],
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+      };
+      await storage.importBulk(input);
+
+      expect(await storage.getSession(newSession.id)).toEqual(newSession);
+      expect(await storage.getExercise(newExercise.id)).toEqual(newExercise);
+      expect(await storage.listBandLabels()).toEqual(['Red']);
+      expect(await storage.getSettings()).toEqual(makeSettings());
+      expect(await storage.getDraft()).toEqual(makeDraft());
+    });
+
+    it('replaces a session/exercise sharing an existing id, not merges it', async () => {
+      const original = makeSession({
+        id: 'replace-me' as SessionId,
+        notes: 'before',
+      });
+      await storage.saveSession(original);
+
+      await storage.importBulk({
+        sessions: [{ ...original, notes: 'after' }],
+        exercises: [],
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+      });
+
+      expect((await storage.getSession(original.id))?.notes).toBe('after');
+    });
+
+    it('replaces bandLabels/settings/loggingDraft when present, and sets the stored schema version', async () => {
+      await storage.saveBandLabels(['Old']);
+      const importedSettings = makeSettings({ theme: 'light' });
+      const importedDraft = makeDraft({ id: 'imported' });
+
+      await storage.importBulk({
+        sessions: [],
+        exercises: [],
+        bandLabels: ['New'],
+        settings: importedSettings,
+        loggingDraft: importedDraft,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+      });
+
+      expect(await storage.listBandLabels()).toEqual(['New']);
+      expect(await storage.getSettings()).toEqual(importedSettings);
+      expect(await storage.getDraft()).toEqual(importedDraft);
+      expect(await storage.getSchemaVersion()).toBe(CURRENT_SCHEMA_VERSION);
+    });
+  });
+
+  describe('resetToFreshInstall (spec 006 FR-015/016)', () => {
+    it('wipes sessions/draft/bandLabels/settings and replaces the catalogue with exactly the seed set', async () => {
+      await storage.saveSession(makeSession({ id: 'wipe-me' as SessionId }));
+      await storage.saveExercise(
+        makeExercise({ id: 'user-added' as ExerciseId }),
+      );
+      await storage.saveDraft(makeDraft());
+      await storage.saveBandLabels(['Red']);
+      await storage.saveSettings(makeSettings());
+
+      const seed = [makeExercise({ id: 'seed-1' as ExerciseId })];
+      await storage.resetToFreshInstall(seed);
+
+      expect(
+        await storage.listSessions({ from: '2000-01-01', to: '2100-01-01' }),
+      ).toEqual([]);
+      expect(await storage.listExercises()).toEqual(seed);
+      expect(await storage.getDraft()).toBeUndefined();
+      expect(await storage.listBandLabels()).toEqual([]);
+      expect(await storage.getSettings()).toBeUndefined();
+      expect(await storage.getSchemaVersion()).toBe(CURRENT_SCHEMA_VERSION);
+    });
+  });
+
   describe('Test isolation', () => {
-    it('reset() clears all state, including the draft and band labels', async () => {
+    it('reset() clears all state, including the draft, band labels, and settings', async () => {
       await storage.saveExercise(makeExercise());
       await storage.saveSession(makeSession());
       await storage.saveDraft(makeDraft());
       await storage.saveBandLabels(['Red']);
+      await storage.saveSettings(makeSettings());
       await storage.setSchemaVersion(2);
 
       storage.reset();
@@ -382,6 +493,7 @@ describe('InMemoryStorage (StoragePort fake)', () => {
       ).toEqual([]);
       expect(await storage.getDraft()).toBeUndefined();
       expect(await storage.listBandLabels()).toEqual([]);
+      expect(await storage.getSettings()).toBeUndefined();
       expect(await storage.getSchemaVersion()).toBe(0);
     });
   });

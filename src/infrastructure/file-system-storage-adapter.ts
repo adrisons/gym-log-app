@@ -2,18 +2,26 @@ import type {
   StoragePort,
   DateRange,
   LoggingDraft,
+  BulkImportInput,
 } from '../application/ports/storage-port';
+import type { Settings } from '../application/ports/settings';
 import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
 import type { SessionId, ExerciseId } from '../domain/ids';
 import { StorageError } from '../application/errors';
 import { toPersistableDraft } from '../application/logging/draft';
 import {
+  migrateExerciseCatalogue,
+  migrateExerciseTemplateDefaults as withTemplateDefaults,
+} from '../application/schema-migration';
+import {
   SESSIONS_DIR,
   EXERCISES_FILE,
   DRAFT_FILE,
   BAND_LABELS_FILE,
+  SETTINGS_FILE,
   META_FILE,
+  PENDING_BULK_WRITE_FILE,
   sessionFileName,
 } from './file-system/layout';
 import {
@@ -35,25 +43,17 @@ const SESSION_KEY_PREFIX = 'session:';
 type OverlayEntry = { kind: 'value'; value: unknown } | { kind: 'deleted' };
 
 /**
- * ADR-0006's v1->v2 backfill, applied wherever an `Exercise` crosses this
- * adapter's boundary — not only inside `#migrateExerciseTemplateDefaults`.
- * This adapter's schema check only runs on a write path (the doc comment
- * above), so `getExercise`/`listExercises` can otherwise hand back a
- * pre-migration v1 record whose `defaultVolumeKind`/`trackEffort` are
- * missing; a caller that then round-trips that record through
- * `saveExercise` (e.g. `renameExerciseWithCollisionCheck`) would have its
- * own write's schema-check migration immediately overwritten by that
- * stale, still-v1-shaped object — permanently, since the stored version
- * is already 2 by the time that happens. Applying the same defaults on
- * every read closes that gap at the source.
+ * The write-ahead journal `importBulk`/`resetToFreshInstall` write before
+ * touching any target file, and delete once every target write succeeds
+ * (spec 006 research.md §2 — the File System Access API has no native
+ * multi-file transaction, so this is how those two methods still satisfy
+ * `StoragePort`'s all-or-nothing contract: a journal left behind on the
+ * next launch means the prior attempt was interrupted, and gets replayed
+ * before anything else runs).
  */
-function withTemplateDefaults(exercise: Exercise): Exercise {
-  return {
-    ...exercise,
-    defaultVolumeKind: exercise.defaultVolumeKind ?? 'reps',
-    trackEffort: exercise.trackEffort ?? false,
-  };
-}
+type PendingBulkWrite =
+  | { kind: 'import'; input: BulkImportInput }
+  | { kind: 'reset'; seedExercises: Exercise[]; schemaVersion: number };
 
 /**
  * Durable `StoragePort` implementation backed by the File System Access
@@ -378,6 +378,11 @@ export class FileSystemStorageAdapter implements StoragePort {
   }
 
   async #checkSchema(): Promise<void> {
+    // Finish any bulk write a prior session was interrupted mid-operation
+    // (spec 006 research.md §2) before doing anything else on this write
+    // path — a stale journal describes writes that must land before the
+    // normal schema-version read/migrate logic below is meaningful.
+    await this.#replayPendingBulkWriteIfAny();
     const stored = await this.#readSchemaVersionRaw(true);
     const action = decideSchemaAction(stored, CURRENT_SCHEMA_VERSION);
     if (action === 'refuse') {
@@ -408,12 +413,16 @@ export class FileSystemStorageAdapter implements StoragePort {
     }
   }
 
-  /** ADR-0006's v1->v2 migration: see the call site's comment. */
+  /** ADR-0006's v1->v2 migration: see the call site's comment. Delegates to
+   * the shared `migrateExerciseCatalogue` (spec 006 research.md §3). */
   async #migrateExerciseTemplateDefaults(): Promise<void> {
     const exercises =
       (await this.#readJson<Exercise[]>(EXERCISES_FILE, true)) ?? [];
     if (exercises.length === 0) return;
-    await this.#writeJson(EXERCISES_FILE, exercises.map(withTemplateDefaults));
+    await this.#writeJson(
+      EXERCISES_FILE,
+      migrateExerciseCatalogue(exercises, 1),
+    );
   }
 
   async #readSchemaVersionRaw(forceHandle: boolean): Promise<number> {
@@ -794,6 +803,168 @@ export class FileSystemStorageAdapter implements StoragePort {
 
   async setSchemaVersion(version: number): Promise<void> {
     await this.#writeJson(META_FILE, { schemaVersion: version });
+  }
+
+  // Settings (spec 006 FR-001/002)
+
+  async getSettings(): Promise<Settings | undefined> {
+    return this.#readJson<Settings>(SETTINGS_FILE);
+  }
+
+  async saveSettings(settings: Settings): Promise<void> {
+    await this.#ensureSchemaCheckedForWrite();
+    await this.#writeJson(SETTINGS_FILE, settings);
+  }
+
+  // Bulk atomic write (spec 006 FR-011/FR-015-016) — write-ahead journal,
+  // research.md §2. Both methods force a real directory handle up front:
+  // unlike the schema-check/mount-time writes the overlay mechanism exists
+  // for, these two are always explicitly user-gesture-initiated (a tap on
+  // "Import"/"Delete everything" in Settings), so there is always a live
+  // gesture to acquire one with.
+
+  async importBulk(input: BulkImportInput): Promise<void> {
+    await this.#ensureSchemaCheckedForWrite();
+    const root = await this.#resolveHandle(true);
+    if (!root) {
+      throw new StorageError(
+        'Import needs File System Access permission — try again from a direct tap on Import.',
+      );
+    }
+    const journal: PendingBulkWrite = { kind: 'import', input };
+    await this.#writeJsonToHandle(root, PENDING_BULK_WRITE_FILE, journal);
+    await this.#applyBulkWriteToHandle(root, input);
+    await this.#removeEntryIfPresent(root, PENDING_BULK_WRITE_FILE);
+  }
+
+  async resetToFreshInstall(seedExercises: Exercise[]): Promise<void> {
+    await this.#ensureSchemaCheckedForWrite();
+    const root = await this.#resolveHandle(true);
+    if (!root) {
+      throw new StorageError(
+        'Delete everything needs File System Access permission — try again from a direct tap on Delete everything.',
+      );
+    }
+    const journal: PendingBulkWrite = {
+      kind: 'reset',
+      seedExercises,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+    };
+    await this.#writeJsonToHandle(root, PENDING_BULK_WRITE_FILE, journal);
+    await this.#applyResetToHandle(root, journal);
+    await this.#removeEntryIfPresent(root, PENDING_BULK_WRITE_FILE);
+  }
+
+  /** Replayed on the next write-path schema check if a journal is found —
+   * re-applying the same target-file writes is idempotent, so this simply
+   * finishes whatever `importBulk`/`resetToFreshInstall` call was cut off
+   * (spec 006 research.md §2). Only reachable via a write path (this
+   * adapter never acquires a handle from a read, FR-004a), same
+   * documented limitation as this adapter's other migration steps. */
+  async #replayPendingBulkWriteIfAny(): Promise<void> {
+    const root = await this.#resolveHandle(true);
+    if (!root) return;
+    const pending = await this.#readJsonFromHandle<PendingBulkWrite>(
+      root,
+      PENDING_BULK_WRITE_FILE,
+    );
+    if (!pending) return;
+    if (pending.kind === 'import') {
+      await this.#applyBulkWriteToHandle(root, pending.input);
+    } else {
+      await this.#applyResetToHandle(root, pending);
+    }
+    await this.#removeEntryIfPresent(root, PENDING_BULK_WRITE_FILE);
+  }
+
+  async #applyBulkWriteToHandle(
+    root: FileSystemDirectoryHandle,
+    input: BulkImportInput,
+  ): Promise<void> {
+    if (input.exercises.length > 0) {
+      const existing =
+        (await this.#readJsonFromHandle<Exercise[]>(root, EXERCISES_FILE)) ??
+        [];
+      const byId = new Map(existing.map((e) => [e.id, e]));
+      for (const exercise of input.exercises) byId.set(exercise.id, exercise);
+      await this.#writeJsonToHandle(root, EXERCISES_FILE, [...byId.values()]);
+    }
+    if (input.sessions.length > 0) {
+      const dir = await root.getDirectoryHandle(SESSIONS_DIR, {
+        create: true,
+      });
+      for (const session of input.sessions) {
+        await this.#run(async () => {
+          const fileHandle = await dir.getFileHandle(
+            sessionFileName(session.id),
+            { create: true },
+          );
+          const writable = await fileHandle.createWritable();
+          await writable.write(JSON.stringify(session));
+          await writable.close();
+        });
+      }
+    }
+    if (input.bandLabels !== undefined) {
+      await this.#writeJsonToHandle(root, BAND_LABELS_FILE, [
+        ...input.bandLabels,
+      ]);
+    }
+    if (input.settings !== undefined) {
+      await this.#writeJsonToHandle(root, SETTINGS_FILE, input.settings);
+    }
+    if (input.loggingDraft !== undefined) {
+      await this.#writeJsonToHandle(
+        root,
+        DRAFT_FILE,
+        toPersistableDraft(input.loggingDraft),
+      );
+    }
+    await this.#writeJsonToHandle(root, META_FILE, {
+      schemaVersion: input.schemaVersion,
+    });
+  }
+
+  async #applyResetToHandle(
+    root: FileSystemDirectoryHandle,
+    payload: { seedExercises: Exercise[]; schemaVersion: number },
+  ): Promise<void> {
+    const sessionsDir = await this.#run(() =>
+      root.getDirectoryHandle(SESSIONS_DIR, { create: true }),
+    );
+    const names: string[] = [];
+    for await (const [name, handle] of sessionsDir.entries()) {
+      if (handle.kind === 'file') names.push(name);
+    }
+    for (const name of names) {
+      await this.#run(() => sessionsDir.removeEntry(name));
+    }
+    for (const key of [...this.#overlay.keys()]) {
+      if (key.startsWith(SESSION_KEY_PREFIX)) this.#overlay.delete(key);
+    }
+    await this.#writeJsonToHandle(root, EXERCISES_FILE, payload.seedExercises);
+    await this.#removeEntryIfPresent(root, DRAFT_FILE);
+    await this.#writeJsonToHandle(root, BAND_LABELS_FILE, []);
+    await this.#removeEntryIfPresent(root, SETTINGS_FILE);
+    await this.#writeJsonToHandle(root, META_FILE, {
+      schemaVersion: payload.schemaVersion,
+    });
+  }
+
+  async #removeEntryIfPresent(
+    root: FileSystemDirectoryHandle,
+    path: string,
+  ): Promise<void> {
+    await this.#run(async () => {
+      try {
+        await root.removeEntry(path);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'NotFoundError') {
+          return;
+        }
+        throw error;
+      }
+    });
   }
 
   /** Wraps every write in `StorageError`, classifying quota failures (FR-012/FR-012a). */
