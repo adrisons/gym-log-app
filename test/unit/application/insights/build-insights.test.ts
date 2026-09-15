@@ -78,7 +78,7 @@ describe('buildInsights', () => {
       );
     }
 
-    const result = buildInsights(sessions, exercises, ASOF);
+    const result = buildInsights(sessions, exercises, 'monday', ASOF);
 
     expect(result.perExerciseProgress.cards.length).toBeGreaterThan(0);
     expect(result.aggregateProgress.cards.length).toBeGreaterThan(0);
@@ -111,7 +111,7 @@ describe('buildInsights', () => {
     }
 
     const start = performance.now();
-    buildInsights(sessions, exercises, ASOF);
+    buildInsights(sessions, exercises, 'monday', ASOF);
     const elapsed = performance.now() - start;
 
     expect(elapsed).toBeLessThan(200);

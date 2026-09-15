@@ -63,6 +63,7 @@ function groupSessionsByExercise(
 export function buildInsights(
   sessions: Session[],
   exercises: Exercise[],
+  firstDayOfWeek: 'monday' | 'sunday' = 'monday',
   asOf: Date = new Date(),
 ): InsightsResult {
   const sessions90d = withinTrailingDays(
@@ -85,7 +86,7 @@ export function buildInsights(
     asOf,
   );
   const plateauCards = buildPlateauCards(sessions8w, exercises);
-  const consistencyResult = computeConsistency(sessions, asOf);
+  const consistencyResult = computeConsistency(sessions, firstDayOfWeek, asOf);
   const pushPullResult = computePushPullBalance(sessions90d, exercises);
 
   const anyExerciseTagged = exercises.some(
