@@ -26,6 +26,21 @@ const COLUMNS = [
   'completed',
 ] as const;
 
+/**
+ * Neutralizes a leading `=`, `+`, `-`, or `@` — spreadsheet applications
+ * (Excel, Sheets, LibreOffice) interpret a cell starting with any of these
+ * as a formula, so user-authored free text (session notes, exercise/block
+ * names, band/free-text load labels) could otherwise execute arbitrary
+ * formulas when this file is opened — a classic CSV-injection vector, and
+ * one that also applies to a file this app later re-imports as data
+ * (untrusted input). Prefixing with a single quote is the standard
+ * mitigation: spreadsheet apps render it as literal text, one character
+ * off from the original value.
+ */
+function neutralizeFormulaLeader(value: string): string {
+  return /^[=+\-@]/.test(value) ? `'${value}` : value;
+}
+
 function quoteCsvField(value: string): string {
   if (/[",\n]/.test(value)) {
     return `"${value.replace(/"/g, '""')}"`;
@@ -40,15 +55,17 @@ function volumeValue(volume: Volume | undefined): string {
   return String(volume.metres);
 }
 
+/** User-authored text only for `band`/`freeText` — the other variants are
+ * numeric or empty, never subject to formula-injection sanitizing. */
 function loadValue(load: Load): string {
   if (load.kind === 'weight') return String(load.value);
-  if (load.kind === 'band') return load.label;
+  if (load.kind === 'band') return neutralizeFormulaLeader(load.label);
   if (load.kind === 'bodyweight') {
     return load.addedOrAssistedKg !== undefined
       ? String(load.addedOrAssistedKg)
       : '';
   }
-  if (load.kind === 'freeText') return load.text;
+  if (load.kind === 'freeText') return neutralizeFormulaLeader(load.text);
   return '';
 }
 
@@ -74,11 +91,13 @@ export function buildTabularExport(
         for (const set of entry.sets) {
           rows.push([
             sessionDate,
-            session.notes,
-            block.name ?? '',
+            neutralizeFormulaLeader(session.notes),
+            neutralizeFormulaLeader(block.name ?? ''),
             block.type,
-            nameById.get(entry.exerciseId) ?? entry.exerciseId,
-            patternById.get(entry.exerciseId) ?? '',
+            neutralizeFormulaLeader(
+              nameById.get(entry.exerciseId) ?? entry.exerciseId,
+            ),
+            neutralizeFormulaLeader(patternById.get(entry.exerciseId) ?? ''),
             set.setKind,
             set.volume?.kind ?? '',
             volumeValue(set.volume),

@@ -96,4 +96,100 @@ describe('buildTabularExport (spec 006 FR-009)', () => {
   it('produces only the header row for no sessions', () => {
     expect(buildTabularExport([], []).split('\n')).toHaveLength(1);
   });
+
+  it('neutralizes a formula-leading session note so spreadsheet apps never execute it (CSV injection)', () => {
+    const exercise = makeExercise();
+    const session: Session = {
+      id: 'sess-1' as SessionId,
+      dateTime: '2026-09-10T18:00:00.000Z',
+      notes: '=cmd|"/c calc"!A1',
+      blocks: [
+        {
+          type: 'straightSets',
+          exercises: [
+            {
+              exerciseId: exercise.id,
+              notes: '',
+              sets: [
+                createSet({
+                  volume: createVolume({ kind: 'reps', count: 5 }),
+                  load: createLoad({ kind: 'none' }),
+                  setKind: 'working',
+                  completed: true,
+                }),
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const csv = buildTabularExport([session], [exercise]);
+    expect(csv).toContain("'=cmd");
+    expect(csv).not.toMatch(/,=cmd/);
+  });
+
+  it('neutralizes a formula-leading exercise name and band/free-text load label', () => {
+    const exercise = makeExercise({ canonicalName: '+1+1' });
+    const session: Session = {
+      id: 'sess-1' as SessionId,
+      dateTime: '2026-09-10T18:00:00.000Z',
+      notes: '',
+      blocks: [
+        {
+          type: 'straightSets',
+          exercises: [
+            {
+              exerciseId: exercise.id,
+              notes: '',
+              sets: [
+                createSet({
+                  volume: createVolume({ kind: 'reps', count: 5 }),
+                  load: createLoad({ kind: 'band', label: '@SUM(1,1)' }),
+                  setKind: 'working',
+                  completed: true,
+                }),
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const csv = buildTabularExport([session], [exercise]);
+    expect(csv).toContain("'+1+1");
+    expect(csv).toContain("'@SUM(1,1)");
+  });
+
+  it('does not alter a genuinely negative numeric load value', () => {
+    const exercise = makeExercise();
+    const session: Session = {
+      id: 'sess-1' as SessionId,
+      dateTime: '2026-09-10T18:00:00.000Z',
+      notes: '',
+      blocks: [
+        {
+          type: 'straightSets',
+          exercises: [
+            {
+              exerciseId: exercise.id,
+              notes: '',
+              sets: [
+                createSet({
+                  volume: createVolume({ kind: 'reps', count: 5 }),
+                  load: createLoad({
+                    kind: 'bodyweight',
+                    addedOrAssistedKg: -10,
+                  }),
+                  setKind: 'working',
+                  completed: true,
+                }),
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const csv = buildTabularExport([session], [exercise]);
+    expect(csv).toContain(',-10,');
+    expect(csv).not.toContain("'-10");
+  });
 });
