@@ -15,7 +15,7 @@ describe('HeaderNav', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('opens the menu with exactly Diary, Insights, Exercises — no Search (ADR-0009)', () => {
+  it('opens the menu with exactly Diary, Insights, Exercises, Settings — no Search (ADR-0009, spec 006 FR-001/006)', () => {
     render(
       <MemoryRouter>
         <HeaderNav />
@@ -26,8 +26,8 @@ describe('HeaderNav', () => {
 
     const menu = screen.getByRole('menu', { name: 'Primary' });
     const items = screen.getAllByRole('menuitem');
-    expect(items).toHaveLength(3);
-    for (const name of ['Diary', 'Insights', 'Exercises']) {
+    expect(items).toHaveLength(4);
+    for (const name of ['Diary', 'Insights', 'Exercises', 'Settings']) {
       expect(
         screen.getByRole('menuitem', { name: new RegExp(name) }),
       ).toBeInTheDocument();
