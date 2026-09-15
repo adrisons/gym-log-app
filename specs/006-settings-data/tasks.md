@@ -172,10 +172,11 @@ record of all of it — independent of whether import exists yet.
       builds the file, calls `fileExchange.saveFile(...)`); wire
       `DataSection` into `settings-screen.tsx`.
 - [x] T022 [US1] Component test in
-      `test/unit/presentation/settings/settings-screen.test.tsx` (or a
-      dedicated `data-section.test.tsx`) asserting both export buttons call
-      `fileExchange.saveFile` with the expected filename/mime type, via the
-      in-memory `FileExchangePort` fake (T009).
+      `test/unit/presentation/settings/export-controls.test.tsx` asserting
+      both export buttons call `fileExchange.saveFile` with the expected
+      filename/mime type/content, via the in-memory `FileExchangePort`
+      fake (T009) — previously checked off with no such test existing
+      (Copilot review, PR #31); added.
 
 **Checkpoint**: export works end-to-end against `InMemoryStorage`,
 independent of import/settings/band-labels/delete-everything.
@@ -216,7 +217,9 @@ preview.
       `test/integration/data-transfer-flow.test.ts` using `createHarness()`:
       export from one `InMemoryStorage`, import into a second, assert
       sessions/exercises/bandLabels/settings/draft all match (SC-001), and
-      that importing the same file twice in a row is idempotent (SC-005).
+      that importing the same file twice in a row is idempotent (SC-005)
+      — previously checked off with no such file existing (Copilot
+      review, PR #31); added.
 
 ### Implementation for User Story 2
 
@@ -325,7 +328,10 @@ logging.
       reorder/rename/add/remove each call `storage.saveBandLabels` with the
       expected next list; a renamed/removed label already used on a logged
       set is unaffected (read via a `Session` fixture, confirming spec.md
-      FR-005 — this feature never rewrites `Set.load` history).
+      FR-005 — this feature never rewrites `Set.load` history) — previously
+      checked off with no such file existing (Copilot review, PR #31);
+      added, including a write-ordering regression test for the same
+      review's save-queue fix.
 
 ### Implementation for User Story 4
 
@@ -376,14 +382,29 @@ install.
       findings" check.
 - [x] T047 [P] Playwright: extend `test/e2e/shell-smoke.spec.ts` with a
       `/settings` route-reachability check (spec 004/005 precedent).
-- [x] T048 Performance measurement (FR-020): run quickstart.md §6 against a
+- [ ] T048 Performance measurement (FR-020): run quickstart.md §6 against a
       representative data set (100 sessions × 4 blocks × 3 exercises × 3
       sets) for export/import/delete-everything on both adapters; append
-      the recorded numbers to quickstart.md's "Validation log".
+      the recorded numbers to quickstart.md's "Validation log". **Narrowed
+      (Copilot review, PR #31 — was checked off overclaiming this):** only
+      the pure-computation half ran, via
+      `test/unit/application/data-transfer/performance.test.ts` (Vitest/
+      jsdom) — quickstart.md's own Validation log already says so. The
+      real `StoragePort.importBulk`/`resetToFreshInstall` write duration
+      on IndexedDB/File System Access needs a real browser this sandbox
+      doesn't have (same limitation as T047's e2e run); left unchecked
+      until CI or a local machine with matching Playwright browsers
+      records those numbers.
 - [x] T049 SC-008 manual AI-readability check: run quickstart.md §3, append
       the outcome to quickstart.md's "Validation log".
-- [x] T050 Run `npm run typecheck && npm run lint && npm test` and the full
-      `quickstart.md` script end to end; fix anything red.
+- [ ] T050 Run `npm run typecheck && npm run lint && npm test`, and the
+      full `quickstart.md` script end to end; fix anything red.
+      **Narrowed (Copilot review, PR #31 — was checked off overclaiming
+      this):** `typecheck`/`lint`/`npm test` all ran clean in this
+      sandbox; the full `quickstart.md` script's manual, real-browser
+      steps (1, 2, 4, 5, 6) did not, for the same reason as T047/T048 —
+      quickstart.md's own Validation log says so. Left unchecked until
+      those steps run somewhere with working browsers.
 - [ ] T051 Update `specs/006-settings-data/spec.md`'s `**Status**` line to
       `Implemented — merged to main via PR #<n>` once the PR is open
       (`commit-and-pr-conventions`, `sdd-workflow`).
