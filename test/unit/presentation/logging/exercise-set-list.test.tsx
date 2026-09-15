@@ -63,7 +63,7 @@ describe('ExerciseSetList (ADR-0010)', () => {
     expect(screen.getByRole('button', { name: 'Add set' })).toBeInTheDocument();
   });
 
-  it('shows the set’s reps and load in the table, plus its effort suffix', () => {
+  it('shows the set’s reps and load in the table, with effort reaching screen readers via the row’s accessible name but not shown as visible text', () => {
     render(
       <ExerciseSetList
         {...baseProps}
@@ -79,7 +79,7 @@ describe('ExerciseSetList (ADR-0010)', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
     expect(screen.getByText('100kg')).toBeInTheDocument();
-    expect(screen.getByText('- Hard')).toBeInTheDocument();
+    expect(screen.queryByText('- Hard')).not.toBeInTheDocument();
   });
 
   it('confirming the add form closes it back to the "+ Add set" button', async () => {
@@ -164,7 +164,7 @@ describe('ExerciseSetList (ADR-0010)', () => {
     expect(screen.queryByText('—')).not.toBeInTheDocument();
   });
 
-  it('attaches the effort suffix to the volume cell, not an empty Load cell, for a none-kind load (Copilot review, PR #33)', () => {
+  it("attaches the effort suffix to the volume cell's accessible name, not an empty Load cell, for a none-kind load (Copilot review, PR #33)", () => {
     const noneLoadWithEffort: DraftSet = {
       id: 'set-none-effort',
       volume: { kind: 'reps', count: 12 },
@@ -184,14 +184,13 @@ describe('ExerciseSetList (ADR-0010)', () => {
       />,
     );
 
-    // The effort word attaches to the reps cell (the only real value this
-    // set has) rather than being appended to an empty Load cell, which
-    // would otherwise read as a bare "— Hard" with nothing for the dash
-    // to follow.
+    // The effort word attaches to the reps cell's own value in the
+    // accessible name (the only real value this set has) rather than an
+    // empty Load cell — it's never rendered as visible text on the row.
     expect(
       screen.getByRole('button', { name: /edit 12 - hard/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/^-\s*Hard$/)).toBeInTheDocument();
+    expect(screen.queryByText(/^-\s*Hard$/)).not.toBeInTheDocument();
   });
 
   it("shows only a trailing delete (×) on a logged set's row — no menu — with Edit reached by tapping the row itself", async () => {
