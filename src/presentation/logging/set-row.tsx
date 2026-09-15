@@ -378,7 +378,6 @@ export function SetRow({
             setWeightKg(Number.isFinite(parsed) && parsed >= 0 ? parsed : 0);
           }}
         />
-        <span className="set-summary__spacer" />
         <div className="set-row__compact-actions">
           <button
             type="button"

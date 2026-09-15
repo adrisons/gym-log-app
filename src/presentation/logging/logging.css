@@ -283,7 +283,7 @@
    inside `.exercise-entry-card`. */
 .set-row--compact {
   display: grid;
-  grid-template-columns: 50px 80px 1fr 44px;
+  grid-template-columns: 50px 1fr 44px;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
@@ -540,10 +540,6 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.set-summary__spacer {
-  min-width: 0;
 }
 
 .set-summary__delete {
