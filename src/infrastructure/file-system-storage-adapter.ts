@@ -581,6 +581,7 @@ export class FileSystemStorageAdapter implements StoragePort {
   }
 
   async getSession(id: SessionId): Promise<Session | undefined> {
+    await this.#replayPendingBulkWriteIfHandleAlreadyAvailable();
     const overlayEntry = this.#overlay.get(`${SESSION_KEY_PREFIX}${id}`);
     if (overlayEntry) {
       return overlayEntry.kind === 'deleted'
@@ -600,6 +601,7 @@ export class FileSystemStorageAdapter implements StoragePort {
   }
 
   async listSessions(range: DateRange): Promise<Session[]> {
+    await this.#replayPendingBulkWriteIfHandleAlreadyAvailable();
     const from = Date.parse(range.from);
     const to = Date.parse(range.to);
     const inRange = (s: Session): boolean => {
@@ -658,12 +660,14 @@ export class FileSystemStorageAdapter implements StoragePort {
   }
 
   async getExercise(id: ExerciseId): Promise<Exercise | undefined> {
+    await this.#replayPendingBulkWriteIfHandleAlreadyAvailable();
     const exercises = (await this.#readJson<Exercise[]>(EXERCISES_FILE)) ?? [];
     const exercise = exercises.find((e) => e.id === id);
     return exercise && withTemplateDefaults(exercise);
   }
 
   async listExercises(): Promise<Exercise[]> {
+    await this.#replayPendingBulkWriteIfHandleAlreadyAvailable();
     const exercises = (await this.#readJson<Exercise[]>(EXERCISES_FILE)) ?? [];
     return exercises.map(withTemplateDefaults);
   }
@@ -776,6 +780,7 @@ export class FileSystemStorageAdapter implements StoragePort {
   }
 
   async getDraft(): Promise<LoggingDraft | undefined> {
+    await this.#replayPendingBulkWriteIfHandleAlreadyAvailable();
     return this.#readJson<LoggingDraft>(DRAFT_FILE);
   }
 
@@ -787,6 +792,7 @@ export class FileSystemStorageAdapter implements StoragePort {
   // Band labels
 
   async listBandLabels(): Promise<string[]> {
+    await this.#replayPendingBulkWriteIfHandleAlreadyAvailable();
     return (await this.#readJson<string[]>(BAND_LABELS_FILE)) ?? [];
   }
 
@@ -798,6 +804,7 @@ export class FileSystemStorageAdapter implements StoragePort {
   // Schema version
 
   async getSchemaVersion(): Promise<number> {
+    await this.#replayPendingBulkWriteIfHandleAlreadyAvailable();
     return this.#readSchemaVersionRaw(false);
   }
 
@@ -808,6 +815,7 @@ export class FileSystemStorageAdapter implements StoragePort {
   // Settings (spec 006 FR-001/002)
 
   async getSettings(): Promise<Settings | undefined> {
+    await this.#replayPendingBulkWriteIfHandleAlreadyAvailable();
     return this.#readJson<Settings>(SETTINGS_FILE);
   }
 
@@ -858,11 +866,32 @@ export class FileSystemStorageAdapter implements StoragePort {
   /** Replayed on the next write-path schema check if a journal is found —
    * re-applying the same target-file writes is idempotent, so this simply
    * finishes whatever `importBulk`/`resetToFreshInstall` call was cut off
-   * (spec 006 research.md §2). Only reachable via a write path (this
-   * adapter never acquires a handle from a read, FR-004a), same
-   * documented limitation as this adapter's other migration steps. */
+   * (spec 006 research.md §2). Forces a handle if one isn't already
+   * resolved — safe here because this only runs from a write path, which
+   * already carries a gesture. */
   async #replayPendingBulkWriteIfAny(): Promise<void> {
     const root = await this.#resolveHandle(true);
+    await this.#replayPendingBulkWriteAtRoot(root);
+  }
+
+  /**
+   * The read-path counterpart (Copilot review, PR #31): a read must never
+   * force a handle (FR-004a), but if one is *already* resolved — this
+   * instance already wrote successfully before, or the directory handle
+   * was reused from the Dexie cache with no picker involved — a read that
+   * skipped this check could otherwise observe the mixed, partially-applied
+   * state a prior `importBulk`/`resetToFreshInstall` left behind if it was
+   * interrupted after replacing some target files but not others. Called
+   * at the top of every read method.
+   */
+  async #replayPendingBulkWriteIfHandleAlreadyAvailable(): Promise<void> {
+    const root = await this.#tryDirectoryHandle();
+    await this.#replayPendingBulkWriteAtRoot(root);
+  }
+
+  async #replayPendingBulkWriteAtRoot(
+    root: FileSystemDirectoryHandle | undefined,
+  ): Promise<void> {
     if (!root) return;
     const pending = await this.#readJsonFromHandle<PendingBulkWrite>(
       root,
