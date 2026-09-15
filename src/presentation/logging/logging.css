@@ -283,7 +283,7 @@
    inside `.exercise-entry-card`. */
 .set-row--compact {
   display: grid;
-  grid-template-columns: 50px 80px 1fr 44px;
+  grid-template-columns: 50px 1fr 44px;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
@@ -432,11 +432,15 @@
    (SetRow's .set-row__inputs) all share this same column layout — a
    design-refinement request (Claude Design canvas exploration) so that
    Reps/Load labels, values, and the trailing action control line up as
-   true columns rather than merely sitting near each other. */
+   true columns rather than merely sitting near each other. Load is a
+   flexible `1fr` (not a fixed width) so it can use all the room between
+   Reps and the delete button — that space used to sit empty in a
+   dedicated spacer column while a long Load value (e.g. "BW +15kg") got
+   clipped with an ellipsis right next to it. */
 .sets-header-row,
 .set-summary {
   display: grid;
-  grid-template-columns: 50px 80px 1fr 44px;
+  grid-template-columns: 50px 1fr 44px;
   align-items: center;
   gap: var(--space-3);
 }
@@ -454,14 +458,35 @@
 }
 
 .set-summary {
+  position: relative;
+  /* Same padding as `.sets-header-row` (not a wider left value) — the
+     effort indicator bar (::before below) sits inside this existing
+     padding rather than adding to it, so the Reps/Load columns stay
+     aligned under their header regardless of whether this row has an
+     effort recorded (Copilot review, PR #34). */
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-sm);
-  /* Reserved regardless of whether this set recorded an effort, so a set
-     that later gets one edited in doesn't shift its neighbors — the tone
-     modifiers below (ADR-0013) only ever repaint this same 3px, never add
-     it. */
-  border-left: 3px solid transparent;
   background: var(--color-surface-raised);
+}
+
+/* ADR-0013's effort indicator, as its own square-cornered bar rather than
+   a `border-left` on `.set-summary` itself — a border rendered on a
+   rounded box (this row's own `border-radius`) picks up rounded ends too,
+   which reads as a soft tick rather than a flat color marker. A plain
+   absolutely-positioned strip is never subject to the parent's rounding,
+   giving square corners regardless. 5px (vs. the old 3px border) reads
+   more clearly as a deliberate marker rather than a stray line. No effort
+   recorded paints no color (transparent, set by the tone modifiers
+   below). */
+.set-summary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 5px;
+  border-radius: 0;
+  background: transparent;
 }
 
 /* Wraps the reps+load value cells as one tap target spanning the grid's
@@ -473,14 +498,14 @@
   grid-column: 1 / 3;
   display: grid;
   /* Mirrors the outer grid's own first two column widths AND gap (50px
-     reps, 80px load, var(--space-3) between) — kept as literal values
+     reps, 1fr load, var(--space-3) between) — kept as literal values
      rather than `subgrid` for wider browser support, so this must stay in
      sync with `.sets-header-row`/`.set-summary`'s own
      `grid-template-columns`/`gap` if either ever changes. Missing the gap
      here (Copilot review, PR #33) started the Load value 12px left of the
      Load header/compact input above it — the two grids must share both
      properties, not just the column widths. */
-  grid-template-columns: 50px 80px;
+  grid-template-columns: 50px 1fr;
   gap: var(--space-3);
   align-items: center;
   font: inherit;
@@ -506,25 +531,16 @@
 .set-summary__load {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  /* The Load column is a fixed 80px (matching the header/input above it),
-     but a Free text load (up to 40 characters, free-text-load-input.tsx)
-     or a long Bodyweight label can exceed that — clip with an ellipsis
-     rather than overflow into the spacer/delete column (Copilot review,
-     PR #33). `min-width: 0` overrides the grid item's implicit `auto`
-     minimum, which would otherwise ignore this and grow the track anyway. */
+  /* The Load column now flexes with the row (`1fr`), but a Free text load
+     (up to 40 characters, free-text-load-input.tsx) can still exceed even
+     that on a narrow phone — clip with an ellipsis rather than overflow
+     into the delete column (Copilot review, PR #33). `min-width: 0`
+     overrides the grid item's implicit `auto` minimum, which would
+     otherwise ignore this and grow the track anyway. */
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.set-summary__effort {
-  font-family: var(--font-ui);
-  color: var(--color-foreground-muted);
-}
-
-.set-summary__spacer {
-  min-width: 0;
 }
 
 .set-summary__delete {
@@ -557,17 +573,17 @@
 /* ADR-0013: a logged set's left edge reads its own effort at a glance —
    the same success/warning/danger tone `EffortPicker`'s wheel already
    uses for the same three effort bands (`view-models.ts`'s `effortTone`).
-   No effort recorded paints no color (the transparent border above). */
-.set-summary--success {
-  border-left-color: var(--color-success);
+   No effort recorded paints no color (the transparent bar above). */
+.set-summary--success::before {
+  background: var(--color-success);
 }
 
-.set-summary--warning {
-  border-left-color: var(--color-warning);
+.set-summary--warning::before {
+  background: var(--color-warning);
 }
 
-.set-summary--danger {
-  border-left-color: var(--color-danger);
+.set-summary--danger::before {
+  background: var(--color-danger);
 }
 
 /* Plays once, only for the one row `LoggingScreen` marks as the set

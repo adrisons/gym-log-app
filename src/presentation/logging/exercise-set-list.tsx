@@ -146,7 +146,6 @@ export function ExerciseSetList({
           </span>
           <span className="sets-header-cell">Load</span>
           <span className="sets-header-cell" />
-          <span className="sets-header-cell" />
         </div>
       )}
       <ul className="set-list">
@@ -190,31 +189,14 @@ export function ExerciseSetList({
                     none-kind load) — only entered data shows, a
                     pre-existing product rule this table must not regress
                     (test: "shows no load column at all for a none-kind
-                    load"). The effort suffix attaches to the Load cell
-                    when a load is present, or to the volume cell
-                    otherwise (Copilot review, PR #33) — appending it to
-                    an empty Load cell rendered a bare "— Hard" with
-                    nothing for the dash to follow. */}
-                <span className="set-summary__reps">
-                  {vm.volumeColumn}
-                  {vm.loadColumn === undefined && vm.effortSuffix && (
-                    <span className="set-summary__effort">
-                      {' '}
-                      - {vm.effortSuffix}
-                    </span>
-                  )}
-                </span>
-                <span className="set-summary__load">
-                  {vm.loadColumn}
-                  {vm.loadColumn !== undefined && vm.effortSuffix && (
-                    <span className="set-summary__effort">
-                      {' '}
-                      - {vm.effortSuffix}
-                    </span>
-                  )}
-                </span>
+                    load"). Effort is deliberately not rendered here
+                    (design refinement) — the row's own tone border already
+                    reflects it, and `vm.summaryLine`'s effort wording still
+                    reaches screen readers via the Edit/Delete aria-labels
+                    below. */}
+                <span className="set-summary__reps">{vm.volumeColumn}</span>
+                <span className="set-summary__load">{vm.loadColumn}</span>
               </button>
-              <span className="set-summary__spacer" />
               <button
                 type="button"
                 className="set-summary__delete"
