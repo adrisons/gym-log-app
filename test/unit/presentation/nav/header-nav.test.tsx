@@ -46,6 +46,38 @@ describe('HeaderNav', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders no back arrow when nothing has registered one', () => {
+    render(
+      <MemoryRouter>
+        <ScreenTitleProvider>
+          <HeaderNav />
+        </ScreenTitleProvider>
+      </MemoryRouter>,
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Back' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders a back arrow linking to the registered route when a screen sets one via useSetScreenTitle's second argument (ADR-0014)", () => {
+    function Screen() {
+      useSetScreenTitle('Session', '/diary');
+      return null;
+    }
+    render(
+      <MemoryRouter>
+        <ScreenTitleProvider>
+          <HeaderNav />
+          <Screen />
+        </ScreenTitleProvider>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute(
+      'href',
+      '/diary',
+    );
+  });
+
   it('opens the menu with exactly Diary, Insights, Exercises, Settings — no Search (ADR-0009, spec 006 FR-001/006)', () => {
     render(
       <MemoryRouter>

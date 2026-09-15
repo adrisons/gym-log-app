@@ -18,6 +18,29 @@
   white-space: nowrap;
 }
 
+.header-nav__back {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-left: calc(-1 * var(--space-2));
+  border-radius: var(--radius-sm);
+  color: var(--color-foreground);
+  text-decoration: none;
+  transition: background var(--duration-short) var(--easing-standard);
+}
+
+.header-nav__back:hover {
+  background: var(--color-border);
+}
+
+.header-nav__back:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
 .header-nav__toggle {
   display: inline-flex;
   align-items: center;

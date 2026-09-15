@@ -131,21 +131,6 @@
   color: var(--color-foreground-muted);
 }
 
-.session-detail-screen__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: var(--space-3);
-}
-
-.session-detail-screen__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  min-width: 44px;
-}
-
 /* A tinted badge behind the icon (canvas reference: `.chip`) — a plain
    unfilled icon read as far quieter than the mockup's colour-tinted
    square, one of the concrete visual gaps against that reference. Neutral

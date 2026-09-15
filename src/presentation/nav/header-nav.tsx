@@ -23,12 +23,18 @@
  * Also renders the current screen's own title (`useScreenTitle`,
  * `screen-title.tsx`) to the left of the menu button — design-refinement
  * request to save the vertical space each screen's own `<h1>` used to take.
+ *
+ * ADR-0014: a screen registering a `backTo` route (`useScreenBackTo`) gets
+ * a back arrow rendered before the title, reusing the same rotated
+ * `chevron-right` glyph `LoggingScreen`'s own "‹ Diary" link already uses
+ * for "back" — one visual vocabulary for the gesture across the app,
+ * rather than a second icon meaning the same thing.
  */
 import { useEffect, useRef, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { Icon } from '@/presentation/design/icons';
 import type { IconName } from '@/presentation/design/icons';
-import { useScreenTitle } from './screen-title';
+import { useScreenBackTo, useScreenTitle } from './screen-title';
 import './header-nav.css';
 
 const DESTINATIONS: { to: string; label: string; icon: IconName }[] = [
@@ -43,6 +49,7 @@ export function HeaderNav() {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const title = useScreenTitle();
+  const backTo = useScreenBackTo();
 
   useEffect(() => {
     if (!open) return;
@@ -71,6 +78,11 @@ export function HeaderNav() {
 
   return (
     <header className="header-nav">
+      {backTo && (
+        <Link to={backTo} className="header-nav__back" aria-label="Back">
+          <Icon name="chevron-right" style={{ transform: 'rotate(180deg)' }} />
+        </Link>
+      )}
       {title && <h1 className="header-nav__title">{title}</h1>}
       <button
         ref={buttonRef}
