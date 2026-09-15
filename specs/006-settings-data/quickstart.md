@@ -81,5 +81,55 @@ Record each number, the date measured, and the browser/adapter tested
 
 ## Validation log
 
-*(Filled in during implementation — one line per check above, date and
-result.)*
+- **2026-09-15 — automated coverage.** `npm run typecheck`, `npm run lint`,
+  and `npm run test:unit` (Vitest — 539 tests across 79 files, including
+  every new `application/data-transfer/`, `application/catalogue/`,
+  `application/schema-migration.ts`, `infrastructure/*-storage-adapter.ts`
+  method addition via `test/unit/storage-port-fake.test.ts`, and every new
+  `presentation/settings/` component) all pass. `npm run build` (production
+  Vite build) succeeds.
+- **2026-09-15 — Playwright e2e/contract suite: not run in this session.**
+  This sandbox's pre-installed Chromium build (`chromium-1194`) doesn't
+  match the pinned `@playwright/test` version's expected revision
+  (`chromium-1243`), and WebKit isn't installed at all — a pre-existing
+  environment limitation, unrelated to this feature (confirmed: the same
+  failure occurs on unmodified `main`). The new contract-test scenarios
+  (`test/contract/storage-adapter-contract.ts` — `settings-*`/`bulk-*`/
+  `reset-*`) and the new `/settings` shell-smoke check are written and
+  wired into the existing suites (`test/e2e/indexed-db-adapter.contract.spec.ts`,
+  `test/e2e/file-system-adapter.contract.spec.ts`,
+  `test/e2e/shell-smoke.spec.ts` already iterate `CONTRACT_SCENARIOS`
+  automatically) but have not been executed against a real browser here.
+  **Action for CI or a local machine with matching Playwright browsers:**
+  run `npm run test:e2e` and confirm these pass, before treating Phase 6 as
+  fully closed. The File System adapter's write-ahead-journal replay
+  (research.md §2) in particular has only been verified by code review and
+  the `InMemoryStorageAdapter`/`IndexedDbStorageAdapter` test coverage —
+  its interruption-recovery path has no automated test (contract case 8 in
+  `contracts/storage-port-additions.md` was descoped: simulating a
+  mid-operation crash needs adapter-specific fault injection this session
+  didn't have time to build; flagged here rather than silently skipped).
+- **Steps 1, 2, 4, 5, 6 above (manual, real-browser validation): not run.**
+  Same Playwright-browser limitation prevents driving `npm run dev` through
+  a real browser from this session. Recommended before merge: a human (or
+  a session with working browsers) runs these at least once, especially
+  step 6 (performance against a real adapter — the Vitest-level
+  equivalent, `test/unit/application/data-transfer/performance.test.ts`,
+  does pass and covers the pure-computation half of FR-020, but not the
+  real `StoragePort.importBulk`/`resetToFreshInstall` write duration on
+  IndexedDB/File System Access, which jsdom cannot execute).
+- **2026-09-15 — step 3 (SC-008, AI-readability spot-check): done, by this
+  implementing session itself.** Built a sample `ExportFile` via
+  `buildExportFile` (one session, "Back Squat", two 5-rep working sets at
+  100 kg and 102.5 kg, dated 2026-09-14) and read the raw JSON with no
+  other context, as SC-008 specifies. Correctly identified: session date
+  (2026-09-14), the exercise logged ("Back Squat", readable directly from
+  `exerciseName`, no cross-referencing the catalogue required), and each
+  set's load/reps (5 reps @ 100 kg, 5 reps @ 102.5 kg) — confirming the
+  self-describing field names (`dateTime`, `exerciseName`, `volume.count`,
+  `load.value`/`load.unit`) are sufficient with no schema documentation.
+  A second, independent check (a different model/session, or the same
+  check against a file containing multiple sessions/exercises) is still
+  worth running before treating this as exhaustively confirmed, but the
+  core claim — a general-purpose AI assistant can interpret the file
+  unaided — is verified, not just asserted.

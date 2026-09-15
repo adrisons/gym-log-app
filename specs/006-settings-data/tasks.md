@@ -31,7 +31,7 @@ are hand-rolled, File System Access's save/open pickers are native,
 feature-detected the same way `select-adapter.ts` already does). Nothing to
 install.
 
-- [ ] T001 Confirm `npm run typecheck`, `npm run lint`, `npm test` are
+- [x] T001 Confirm `npm run typecheck`, `npm run lint`, `npm test` are
       green on `claude/next-implementation-steps-h28ebx` before starting
       (baseline, so any later red run is attributable to this feature).
 
@@ -41,7 +41,7 @@ install.
 
 **⚠️ Every user story below depends on this phase.**
 
-- [ ] T002 [P] Add `Settings` type + `withSettingsDefaults()` in
+- [x] T002 [P] Add `Settings` type + `withSettingsDefaults()` in
       `src/application/ports/settings.ts` (data-model.md): fields
       `defaultUnit: 'kg' | 'lb'`, `quickIncrements: { durationSeconds:
       number; distanceMetres: number }`, `theme: 'light' | 'dark' |
@@ -49,9 +49,9 @@ install.
       `{ defaultUnit: 'kg', quickIncrements: { durationSeconds: 5,
       distanceMetres: 5 }, theme: 'system', firstDayOfWeek: 'monday' }`
       (research.md §7).
-- [ ] T003 [P] Add `src/application/ports/file-exchange-port.ts`
+- [x] T003 [P] Add `src/application/ports/file-exchange-port.ts`
       (`FileExchangePort` — `saveFile`/`pickFile`, contracts/file-exchange-port.md).
-- [ ] T004 Extend `src/application/ports/storage-port.ts`
+- [x] T004 Extend `src/application/ports/storage-port.ts`
       (contracts/storage-port-additions.md): `getSettings(): Promise<Settings
       | undefined>`, `saveSettings(settings: Settings): Promise<void>`,
       `importBulk(input: BulkImportInput): Promise<void>` (`BulkImportInput`
@@ -60,7 +60,7 @@ install.
       means replace, absent means leave untouched; `schemaVersion: number`
       required), `resetToFreshInstall(seedExercises: Exercise[]):
       Promise<void>`. Depends on T002.
-- [ ] T005 [P] Extract `src/application/schema-migration.ts`
+- [x] T005 [P] Extract `src/application/schema-migration.ts`
       (`migrateExerciseCatalogue(exercises: Exercise[], storedVersion:
       number): Exercise[]`, re-exporting `decideSchemaAction` from
       `src/infrastructure/schema-version.ts`) from the logic currently
@@ -68,38 +68,38 @@ install.
       and `FileSystemStorageAdapter`'s `withTemplateDefaults` (research.md
       §3) — same v1→v2 backfill (`defaultVolumeKind ?? 'reps'`,
       `trackEffort ?? false`), behavior unchanged.
-- [ ] T006 [P] Add `src/application/catalogue/seed-exercises.ts`:
+- [x] T006 [P] Add `src/application/catalogue/seed-exercises.ts`:
       `buildSeedCatalogue(): Exercise[]` returning twelve common strength
       exercises (fresh `crypto.randomUUID()` ids per call, `discipline:
       'Strength'`) covering squat, hinge, horizontal push, horizontal pull,
       vertical push, vertical pull, lunge, and core movement patterns
       (research.md §1).
-- [ ] T007 [US*] [P] Wire first-launch seeding into
+- [x] T007 [US*] [P] Wire first-launch seeding into
       `src/presentation/main.tsx`'s `mount()`: after
       `useStorageAccess.getState().configure(storage)`, if
       `storage.listExercises()` is empty, save every `buildSeedCatalogue()`
       entry (D9/ADR-0005 gap closure, research.md §1 — first-run only, no
       later-launch re-seed). Depends on T006.
-- [ ] T008 [P] Add `src/infrastructure/file-exchange-adapter.ts`
+- [x] T008 [P] Add `src/infrastructure/file-exchange-adapter.ts`
       (`FileExchangePort` impl: `showSaveFilePicker`/`showOpenFilePicker`
       where `'showSaveFilePicker' in window`, else `<a download>` /
       `<input type="file">` fallback — contracts/file-exchange-port.md).
       Depends on T003.
-- [ ] T009 [P] Add `src/infrastructure/in-memory-file-exchange-adapter.ts`
+- [x] T009 [P] Add `src/infrastructure/in-memory-file-exchange-adapter.ts`
       (test-only fake: `saveFile` records calls, `pickFile` returns a
       pre-set response via `setNextPick()`) and re-export it from
       `test/support/index.ts` alongside `InMemoryStorage`. Depends on T003.
-- [ ] T010 Add a `settings` table to `src/infrastructure/indexed-db/schema.ts`
+- [x] T010 Add a `settings` table to `src/infrastructure/indexed-db/schema.ts`
       (single row keyed `'current'`, mirroring the existing `bandLabels`/
       `draft` tables). Depends on T004.
-- [ ] T011 Add `SETTINGS_FILE = 'settings.json'` and
+- [x] T011 Add `SETTINGS_FILE = 'settings.json'` and
       `PENDING_BULK_WRITE_FILE = '_pending-bulk-write.json'` constants to
       `src/infrastructure/file-system/layout.ts`. Depends on T004.
-- [ ] T012 [P] Implement `getSettings`/`saveSettings`/`importBulk`/
+- [x] T012 [P] Implement `getSettings`/`saveSettings`/`importBulk`/
       `resetToFreshInstall` on `src/infrastructure/in-memory-storage-adapter.ts`
       (trivially atomic — synchronous `Map` mutations, no `await` between
       them, research.md §2). Depends on T004, T005.
-- [ ] T013 Implement `getSettings`/`saveSettings` on
+- [x] T013 Implement `getSettings`/`saveSettings` on
       `src/infrastructure/indexed-db-storage-adapter.ts` (new `settings`
       table) and `importBulk`/`resetToFreshInstall` via
       `this.#db.transaction('rw', [sessions, exercises, draft, bandLabels,
@@ -107,7 +107,7 @@ install.
       the existing `mergeExercises`/`deleteExerciseCascade`); replace its
       own migration logic with `schema-migration.ts` (T005). Depends on
       T004, T005, T010.
-- [ ] T014 Implement `getSettings`/`saveSettings` on
+- [x] T014 Implement `getSettings`/`saveSettings` on
       `src/infrastructure/file-system-storage-adapter.ts` (new
       `settings.json`) and `importBulk`/`resetToFreshInstall` via the
       write-ahead journal (`_pending-bulk-write.json`, research.md §2:
@@ -116,10 +116,10 @@ install.
       leftover journal found on the next instantiation); replace its own
       migration logic with `schema-migration.ts` (T005). Depends on T004,
       T005, T011.
-- [ ] T015 Extend `test/contract/storage-adapter-contract.ts` with the
+- [x] T015 Extend `test/contract/storage-adapter-contract.ts` with the
       eight cases in contracts/storage-port-additions.md ("Contract
       tests"), run against all three adapters. Depends on T012, T013, T014.
-- [ ] T016 [P] Add `src/presentation/settings/settings-screen.tsx` (empty
+- [x] T016 [P] Add `src/presentation/settings/settings-screen.tsx` (empty
       section placeholders + a `DataSection` host — contracts/
       screen-contracts.md), route it at `/settings` in
       `src/presentation/main.tsx` under `<Route element={<AppShell />}>`,
@@ -144,7 +144,7 @@ record of all of it — independent of whether import exists yet.
 
 ### Tests for User Story 1
 
-- [ ] T017 [P] [US1] Unit tests for `buildExportFile()` in
+- [x] T017 [P] [US1] Unit tests for `buildExportFile()` in
       `test/unit/application/data-transfer/export-file.test.ts`: every
       record kind included with correct presence semantics (data-model.md:
       `bandLabels`/`settings`/`loggingDraft` each omitted when absent
@@ -152,26 +152,26 @@ record of all of it — independent of whether import exists yet.
       `ExerciseEntry` gains `exerciseName`), `format`/`schemaVersion`/
       `exportedAt` always present, no device-identifying field anywhere
       (FR-023 spot-check).
-- [ ] T018 [P] [US1] Unit tests for `buildTabularExport()` in
+- [x] T018 [P] [US1] Unit tests for `buildTabularExport()` in
       `test/unit/application/data-transfer/tabular-export.test.ts`: one row
       per `Set`, RFC 4180 quoting for values containing commas/quotes/
       newlines, header row present.
 
 ### Implementation for User Story 1
 
-- [ ] T019 [US1] Implement `buildExportFile(local): ExportFile` in
+- [x] T019 [US1] Implement `buildExportFile(local): ExportFile` in
       `src/application/data-transfer/export-file.ts` per data-model.md
       (pure function of already-read `StoragePort` results — no I/O
       inside it).
-- [ ] T020 [US1] Implement `buildTabularExport(sessions, exercises):
+- [x] T020 [US1] Implement `buildTabularExport(sessions, exercises):
       string` in `src/application/data-transfer/tabular-export.ts`
       (research.md §5 column list).
-- [ ] T021 [US1] Add `src/presentation/settings/data-section.tsx` and
+- [x] T021 [US1] Add `src/presentation/settings/data-section.tsx` and
       `src/presentation/settings/export-controls.tsx` (contracts/
       screen-contracts.md: two buttons, each reads via `requireStorage()`,
       builds the file, calls `fileExchange.saveFile(...)`); wire
       `DataSection` into `settings-screen.tsx`.
-- [ ] T022 [US1] Component test in
+- [x] T022 [US1] Component test in
       `test/unit/presentation/settings/settings-screen.test.tsx` (or a
       dedicated `data-section.test.tsx`) asserting both export buttons call
       `fileExchange.saveFile` with the expected filename/mime type, via the
@@ -193,26 +193,26 @@ preview.
 
 ### Tests for User Story 2
 
-- [ ] T023 [P] [US2] Unit tests for `computeImportPreview()` in
+- [x] T023 [P] [US2] Unit tests for `computeImportPreview()` in
       `test/unit/application/data-transfer/import-preview.test.ts`: add vs.
       replace counts by id for sessions/exercises; presence/replace
       reporting for bandLabels/settings/loggingDraft (data-model.md); a
       file re-imported into the same device shows zero adds, all replaces
       (SC-005).
-- [ ] T024 [P] [US2] Unit tests for parse/validation in
+- [x] T024 [P] [US2] Unit tests for parse/validation in
       `test/unit/application/data-transfer/import-validation.test.ts`:
       rejects a file missing `format: 'gym-log-export'`; rejects
       unparseable JSON; rejects a `schemaVersion` newer than
       `CURRENT_SCHEMA_VERSION` (FR-013) with nothing written; rejects a
       structurally invalid but same-version file (FR-014) — every
       rejection path returns a result, never throws past the caller.
-- [ ] T025 [P] [US2] Unit tests for `applyImport()` orchestration in
+- [x] T025 [P] [US2] Unit tests for `applyImport()` orchestration in
       `test/unit/application/data-transfer/apply-import.test.ts`: an older
       `schemaVersion` file is migrated in memory via
       `schema-migration.ts` before the preview is computed (FR-012);
       cancelling after preview calls no `StoragePort` write method at all
       (no trace, spec.md FR-012).
-- [ ] T026 [US2] Integration test
+- [x] T026 [US2] Integration test
       `test/integration/data-transfer-flow.test.ts` using `createHarness()`:
       export from one `InMemoryStorage`, import into a second, assert
       sessions/exercises/bandLabels/settings/draft all match (SC-001), and
@@ -220,22 +220,22 @@ preview.
 
 ### Implementation for User Story 2
 
-- [ ] T027 [US2] Implement `parseAndValidateExportFile(content: string):
+- [x] T027 [US2] Implement `parseAndValidateExportFile(content: string):
       { ok: true; file: ExportFile } | { ok: false; message: string }` in
       `src/application/data-transfer/import-validation.ts` (FR-013/014).
-- [ ] T028 [US2] Implement `computeImportPreview(local, file):
+- [x] T028 [US2] Implement `computeImportPreview(local, file):
       ImportPreview` in `src/application/data-transfer/import-preview.ts`
       per data-model.md (pure — no `StoragePort` call inside it).
-- [ ] T029 [US2] Implement `applyImport()` in
+- [x] T029 [US2] Implement `applyImport()` in
       `src/application/data-transfer/apply-import.ts`: validate → migrate
       via `schema-migration.ts` if `file.schemaVersion < CURRENT_SCHEMA_VERSION`
       → read local state → `computeImportPreview` → (caller decides
       confirm/cancel) → on confirm, `storage.importBulk(...)` with
       `schemaVersion: CURRENT_SCHEMA_VERSION`.
-- [ ] T030 [US2] Add `src/presentation/settings/import-flow.tsx`
+- [x] T030 [US2] Add `src/presentation/settings/import-flow.tsx`
       (contracts/screen-contracts.md steps 1-6: pick → validate → preview →
       confirm/cancel → `importBulk`); wire into `data-section.tsx`.
-- [ ] T031 [US2] Component test
+- [x] T031 [US2] Component test
       `test/unit/presentation/settings/import-flow.test.tsx`: rejection
       message shown and no preview for an invalid file; preview counts
       rendered for a valid file; Cancel calls no storage write; Confirm
@@ -258,11 +258,11 @@ confirm each persisted and is visibly in effect where it renders.
 
 ### Tests for User Story 3
 
-- [ ] T032 [P] [US3] Unit tests for `withSettingsDefaults()` in
+- [x] T032 [P] [US3] Unit tests for `withSettingsDefaults()` in
       `test/unit/application/settings.test.ts`: an empty/partial stored
       record is filled to the documented defaults (T002); a fully-populated
       record passes through unchanged.
-- [ ] T033 [P] [US3] Unit tests for `computeConsistency(sessions,
+- [x] T033 [P] [US3] Unit tests for `computeConsistency(sessions,
       firstDayOfWeek, asOf)` in
       `test/unit/application/insights/consistency.test.ts` (extends the
       existing file): a `'sunday'` first-day-of-week buckets weeks
@@ -272,35 +272,35 @@ confirm each persisted and is visibly in effect where it renders.
 
 ### Implementation for User Story 3
 
-- [ ] T034 [US3] Add `src/application/settings-store.ts` (Zustand,
+- [x] T034 [US3] Add `src/application/settings-store.ts` (Zustand,
       `configure(storage)` pattern per `logging-store.ts`): holds
       `settings: Settings` (always defaulted via `withSettingsDefaults`
       over the port's raw, possibly-`undefined` `getSettings()`), exposes
       `updateSettings(patch: Partial<Settings>)` that merges, calls
       `storage.saveSettings(next)`, and updates state optimistically
       (FR-002 — no Save button).
-- [ ] T035 [P] [US3] Add `src/presentation/settings/unit-and-increments-section.tsx`
+- [x] T035 [P] [US3] Add `src/presentation/settings/unit-and-increments-section.tsx`
       (`defaultUnit`, `quickIncrements`).
-- [ ] T036 [P] [US3] Add `src/presentation/settings/theme-section.tsx`
+- [x] T036 [P] [US3] Add `src/presentation/settings/theme-section.tsx`
       (`theme`); on change, set `document.documentElement.dataset.theme`
       directly (`'system'` re-enables following the OS preference).
-- [ ] T037 [P] [US3] Add `src/presentation/settings/first-day-of-week-section.tsx`
+- [x] T037 [P] [US3] Add `src/presentation/settings/first-day-of-week-section.tsx`
       (`firstDayOfWeek`).
-- [ ] T038 [US3] Edit `src/presentation/main.tsx`'s
+- [x] T038 [US3] Edit `src/presentation/main.tsx`'s
       `applyThemeFromSystemPreference()` listener to no-op once an explicit
       `theme` choice exists (read via `useSettingsStore` at mount — the
       doc comment already anticipates this exact change, plan.md Scope).
-- [ ] T039 [US3] Edit `src/application/insights/consistency.ts`:
+- [x] T039 [US3] Edit `src/application/insights/consistency.ts`:
       `computeConsistency(sessions: Session[], firstDayOfWeek:
       'monday' | 'sunday', asOf: Date = new Date())`, replacing the
       hardcoded Monday-only `isoWeekStart` with a
       `weekStart(date, firstDayOfWeek)` that branches on the new
       parameter (FR-018).
-- [ ] T040 [US3] Edit `src/application/insights/build-insights.ts` and
+- [x] T040 [US3] Edit `src/application/insights/build-insights.ts` and
       `src/presentation/insights/insights-screen.tsx`: read
       `useSettingsStore`'s `firstDayOfWeek` and thread it into
       `buildInsights`/`computeConsistency`.
-- [ ] T041 [US3] Wire the three new sections into `settings-screen.tsx`;
+- [x] T041 [US3] Wire the three new sections into `settings-screen.tsx`;
       component tests for each section (immediate apply, persisted value
       shown on remount) in `test/unit/presentation/settings/`.
 
@@ -320,7 +320,7 @@ logging.
 
 ### Tests for User Story 4
 
-- [ ] T042 [US4] Component test
+- [x] T042 [US4] Component test
       `test/unit/presentation/settings/band-labels-section.test.tsx`:
       reorder/rename/add/remove each call `storage.saveBandLabels` with the
       expected next list; a renamed/removed label already used on a logged
@@ -329,7 +329,7 @@ logging.
 
 ### Implementation for User Story 4
 
-- [ ] T043 [US4] Add `src/presentation/settings/band-labels-section.tsx`
+- [x] T043 [US4] Add `src/presentation/settings/band-labels-section.tsx`
       (contracts/screen-contracts.md) and wire it into
       `settings-screen.tsx`.
 
@@ -350,7 +350,7 @@ install.
 
 ### Tests for User Story 5
 
-- [ ] T044 [US5] Component test
+- [x] T044 [US5] Component test
       `test/unit/presentation/settings/delete-everything-flow.test.tsx`:
       backing out of either confirmation calls no storage method; both
       confirmations call `storage.resetToFreshInstall(buildSeedCatalogue())`
@@ -358,7 +358,7 @@ install.
 
 ### Implementation for User Story 5
 
-- [ ] T045 [US5] Add `src/presentation/settings/delete-everything-flow.tsx`
+- [x] T045 [US5] Add `src/presentation/settings/delete-everything-flow.tsx`
       (contracts/screen-contracts.md: two sequential confirmations, second
       states irreversibility) and wire it into `data-section.tsx`.
 
@@ -368,21 +368,21 @@ install.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T046 [P] Accessibility pass (`docs/requirements.md` §7.4,
+- [x] T046 [P] Accessibility pass (`docs/requirements.md` §7.4,
       `docs/testing.md`'s six interactive-element states) over every new
       component from T016–T045: focus-visible, keyboard reachability,
       disabled-with-reason, loading state on export/import/delete actions,
       no color-only state. Record as SC-006's "zero unresolved critical
       findings" check.
-- [ ] T047 [P] Playwright: extend `test/e2e/shell-smoke.spec.ts` with a
+- [x] T047 [P] Playwright: extend `test/e2e/shell-smoke.spec.ts` with a
       `/settings` route-reachability check (spec 004/005 precedent).
-- [ ] T048 Performance measurement (FR-020): run quickstart.md §6 against a
+- [x] T048 Performance measurement (FR-020): run quickstart.md §6 against a
       representative data set (100 sessions × 4 blocks × 3 exercises × 3
       sets) for export/import/delete-everything on both adapters; append
       the recorded numbers to quickstart.md's "Validation log".
-- [ ] T049 SC-008 manual AI-readability check: run quickstart.md §3, append
+- [x] T049 SC-008 manual AI-readability check: run quickstart.md §3, append
       the outcome to quickstart.md's "Validation log".
-- [ ] T050 Run `npm run typecheck && npm run lint && npm test` and the full
+- [x] T050 Run `npm run typecheck && npm run lint && npm test` and the full
       `quickstart.md` script end to end; fix anything red.
 - [ ] T051 Update `specs/006-settings-data/spec.md`'s `**Status**` line to
       `Implemented — merged to main via PR #<n>` once the PR is open

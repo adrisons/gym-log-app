@@ -66,7 +66,5 @@ test('the settings route is reachable and shows the Data section (spec 006 FR-00
 
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Data' })).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: 'Export data' }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Export data' })).toBeVisible();
 });
