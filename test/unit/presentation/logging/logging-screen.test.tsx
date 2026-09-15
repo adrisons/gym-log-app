@@ -96,8 +96,10 @@ describe('LoggingScreen (FR-001)', () => {
       screen.getByRole('spinbutton', { name: /weight/i }),
       '60',
     );
-    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
-    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /^reps$/i }),
+      '5',
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
 
     await waitFor(async () => {
@@ -138,8 +140,10 @@ describe('LoggingScreen (FR-001)', () => {
       screen.getByRole('spinbutton', { name: /weight/i }),
       '60',
     );
-    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
-    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /^reps$/i }),
+      '5',
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
     await waitFor(async () => {
       const draft = await storage.getDraft();
@@ -154,8 +158,9 @@ describe('LoggingScreen (FR-001)', () => {
     // which must move the animation marker to it instead of leaving (or
     // also adding) it on the first.
     await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
-    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
-    await userEvent.keyboard('{ArrowDown}');
+    const repsField = screen.getByRole('spinbutton', { name: /^reps$/i });
+    await userEvent.clear(repsField);
+    await userEvent.type(repsField, '6');
     await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
     // One `waitFor`, not two: the animation marker is intentionally
     // consumed once the marked row's own entrance animation ends (or
@@ -361,8 +366,10 @@ describe('LoggingScreen "Log workout" (FR-027; ADR-0008, ADR-0011, ADR-0012)', (
         screen.getByRole('heading', { name: 'Back squat' }),
       ).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
-    await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /^reps$/i }),
+      '5',
+    );
 
     await waitFor(() => {
       expect(

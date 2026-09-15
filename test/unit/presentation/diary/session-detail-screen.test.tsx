@@ -75,12 +75,12 @@ describe('SessionDetailScreen (FR-004/005)', () => {
         screen.getByRole('heading', { name: 'Squat' }),
       ).toBeInTheDocument();
     });
-    expect(screen.getByText('5 x 100kg')).toBeInTheDocument();
+    expect(screen.getByText('5')).toBeInTheDocument();
+    expect(screen.getByText('100kg')).toBeInTheDocument();
 
     await userEvent.click(
-      screen.getByRole('button', { name: /5 x 100kg actions/i }),
+      screen.getByRole('button', { name: /delete 5 x 100kg/i }),
     );
-    await userEvent.click(screen.getByText('Delete set'));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -149,9 +149,8 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     });
 
     await userEvent.click(
-      screen.getByRole('button', { name: /5 x 100kg actions/i }),
+      screen.getByRole('button', { name: /edit 5 x 100kg/i }),
     );
-    await userEvent.click(screen.getByText('Edit'));
     const weightField = screen.getByRole('spinbutton', { name: /weight/i });
     await userEvent.clear(weightField);
     await userEvent.type(weightField, '110');

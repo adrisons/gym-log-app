@@ -173,11 +173,15 @@ export function ExerciseSetList({
                   setForm('edit');
                 }}
               >
-                <span className="set-summary__reps">
-                  {vm.volumeColumn ?? '—'}
-                </span>
+                {/* Empty, not a "—" placeholder, when this column's value
+                    is absent (a load-only set with no volume, or a
+                    none-kind load) — only entered data shows, a
+                    pre-existing product rule this table must not regress
+                    (test: "shows no load column at all for a none-kind
+                    load"). */}
+                <span className="set-summary__reps">{vm.volumeColumn}</span>
                 <span className="set-summary__load">
-                  {vm.loadColumn ?? '—'}
+                  {vm.loadColumn}
                   {vm.effortSuffix && (
                     <span className="set-summary__effort">
                       {' '}
