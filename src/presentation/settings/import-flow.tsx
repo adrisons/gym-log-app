@@ -13,8 +13,15 @@ type FlowState =
   | { step: 'idle' }
   | { step: 'error'; message: string }
   | { step: 'preview'; prepared: PreparedImport }
-  | { step: 'applying' }
+  | { step: 'applying'; prepared: PreparedImport }
   | { step: 'done' };
+
+export interface ImportFlowProps {
+  /** Called once `commit()` has landed — the caller refreshes whatever
+   * in-memory state (Settings store, band labels, theme) still holds the
+   * pre-import snapshot (Copilot review, PR #31). */
+  onImported: () => void | Promise<void>;
+}
 
 function describeSingleton(
   name: string,
@@ -26,25 +33,49 @@ function describeSingleton(
     : `${name} will be added.`;
 }
 
-export function ImportFlow() {
+function messageFor(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : 'Something went wrong reading that file.';
+}
+
+export function ImportFlow({ onImported }: ImportFlowProps) {
   const [state, setState] = useState<FlowState>({ step: 'idle' });
 
   async function pickAndPrepare(): Promise<void> {
-    const picked = await requireFileExchange().pickFile('application/json');
-    if (!picked) return; // cancelled — no-op
+    try {
+      const picked = await requireFileExchange().pickFile('application/json');
+      if (!picked) return; // cancelled — no-op
 
-    const result = await prepareImport(requireStorage(), picked.content);
-    if (!result.ok) {
-      setState({ step: 'error', message: result.message });
-      return;
+      const result = await prepareImport(requireStorage(), picked.content);
+      if (!result.ok) {
+        setState({ step: 'error', message: result.message });
+        return;
+      }
+      setState({ step: 'preview', prepared: result.prepared });
+    } catch (error) {
+      // Picker/read failures, and failures reading the local snapshot
+      // inside prepareImport, are not ImportValidationResult failures —
+      // without this catch they reject pickAndPrepare() unhandled
+      // (Copilot review, PR #31).
+      setState({ step: 'error', message: messageFor(error) });
     }
-    setState({ step: 'preview', prepared: result.prepared });
   }
 
   async function confirm(prepared: PreparedImport): Promise<void> {
-    setState({ step: 'applying' });
-    await prepared.commit();
+    setState({ step: 'applying', prepared });
+    try {
+      await prepared.commit();
+    } catch (error) {
+      // A rejected commit() must not leave the flow stuck on "Importing…"
+      // forever, nor produce an unhandled rejection (Copilot review, PR
+      // #31) — the screen contract still requires the StorageError
+      // message surfaced, same as a validation failure.
+      setState({ step: 'error', message: messageFor(error) });
+      return;
+    }
     setState({ step: 'done' });
+    await onImported();
   }
 
   return (

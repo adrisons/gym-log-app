@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DeleteEverythingFlow } from '@/presentation/settings/delete-everything-flow';
@@ -6,6 +6,7 @@ import { useStorageAccess } from '@/application/storage-access';
 import type { Exercise } from '@/domain/exercise';
 import type { ExerciseId, SessionId } from '@/domain/ids';
 import { createSession } from '@/domain/session';
+import { StorageError } from '@/application/errors';
 import { InMemoryStorage } from '../../../support';
 
 describe('DeleteEverythingFlow (spec 006 FR-015/016)', () => {
@@ -36,7 +37,7 @@ describe('DeleteEverythingFlow (spec 006 FR-015/016)', () => {
 
   it('backing out of the first confirmation deletes nothing', async () => {
     const user = userEvent.setup();
-    render(<DeleteEverythingFlow />);
+    render(<DeleteEverythingFlow onDeleted={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: 'Delete everything' }));
     await waitFor(() =>
@@ -51,9 +52,10 @@ describe('DeleteEverythingFlow (spec 006 FR-015/016)', () => {
     ).toHaveLength(1);
   });
 
-  it('requires two confirmations, the second stating irreversibility, before deleting anything', async () => {
+  it('requires two confirmations, the second stating irreversibility, before deleting anything, then calls onDeleted', async () => {
+    const onDeleted = vi.fn();
     const user = userEvent.setup();
-    render(<DeleteEverythingFlow />);
+    render(<DeleteEverythingFlow onDeleted={onDeleted} />);
 
     await user.click(screen.getByRole('button', { name: 'Delete everything' }));
     await waitFor(() =>
@@ -67,6 +69,7 @@ describe('DeleteEverythingFlow (spec 006 FR-015/016)', () => {
       expect(screen.getByText(/cannot be undone/)).toBeInTheDocument(),
     );
     expect(await storage.listExercises()).toHaveLength(1); // still nothing deleted
+    expect(onDeleted).not.toHaveBeenCalled();
 
     await user.click(
       screen.getAllByRole('button', { name: 'Delete everything' })[1]!,
@@ -81,5 +84,31 @@ describe('DeleteEverythingFlow (spec 006 FR-015/016)', () => {
     expect(remainingExercises.map((e) => e.canonicalName)).not.toContain(
       'User-added',
     );
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
+  });
+
+  it('a rejected resetToFreshInstall surfaces the StorageError message instead of leaving the flow stuck on "Deleting…"', async () => {
+    vi.spyOn(storage, 'resetToFreshInstall').mockRejectedValue(
+      new StorageError(
+        'File System Access permission was lost or revoked for this directory.',
+      ),
+    );
+    const onDeleted = vi.fn();
+    const user = userEvent.setup();
+    render(<DeleteEverythingFlow onDeleted={onDeleted} />);
+
+    await user.click(screen.getByRole('button', { name: 'Delete everything' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(
+      screen.getAllByRole('button', { name: 'Delete everything' })[1]!,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'File System Access permission was lost or revoked for this directory.',
+      ),
+    );
+    expect(screen.queryByText('Deleting…')).not.toBeInTheDocument();
+    expect(onDeleted).not.toHaveBeenCalled();
   });
 });

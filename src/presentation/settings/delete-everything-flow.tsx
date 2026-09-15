@@ -8,15 +8,43 @@ import { requireStorage } from '@/application/storage-access';
 import { buildSeedCatalogue } from '@/application/catalogue/seed-exercises';
 
 type FlowState =
-  'idle' | 'confirm-first' | 'confirm-second' | 'deleting' | 'done';
+  | 'idle'
+  | 'confirm-first'
+  | 'confirm-second'
+  | 'deleting'
+  | 'done'
+  | { error: string };
 
-export function DeleteEverythingFlow() {
+export interface DeleteEverythingFlowProps {
+  /** Called once `resetToFreshInstall` has landed — the caller refreshes
+   * whatever in-memory state (Settings store, band labels, theme) still
+   * holds the pre-reset snapshot (Copilot review, PR #31). */
+  onDeleted: () => void | Promise<void>;
+}
+
+function messageFor(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : 'Something went wrong deleting your data.';
+}
+
+export function DeleteEverythingFlow({ onDeleted }: DeleteEverythingFlowProps) {
   const [state, setState] = useState<FlowState>('idle');
 
   async function deleteEverything(): Promise<void> {
     setState('deleting');
-    await requireStorage().resetToFreshInstall(buildSeedCatalogue());
+    try {
+      await requireStorage().resetToFreshInstall(buildSeedCatalogue());
+    } catch (error) {
+      // Without this catch, a rejection (permission loss, quota, a
+      // journal-write failure) leaves the UI stuck on "Deleting…" forever
+      // as an unhandled rejection, silently implying success never
+      // actually happened (Copilot review, PR #31).
+      setState({ error: messageFor(error) });
+      return;
+    }
     setState('done');
+    await onDeleted();
   }
 
   return (
@@ -29,6 +57,12 @@ export function DeleteEverythingFlow() {
       >
         Delete everything
       </button>
+
+      {typeof state === 'object' && (
+        <p role="alert" className="settings-message">
+          {state.error}
+        </p>
+      )}
 
       {state === 'confirm-first' && (
         <div

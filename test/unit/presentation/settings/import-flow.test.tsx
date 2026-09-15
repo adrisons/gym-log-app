@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ImportFlow } from '@/presentation/settings/import-flow';
@@ -7,6 +7,7 @@ import { useFileExchangeAccess } from '@/application/file-exchange-access';
 import { buildExportFile } from '@/application/data-transfer/export-file';
 import type { Exercise } from '@/domain/exercise';
 import type { ExerciseId } from '@/domain/ids';
+import { StorageError } from '@/application/errors';
 import { InMemoryStorage, InMemoryFileExchange } from '../../../support';
 
 function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
@@ -37,7 +38,7 @@ describe('ImportFlow (spec 006 FR-010/011)', () => {
   it('shows a rejection message and no preview for an invalid file', async () => {
     fileExchange.setNextPick({ name: 'bad.json', content: '{not json' });
     const user = userEvent.setup();
-    render(<ImportFlow />);
+    render(<ImportFlow onImported={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: 'Import data' }));
 
@@ -45,7 +46,7 @@ describe('ImportFlow (spec 006 FR-010/011)', () => {
     expect(screen.queryByText(/to add/)).not.toBeInTheDocument();
   });
 
-  it('shows accurate add/replace counts for a valid file, and calls importBulk only on Confirm', async () => {
+  it('shows accurate add/replace counts for a valid file, calls importBulk only on Confirm, and calls onImported once landed', async () => {
     const exercise = makeExercise();
     const file = buildExportFile({
       sessions: [],
@@ -58,8 +59,9 @@ describe('ImportFlow (spec 006 FR-010/011)', () => {
       name: 'export.json',
       content: JSON.stringify(file),
     });
+    const onImported = vi.fn();
     const user = userEvent.setup();
-    render(<ImportFlow />);
+    render(<ImportFlow onImported={onImported} />);
 
     await user.click(screen.getByRole('button', { name: 'Import data' }));
 
@@ -67,15 +69,17 @@ describe('ImportFlow (spec 006 FR-010/011)', () => {
       expect(screen.getByText(/Exercises: 1 to add/)).toBeInTheDocument(),
     );
     expect(await storage.listExercises()).toEqual([]);
+    expect(onImported).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'Confirm import' }));
 
     await waitFor(async () => {
       expect(await storage.listExercises()).toEqual([exercise]);
     });
+    await waitFor(() => expect(onImported).toHaveBeenCalledTimes(1));
   });
 
-  it('Cancel writes nothing', async () => {
+  it('Cancel writes nothing and never calls onImported', async () => {
     const file = buildExportFile({
       sessions: [],
       exercises: [makeExercise()],
@@ -87,8 +91,9 @@ describe('ImportFlow (spec 006 FR-010/011)', () => {
       name: 'export.json',
       content: JSON.stringify(file),
     });
+    const onImported = vi.fn();
     const user = userEvent.setup();
-    render(<ImportFlow />);
+    render(<ImportFlow onImported={onImported} />);
 
     await user.click(screen.getByRole('button', { name: 'Import data' }));
     await waitFor(() =>
@@ -102,16 +107,69 @@ describe('ImportFlow (spec 006 FR-010/011)', () => {
     expect(
       screen.queryByRole('button', { name: 'Confirm import' }),
     ).not.toBeInTheDocument();
+    expect(onImported).not.toHaveBeenCalled();
   });
 
   it('a cancelled file pick (undefined) is a no-op', async () => {
     fileExchange.setNextPick(undefined);
     const user = userEvent.setup();
-    render(<ImportFlow />);
+    render(<ImportFlow onImported={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: 'Import data' }));
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByText(/to add/)).not.toBeInTheDocument();
+  });
+
+  it('a picker failure surfaces as an error instead of an unhandled rejection', async () => {
+    vi.spyOn(fileExchange, 'pickFile').mockRejectedValue(
+      new Error('Could not open the file picker.'),
+    );
+    const user = userEvent.setup();
+    render(<ImportFlow onImported={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Import data' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Could not open the file picker.',
+      ),
+    );
+  });
+
+  it('a rejected commit surfaces the StorageError message instead of leaving the flow stuck on "Importing…"', async () => {
+    const file = buildExportFile({
+      sessions: [],
+      exercises: [makeExercise()],
+      bandLabels: [],
+      settings: undefined,
+      loggingDraft: undefined,
+    });
+    fileExchange.setNextPick({
+      name: 'export.json',
+      content: JSON.stringify(file),
+    });
+    vi.spyOn(storage, 'importBulk').mockRejectedValue(
+      new StorageError('Storage quota exceeded — nothing was written.'),
+    );
+    const onImported = vi.fn();
+    const user = userEvent.setup();
+    render(<ImportFlow onImported={onImported} />);
+
+    await user.click(screen.getByRole('button', { name: 'Import data' }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Confirm import' }),
+      ).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole('button', { name: 'Confirm import' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Storage quota exceeded — nothing was written.',
+      ),
+    );
+    expect(screen.queryByText('Importing…')).not.toBeInTheDocument();
+    expect(onImported).not.toHaveBeenCalled();
   });
 });
