@@ -33,22 +33,41 @@ interface SettingsState {
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
 }
 
-export const useSettingsStore = create<SettingsState>((set, get) => ({
-  storage: undefined,
-  settings: DEFAULT_SETTINGS,
-  loaded: false,
-  configure: (storage) => set({ storage }),
-  async load() {
-    const { storage } = get();
-    if (!storage) return;
-    const stored = await storage.getSettings();
-    set({ settings: withSettingsDefaults(stored), loaded: true });
-  },
-  async updateSettings(patch) {
-    const { storage, settings } = get();
-    if (!storage) return;
-    const next = withSettingsDefaults({ ...settings, ...patch });
-    set({ settings: next });
-    await storage.saveSettings(next);
-  },
-}));
+export const useSettingsStore = create<SettingsState>((set, get) => {
+  // Chains every persisted write onto one queue, mirroring
+  // `session-detail-screen.tsx`'s `saveQueueRef` (Copilot review, PR #31):
+  // every call site fires `updateSettings` with `void`, so two edits close
+  // together (e.g. two quick-increment fields) could otherwise have their
+  // `saveSettings` calls resolve out of order and persist the *older*
+  // snapshot last, clobbering the newer one the UI already shows. `.catch`
+  // is attached synchronously in the same expression that replaces the
+  // ref, so a rejected attempt never permanently short-circuits every
+  // later save chained onto it, and is never left unobserved (only
+  // reachable via `void updateSettings(...)`, so nothing else would ever
+  // await it) — it's only logged, same as the session-save queue.
+  let saveQueue: Promise<void> = Promise.resolve();
+
+  return {
+    storage: undefined,
+    settings: DEFAULT_SETTINGS,
+    loaded: false,
+    configure: (storage) => set({ storage }),
+    async load() {
+      const { storage } = get();
+      if (!storage) return;
+      const stored = await storage.getSettings();
+      set({ settings: withSettingsDefaults(stored), loaded: true });
+    },
+    async updateSettings(patch) {
+      const { storage, settings } = get();
+      if (!storage) return;
+      const next = withSettingsDefaults({ ...settings, ...patch });
+      set({ settings: next });
+      const attempt = saveQueue.then(() => storage.saveSettings(next));
+      saveQueue = attempt.catch((error: unknown) => {
+        console.error('Failed to save settings', error);
+      });
+      await saveQueue;
+    },
+  };
+});
