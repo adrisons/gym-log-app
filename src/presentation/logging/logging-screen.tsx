@@ -16,16 +16,13 @@
  * delete) lives on its own `/exercises` screen so this one stays focused
  * on the single primary action of recording a set (docs/design.md §2).
  *
- * A `loose` block (`DraftBlock.loose`, presentation-only — never part of
- * the persisted `Block`) renders `bare` — no header, no menu, its
- * exercises shown directly, even while empty — so an exercise added
- * without ever tapping "Add block" never looks like it's sitting inside a
- * block the user didn't ask for. `loose` is distinct from having no name:
- * an explicitly created block that hasn't been named yet is never `loose`
- * and always keeps its header (position label, rename, delete — FR-2).
- * "Add exercise"/"Add block" sit at the bottom of the screen, after
- * whatever's already there, matching the natural order of adding to
- * something you can already see.
+ * ADR-0011: every exercise now always belongs to a real block — the
+ * earlier `loose` container for an exercise added without ever tapping
+ * "Add block" is retired. `createDraft` seeds a fresh draft with one
+ * unnamed block already in it, so there is always at least one block to
+ * add an exercise to; the only way to add one is each block's own "Add
+ * exercise to …" footer control, and "Add block" (bottom of the screen)
+ * is how a second one gets created.
  *
  * `docs/requirements.md` FR-1 (design-refinement pass): reached from a
  * floating action on the diary rather than a nav tab, so a "‹ Diary" link
@@ -47,20 +44,16 @@ import {
   useLoggingSession,
   draftHasContent,
 } from '@/application/logging/logging-store';
-import {
-  toBlockViewModel,
-  toSetSummaryViewModel,
-} from '@/application/logging/view-models';
+import { toBlockViewModel } from '@/application/logging/view-models';
 import type { Exercise } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
 import { prefersReducedMotion } from '@/presentation/design/motion';
 import { SessionDateTimeField } from './session-date-time-field';
 import { AddExerciseControl } from './add-exercise-control';
-import { SetRow } from './set-row';
+import { ExerciseSetList } from './exercise-set-list';
 import { BlockCard } from './block-card';
 import { ExerciseEntryCard } from './exercise-entry-card';
 import { ExerciseTemplatePanel } from './exercise-template-panel';
-import { OverflowMenu } from './overflow-menu';
 import { UndoToast } from './undo-toast';
 import './logging.css';
 
@@ -83,6 +76,7 @@ export function LoggingScreen() {
   const setSessionDateTime = useLoggingSession((s) => s.setSessionDateTime);
   const addExerciseEntry = useLoggingSession((s) => s.addExerciseEntry);
   const addSet = useLoggingSession((s) => s.addSet);
+  const updateSet = useLoggingSession((s) => s.updateSet);
   const lastAddedSetId = useLoggingSession((s) => s.lastAddedSetId);
   const clearLastAddedSetId = useLoggingSession((s) => s.clearLastAddedSetId);
   const prefillNextSet = useLoggingSession((s) => s.prefillNextSet);
@@ -96,7 +90,7 @@ export function LoggingScreen() {
   const saveBandLabels = useLoggingSession((s) => s.saveBandLabels);
   const addBlock = useLoggingSession((s) => s.addBlock);
   const renameBlock = useLoggingSession((s) => s.renameBlock);
-  const setBlockRounds = useLoggingSession((s) => s.setBlockRounds);
+  const reorderBlock = useLoggingSession((s) => s.reorderBlock);
   const reorderBlockExercise = useLoggingSession((s) => s.reorderBlockExercise);
   const moveExerciseAcrossBlocks = useLoggingSession(
     (s) => s.moveExerciseAcrossBlocks,
@@ -181,15 +175,6 @@ export function LoggingScreen() {
     return <main className="logging-screen" aria-label="Log a session" />;
   }
 
-  // Position labels ("Block N") and "Move to block" targets are both
-  // computed from the ordinal among non-loose blocks, never the raw array
-  // index — a `loose` container renders with no label at all, so counting
-  // it would misnumber the first *visible* block (e.g. a loose exercise
-  // followed by the user's first "Add block" press would otherwise show
-  // that sole visible block as "Block 2") and would also offer it as a
-  // synthetic, headerless move target.
-  const nonLooseBlocks = draft.blocks.filter((b) => b.loose !== true);
-
   return (
     <main className="logging-screen" aria-label="Log a session">
       <Link to="/diary" className="logging-button logging-button--icon-label">
@@ -250,44 +235,38 @@ export function LoggingScreen() {
         />
       )}
 
-      {draft.blocks.map((block) => {
-        const blockVm = toBlockViewModel(
-          block,
-          nonLooseBlocks.findIndex((b) => b.id === block.id),
-          catalogue,
-        );
-        const otherBlocks = nonLooseBlocks
+      {draft.blocks.map((block, blockIndex) => {
+        const blockVm = toBlockViewModel(block, blockIndex, catalogue);
+        const otherBlocks = draft.blocks
           .filter((b) => b.id !== block.id)
           .map((b) =>
             toBlockViewModel(
               b,
-              nonLooseBlocks.findIndex((x) => x.id === b.id),
+              draft.blocks.findIndex((x) => x.id === b.id),
               catalogue,
             ),
           )
           .map((vm) => ({ id: vm.id, displayName: vm.displayName }));
-        const totalSets = block.exercises.reduce(
-          (sum, entry) => sum + entry.sets.length,
-          0,
-        );
-        // No `exercises.length > 0` guard: a `loose` block stays bare even
-        // once emptied by deleting its last exercise — it's still an
-        // implicit container the user never asked to see as a block.
-        const isBare = block.loose === true;
 
         return (
           <BlockCard
             key={block.id}
             displayName={blockVm.displayName}
             hasName={block.name !== undefined}
-            bare={isBare}
-            subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'} logged`}
-            rounds={block.rounds}
+            subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'}`}
+            canMoveUp={blockIndex > 0}
+            canMoveDown={blockIndex < draft.blocks.length - 1}
+            onMoveUp={() => void reorderBlock(blockIndex, blockIndex - 1)}
+            onMoveDown={() => void reorderBlock(blockIndex, blockIndex + 1)}
             onRename={(name) => void renameBlock(block.id, name)}
-            onSetRounds={(rounds) => void setBlockRounds(block.id, rounds)}
             onDelete={() => void deleteBlock(block.id)}
             footer={
-              isBare ? undefined : (
+              // FR-028: adding an exercise to the active form must stay
+              // unavailable while a pendingDraft is unresolved — the
+              // default seeded block (ADR-0011) always exists and renders
+              // regardless, so its own footer control needs this same
+              // gate the bottom-of-screen controls already have.
+              !pendingDraft ? (
                 <AddExerciseControl
                   buttonLabel={`Add exercise to ${blockVm.displayName}`}
                   fieldLabel={`Add exercise to ${blockVm.displayName}`}
@@ -304,7 +283,7 @@ export function LoggingScreen() {
                     })();
                   }}
                 />
-              )
+              ) : undefined
             }
           >
             {block.exercises.map((entry, entryIndex) => {
@@ -339,70 +318,37 @@ export function LoggingScreen() {
                     exercise ? () => setEditingTemplateFor(exercise) : undefined
                   }
                 >
-                  <ul className="set-list">
-                    {entry.sets.map((set) => {
-                      const vm = toSetSummaryViewModel(set);
-                      const isNewest = vm.id === lastAddedSetId;
-                      return (
-                        <li
-                          key={vm.id}
-                          className={
-                            isNewest
-                              ? 'set-summary set-summary--new'
-                              : 'set-summary'
-                          }
-                          {...(isNewest
-                            ? {
-                                onAnimationEnd: () => {
-                                  // Guards against a stale closure: if a
-                                  // second set committed (moving the
-                                  // marker on) before this row's own
-                                  // animation ended, only *that* row's
-                                  // handler should consume it — this one
-                                  // clearing a marker that has already
-                                  // moved on would strand the newer row's
-                                  // own entrance animation mid-flight
-                                  // (Copilot review, PR #22).
-                                  if (
-                                    useLoggingSession.getState()
-                                      .lastAddedSetId === vm.id
-                                  ) {
-                                    clearLastAddedSetId();
-                                  }
-                                },
-                              }
-                            : {})}
-                        >
-                          <span>{vm.loadLabel}</span>
-                          <span>{vm.volumeLabel}</span>
-                          <OverflowMenu
-                            label={`${vm.loadLabel} ${vm.volumeLabel} actions`}
-                          >
-                            <button
-                              type="button"
-                              className="logging-button logging-button--icon-label"
-                              onClick={() =>
-                                void deleteSet(block.id, entry.id, vm.id)
-                              }
-                            >
-                              <Icon name="trash" />
-                              Delete set
-                            </button>
-                          </OverflowMenu>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <SetRow
-                    key={`${entry.id}-${entry.sets.length}-${exercise?.defaultLoadType ?? 'none'}-${exercise?.defaultVolumeKind ?? 'reps'}-${exercise?.trackEffort ?? false}`}
-                    prefill={prefillNextSet(block.id, entry.id)}
+                  <ExerciseSetList
+                    sets={entry.sets}
                     loadKind={exercise?.defaultLoadType ?? 'none'}
                     volumeKind={exercise?.defaultVolumeKind ?? 'reps'}
                     trackEffort={exercise?.trackEffort ?? false}
                     bandLabels={bandLabels}
                     freeTextSuggestions={suggestFreeTextLoads(entry.exerciseId)}
-                    onConfirm={(input) => void addSet(entry.id, input)}
+                    prefill={prefillNextSet(block.id, entry.id)}
+                    onAddSet={(input) => void addSet(entry.id, input)}
+                    onUpdateSet={(setId, input) =>
+                      void updateSet(entry.id, setId, input)
+                    }
+                    onDeleteSet={(setId) =>
+                      void deleteSet(block.id, entry.id, setId)
+                    }
                     onSaveBandLabels={(labels) => void saveBandLabels(labels)}
+                    newestSetId={lastAddedSetId}
+                    onNewestSetAnimationEnd={(setId) => {
+                      // Guards against a stale closure: if a second set
+                      // committed (moving the marker on) before this row's
+                      // own animation ended, only *that* row's handler
+                      // should consume it — this one clearing a marker
+                      // that has already moved on would strand the newer
+                      // row's own entrance animation mid-flight (Copilot
+                      // review, PR #22).
+                      if (
+                        useLoggingSession.getState().lastAddedSetId === setId
+                      ) {
+                        clearLastAddedSetId();
+                      }
+                    }}
                   />
                 </ExerciseEntryCard>
               );
@@ -423,44 +369,29 @@ export function LoggingScreen() {
       </div>
 
       {!pendingDraft && (
-        <>
-          <AddExerciseControl
-            buttonLabel="Add exercise"
-            fieldLabel="Exercise"
-            search={searchExercises}
-            onSelectExercise={(exercise) => void addExerciseEntry(exercise.id)}
-            onCreateExercise={(name) => {
-              void (async () => {
-                const exercise = await createExercise({ canonicalName: name });
-                await addExerciseEntry(exercise.id);
-              })();
-            }}
-          />
-          <button
-            type="button"
-            className="logging-button logging-button--icon-label"
-            onClick={() => void addBlock(undefined, 'straightSets')}
-          >
-            <Icon name="plus" />
-            Add block
-          </button>
-        </>
-      )}
-
-      {!pendingDraft && draftHasContent(draft) && (
         <button
           type="button"
-          className="logging-button logging-button--primary"
-          onClick={() => {
-            void (async () => {
-              await registerWorkout();
-              navigate('/diary');
-            })();
-          }}
+          className="logging-button logging-button--icon-label"
+          onClick={() => void addBlock(undefined, 'straightSets')}
         >
-          Log workout
+          <Icon name="plus" />
+          Add block
         </button>
       )}
+
+      <button
+        type="button"
+        className="logging-button logging-button--primary"
+        disabled={!!pendingDraft || !draftHasContent(draft)}
+        onClick={() => {
+          void (async () => {
+            await registerWorkout();
+            navigate('/diary');
+          })();
+        }}
+      >
+        Log workout
+      </button>
     </main>
   );
 }

@@ -50,11 +50,12 @@ import type {
 import {
   addExerciseEntry as addExerciseEntryToDraft,
   addSet as addSetToDraft,
+  updateSet as updateSetInDraft,
   findBlockIdForEntry,
   prefillNextSet as prefillNextSetFromDraft,
   addBlock as addBlockToDraft,
   renameBlock as renameBlockInDraft,
-  setBlockRounds as setBlockRoundsInDraft,
+  reorderBlock as reorderBlockInDraft,
   reorderBlockExercise as reorderBlockExerciseInDraft,
   moveExerciseAcrossBlocks as moveExerciseAcrossBlocksInDraft,
   deleteBlock as deleteBlockFromDraft,
@@ -136,6 +137,16 @@ export interface LoggingSessionState {
    * resolves to any block at all (deleted in the meantime), or while
    * `pendingDraft` is set (FR-028). */
   addSet: (entryId: string, input: AddSetInput) => Promise<void>;
+  /** ADR-0010: edits an already-recorded set in place, resolving the
+   * entry's *current* block the same way `addSet` does (`findBlockIdForEntry`).
+   * A no-op if the entry no longer resolves to any block, or while
+   * `pendingDraft` is set (FR-028). No debounce — this is always an
+   * explicit, single confirm-button tap, not an edit-triggered auto-commit. */
+  updateSet: (
+    entryId: string,
+    setId: string,
+    input: AddSetInput,
+  ) => Promise<void>;
   clearJustRegisteredWorkout: () => void;
   clearLastAddedSetId: () => void;
   /** FR-028: loads `pendingDraft` as the active `draft` and clears it,
@@ -170,10 +181,7 @@ export interface LoggingSessionState {
     type: DraftBlock['type'],
   ) => Promise<void>;
   renameBlock: (blockId: string, name: string | undefined) => Promise<void>;
-  setBlockRounds: (
-    blockId: string,
-    rounds: number | undefined,
-  ) => Promise<void>;
+  reorderBlock: (fromIndex: number, toIndex: number) => Promise<void>;
   reorderBlockExercise: (
     blockId: string,
     fromIndex: number,
@@ -523,6 +531,19 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       await persistDraft(storage, updated);
     },
 
+    updateSet: async (entryId, setId, input) => {
+      const { storage, draft: current, pendingDraft } = get();
+      if (!storage || !current || pendingDraft) return;
+      const blockId = findBlockIdForEntry(current, entryId);
+      if (!blockId) return; // entry no longer exists — nothing to update
+      const result = updateSetInDraft(current, blockId, entryId, setId, input);
+      if (result === current) return; // setId didn't resolve — no-op
+
+      const updated = touch(result);
+      set({ draft: updated });
+      await persistDraft(storage, updated);
+    },
+
     prefillNextSet: (blockId, entryId) => {
       const current = get().draft;
       if (!current) return undefined;
@@ -548,7 +569,27 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       const { storage } = get();
       if (!storage) return;
       const before = get().catalogue.find((e) => e.id === exerciseId);
-      if (!before) return;
+      // A cold cache (e.g. a direct `/exercises` visit — ADR-0010 —
+      // reaching this before this store's own `initialize()` has ever
+      // populated `catalogue`, which `ExerciseCatalogueScreen` doesn't
+      // call) has nothing to optimistically update yet, but the write
+      // itself doesn't depend on the local cache
+      // (`updateExerciseTemplateUseCase` re-fetches from storage) — it
+      // must still happen, not silently no-op. Skip the optimistic
+      // update/rollback dance below and adopt the fresh exercise into the
+      // cache once the write lands instead.
+      if (!before) {
+        await updateExerciseTemplateUseCase(storage, exerciseId, template);
+        const updated = await storage.getExercise(exerciseId);
+        if (updated) {
+          set((state) => ({
+            catalogue: state.catalogue.some((e) => e.id === exerciseId)
+              ? state.catalogue.map((e) => (e.id === exerciseId ? updated : e))
+              : [...state.catalogue, updated],
+          }));
+        }
+        return;
+      }
       const optimistic = { ...before, ...template };
       set((state) => ({
         catalogue: state.catalogue.map((exercise) =>
@@ -616,10 +657,10 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       await persistDraft(storage, updated);
     },
 
-    setBlockRounds: async (blockId, rounds) => {
+    reorderBlock: async (fromIndex, toIndex) => {
       const { storage, draft: current } = get();
       if (!storage || !current) return;
-      const updated = touch(setBlockRoundsInDraft(current, blockId, rounds));
+      const updated = touch(reorderBlockInDraft(current, fromIndex, toIndex));
       set({ draft: updated });
       await persistDraft(storage, updated);
     },

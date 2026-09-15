@@ -73,8 +73,11 @@ describe('SessionDetailScreen (FR-004/005)', () => {
         screen.getByRole('heading', { name: 'Squat' }),
       ).toBeInTheDocument();
     });
-    expect(screen.getByText('100 kg')).toBeInTheDocument();
+    expect(screen.getByText('5 x 100kg')).toBeInTheDocument();
 
+    await userEvent.click(
+      screen.getByRole('button', { name: /5 x 100kg actions/i }),
+    );
     await userEvent.click(screen.getByText('Delete set'));
 
     await waitFor(async () => {
@@ -83,7 +86,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     });
   });
 
-  it("edits and clears a block's rounds, persisting each change via saveSession (ADR-0008, Copilot review regression)", async () => {
+  it("editing a set's weight preserves its setKind and completed — not the add-form's fixed 'working'/true (ADR-0010, Copilot review, PR #27)", async () => {
     const storage = new InMemoryStorage();
     const exerciseId = 'ex-1' as ExerciseId;
     const sessionId = 's1' as SessionId;
@@ -104,9 +107,25 @@ describe('SessionDetailScreen (FR-004/005)', () => {
         notes: '',
         blocks: [
           createBlock({
-            type: 'circuit',
-            rounds: 3,
-            exercises: [{ exerciseId, notes: '', sets: [] }],
+            type: 'straightSets',
+            exercises: [
+              {
+                exerciseId,
+                notes: '',
+                sets: [
+                  createSet({
+                    volume: createVolume({ kind: 'reps', count: 5 }),
+                    load: createLoad({
+                      kind: 'weight',
+                      value: 100,
+                      unit: 'kg',
+                    }),
+                    setKind: 'warmUp',
+                    completed: false,
+                  }),
+                ],
+              },
+            ],
           }),
         ],
       }),
@@ -126,24 +145,83 @@ describe('SessionDetailScreen (FR-004/005)', () => {
         screen.getByRole('heading', { name: 'Squat' }),
       ).toBeInTheDocument();
     });
-    const roundsInput = screen.getByLabelText('Rounds');
-    expect(roundsInput).toHaveValue(3);
 
-    await userEvent.clear(roundsInput);
-    await userEvent.type(roundsInput, '5');
+    await userEvent.click(
+      screen.getByRole('button', { name: /5 x 100kg actions/i }),
+    );
+    await userEvent.click(screen.getByText('Edit'));
+    const weightField = screen.getByRole('spinbutton', { name: /weight/i });
+    await userEvent.clear(weightField);
+    await userEvent.type(weightField, '110');
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
-      expect(saved?.blocks[0]?.rounds).toBe(5);
-    });
-
-    await userEvent.clear(roundsInput);
-    await waitFor(async () => {
-      const saved = await storage.getSession(sessionId);
-      expect(saved?.blocks[0]).not.toHaveProperty('rounds');
+      const set = saved?.blocks[0]?.exercises[0]?.sets[0];
+      expect(set?.load).toEqual({ kind: 'weight', value: 110, unit: 'kg' });
+      expect(set?.setKind).toBe('warmUp');
+      expect(set?.completed).toBe(false);
     });
   });
 
-  it('adding an exercise via the bottom control creates and persists a new block when the last block is named', async () => {
+  it("reorders blocks via a block's own Move up/Move down menu items, persisting the new order via saveSession (ADR-0013)", async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const sessionId = 's1' as SessionId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [
+          createBlock({
+            type: 'straightSets',
+            name: 'Push day',
+            exercises: [{ exerciseId, notes: '', sets: [] }],
+          }),
+          createBlock({ type: 'straightSets', name: 'Leg day', exercises: [] }),
+        ],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <Routes>
+          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Push day')).toBeInTheDocument();
+      expect(screen.getByText('Leg day')).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Push day actions' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Move down' }));
+
+    await waitFor(async () => {
+      const saved = await storage.getSession(sessionId);
+      expect(saved?.blocks.map((b) => b.name)).toEqual(['Leg day', 'Push day']);
+    });
+  });
+
+  it("adding an exercise via a block's own control adds it to that block and persists the change (ADR-0011: no more top-level/loose control)", async () => {
     const storage = new InMemoryStorage();
     const exerciseId = 'ex-1' as ExerciseId;
     const sessionId = 's1' as SessionId;
@@ -194,7 +272,9 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       ).toBeInTheDocument();
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Push day' }),
+    );
     await userEvent.type(
       screen.getByPlaceholderText(/search or create an exercise/i),
       'Deadlift',
@@ -209,6 +289,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
+      expect(saved?.blocks).toHaveLength(1);
       const exerciseIds = saved?.blocks.flatMap((block) =>
         block.exercises.map((entry) => entry.exerciseId),
       );
@@ -241,6 +322,13 @@ describe('SessionDetailScreen (FR-004/005)', () => {
             name: 'Push day',
             exercises: [{ exerciseId, notes: '', sets: [] }],
           }),
+          // A second, independent block — ADR-0011 removed the top-level/
+          // "loose" add control, so the exercise creation below must
+          // target a specific block's own control; deleting this other
+          // block while that's pending is what keeps the two edits
+          // genuinely independent (the stale-closure scenario this test
+          // guards against).
+          createBlock({ type: 'straightSets', name: 'Leg day', exercises: [] }),
         ],
       }),
     );
@@ -274,9 +362,11 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       ).toBeInTheDocument();
     });
 
-    // Start creating "Deadlift" — this awaits the gated `saveExercise` and
-    // will not resolve until `releaseSave()` is called below.
-    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    // Start creating "Deadlift" in "Push day" — this awaits the gated
+    // `saveExercise` and will not resolve until `releaseSave()` below.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Push day' }),
+    );
     await userEvent.type(
       screen.getByPlaceholderText(/search or create an exercise/i),
       'Deadlift',
@@ -285,13 +375,19 @@ describe('SessionDetailScreen (FR-004/005)', () => {
 
     // While that create is still pending, make a second, independent edit
     // whose effect a stale closure would silently undo: deleting the
-    // existing "Push day" block. A stale-closure regression would rebuild
+    // unrelated "Leg day" block. A stale-closure regression would rebuild
     // its own `next` from the pre-delete snapshot it captured before the
-    // await, resurrecting "Push day" once it finally persists — a count
+    // await, resurrecting "Leg day" once it finally persists — a count
     // -only assertion (e.g. "2 blocks") can't tell that apart from the
     // correct outcome, since both happen to end up with the same number
-    // of blocks; asserting Push day is actually gone can.
-    await userEvent.click(screen.getByRole('button', { name: 'Delete block' }));
+    // of blocks; asserting Leg day is actually gone can.
+    //
+    // Both blocks render their own "Delete block" button — index 1 is
+    // "Leg day", the second block in the fixture above.
+    const deleteBlockButtons = screen.getAllByRole('button', {
+      name: 'Delete block',
+    });
+    await userEvent.click(deleteBlockButtons[1]!);
 
     releaseSave();
 
@@ -303,8 +399,8 @@ describe('SessionDetailScreen (FR-004/005)', () => {
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
-      // The delete survived: "Push day" never comes back.
-      expect(saved?.blocks.some((b) => b.name === 'Push day')).toBe(false);
+      // The delete survived: "Leg day" never comes back.
+      expect(saved?.blocks.some((b) => b.name === 'Leg day')).toBe(false);
       // The create also survived: Deadlift is recorded somewhere.
       const catalogue = await storage.listExercises();
       const deadliftId = catalogue.find(
@@ -379,7 +475,9 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     });
 
     // First edit: its save is the one rejected above.
-    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
+    );
     await userEvent.type(
       screen.getByPlaceholderText(/search or create an exercise/i),
       'Deadlift',
@@ -396,7 +494,9 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     // Second edit, after the first save's rejection: a broken queue would
     // never call `saveSession` again from this point on, so this edit
     // would silently never persist.
-    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
+    );
     await userEvent.type(
       screen.getByPlaceholderText(/search or create an exercise/i),
       'Bench press',
@@ -499,7 +599,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('numbers the first explicit block "Block 1" even after a loose exercise already exists (loose-block-numbering regression)', async () => {
+  it('a session with zero blocks offers only "Add block"; the first block created is numbered Block 1 (ADR-0011: no more top-level/loose add)', async () => {
     const storage = new InMemoryStorage();
     const sessionId = 's1' as SessionId;
     await storage.saveSession(
@@ -523,35 +623,38 @@ describe('SessionDetailScreen (FR-004/005)', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: 'Add exercise' }),
+        screen.getByRole('button', { name: 'Add block' }),
       ).toBeInTheDocument();
     });
+    // With zero blocks, there is no exercise-adding control at all — every
+    // exercise now belongs to a specific block's own control.
+    expect(
+      screen.queryByRole('button', { name: /add exercise/i }),
+    ).not.toBeInTheDocument();
 
-    // Adding an exercise with no explicit block first creates a `loose`
-    // container at index 0 — it renders bare, with no "Block N" label.
-    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
-    await userEvent.type(
-      screen.getByPlaceholderText(/search or create an exercise/i),
-      'Lat pulldown',
-    );
-    await userEvent.click(screen.getByText('Create "Lat pulldown"'));
-    await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: 'Lat pulldown' }),
-      ).toBeInTheDocument();
-    });
-
-    // The first explicitly created block must still be numbered "Block 1"
-    // — the loose container ahead of it in the array has no label and
-    // must not be counted.
     await userEvent.click(screen.getByRole('button', { name: 'Add block' }));
     await waitFor(() => {
       expect(screen.getByText('Block 1')).toBeInTheDocument();
     });
     expect(screen.queryByText('Block 2')).not.toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
+    );
+    await userEvent.type(
+      screen.getByPlaceholderText(/search or create an exercise/i),
+      'Lat pulldown',
+    );
+    await userEvent.click(screen.getByText('Create "Lat pulldown"'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Lat pulldown' }),
+      ).toBeInTheDocument();
+    });
   });
 
-  it('a loose block stays chrome-less even after its last exercise is deleted (empty-loose-block regression)', async () => {
+  it('a block keeps its header/controls even after its last exercise is deleted (ADR-0011: no more chrome-less/"loose" rendering)', async () => {
     const storage = new InMemoryStorage();
     const exerciseId = 'ex-1' as ExerciseId;
     const sessionId = 's1' as SessionId;
@@ -595,39 +698,26 @@ describe('SessionDetailScreen (FR-004/005)', () => {
         screen.getByRole('heading', { name: 'Squat' }),
       ).toBeInTheDocument();
     });
-
-    // Top-level "Add exercise" (not a per-block footer): the trailing
-    // block is named ("Push day"), so this creates a fresh loose block.
-    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
-    await userEvent.type(
-      screen.getByPlaceholderText(/search or create an exercise/i),
-      'Lat pulldown',
-    );
-    await userEvent.click(screen.getByText('Create "Lat pulldown"'));
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: 'Lat pulldown' }),
-      ).toBeInTheDocument();
-    });
-    // Loose block: no "Block 2" header for it.
-    expect(screen.queryByText('Block 2')).not.toBeInTheDocument();
+    expect(screen.getByText('Push day')).toBeInTheDocument();
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Lat pulldown actions' }),
+      screen.getByRole('button', { name: 'Squat actions' }),
     );
     await userEvent.click(
       screen.getByRole('button', { name: 'Delete exercise' }),
     );
 
-    // Now empty, but still loose: must stay invisible, not suddenly gain
-    // a "Block 2" header with rename/delete controls.
+    // Now empty, but still a real block: "Push day" and its rename/delete
+    // controls stay visible, unlike the old "loose" container.
     await waitFor(() => {
       expect(
-        screen.queryByRole('heading', { name: 'Lat pulldown' }),
+        screen.queryByRole('heading', { name: 'Squat' }),
       ).not.toBeInTheDocument();
     });
-    expect(screen.queryByText('Block 2')).not.toBeInTheDocument();
+    expect(screen.getByText('Push day')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('button', { name: /^rename$/i }).length,
+    ).toBeGreaterThan(0);
   });
 
   it('saving an exercise template re-syncs the logging store, not just this screen (stale-template regression)', async () => {
@@ -835,7 +925,9 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       ).toBeInTheDocument();
     });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Push day' }),
+    );
     await userEvent.type(
       screen.getByPlaceholderText(/search or create an exercise/i),
       'Deadlift',

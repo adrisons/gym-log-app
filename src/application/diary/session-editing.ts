@@ -8,10 +8,9 @@
  * `StoragePort.saveSession`, not the draft-promotion path.
  *
  * Scope note: mirrors spec 001's own editable surface (add/rename/delete
- * a block; add/delete an exercise entry; add/delete a set) — spec 001's
- * confirmed sets are themselves never edited in place, only added or
- * deleted (`logging-screen.tsx`), so this screen doesn't need to either.
- * Undo is intentionally out of scope for this screen: spec.md FR-005
+ * a block; add/delete/edit an exercise entry's sets — ADR-0010 added
+ * editing a set in place, spec 001 FR-029, alongside add/delete). Undo is
+ * intentionally out of scope for this screen: spec.md FR-005
  * requires edits to be editable and persisted, not undoable — the 5-second
  * undo window is spec 001 FR-001's own logging-critical-path guarantee,
  * not restated for after-the-fact editing here.
@@ -40,13 +39,7 @@ export function sessionToEditable(session: Session): EditableSession {
     blocks: session.blocks.map((block): DraftBlock => ({
       id: newId(),
       ...(block.name !== undefined ? { name: block.name } : {}),
-      // No `loose` here: the persisted `Block` doesn't carry it (see
-      // `domain/block.ts`'s doc comment) — every block reloaded from
-      // storage defaults to non-loose (shows its header), which is the
-      // FR-2-compliant choice for a block whose original "explicit vs.
-      // implicit" provenance wasn't persisted.
       type: block.type,
-      ...(block.rounds !== undefined ? { rounds: block.rounds } : {}),
       exercises: block.exercises.map((entry): DraftExerciseEntry => ({
         id: newId(),
         exerciseId: entry.exerciseId,
@@ -84,10 +77,7 @@ export function editableToSession(
     blocks: editable.blocks.map((block) =>
       createBlock({
         ...(block.name !== undefined ? { name: block.name } : {}),
-        // `block.loose` is deliberately dropped here — presentation-only,
-        // never part of the persisted `Block` (see `domain/block.ts`).
         type: block.type,
-        ...(block.rounds !== undefined ? { rounds: block.rounds } : {}),
         exercises: block.exercises.map((entry) => ({
           exerciseId: entry.exerciseId,
           notes: entry.notes,

@@ -65,7 +65,7 @@ export function ExerciseEntryCard({
             <label className="logging-screen__field-label">
               <span className="logging-screen__field-label--icon">
                 <Icon name="move-to" />
-                Move to block
+                Move to
               </span>
               <select
                 className="logging-field-input"

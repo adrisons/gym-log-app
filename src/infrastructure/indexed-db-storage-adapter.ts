@@ -9,7 +9,6 @@ import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
 import type { SessionId, ExerciseId } from '../domain/ids';
 import { StorageError } from '../application/errors';
-import { toPersistableDraft } from '../application/logging/draft';
 import { migrateExerciseCatalogue } from '../application/schema-migration';
 import {
   GymLogDatabase,
@@ -77,9 +76,17 @@ export class IndexedDbStorageAdapter implements StoragePort {
       // for a backfill it no longer needs (Copilot review, PR #21).
       await this.#migrateExerciseTemplateDefaults();
     }
-    // v2 -> v3 (ADR-0008): Block.rounds is optional, and its absence in
-    // every already-stored Session is itself valid v3 data — no stored
-    // shape changes, so this step has no backfill of its own to run.
+    // v2 -> v3 (ADR-0008): Block.rounds was optional, and its absence in
+    // every already-stored Session was itself valid v3 data — no stored
+    // shape changes, so this step never had a backfill of its own to run.
+    // v3 -> v4 (ADR-0013): removes `rounds` again (redundant with each
+    // exercise entry's own set count). Still no backfill: a v3 record's
+    // leftover `rounds` key is inert data `Block`'s own type no longer
+    // declares — nothing reads it, and nothing needs to strip it either,
+    // the same "additive/removal needs no data rewrite" reasoning v2 -> v3
+    // itself already relied on. `docs/requirements.md` §6 still requires
+    // the version bump itself for any change to a canonical persisted
+    // shape, even one with no backfill of its own (Copilot review, PR #30).
     if (action === 'migrate' || stored === 0) {
       // `stored === 0` (the never-initialized sentinel, itself decided
       // as 'open' since there is nothing to migrate) still needs this
@@ -257,7 +264,7 @@ export class IndexedDbStorageAdapter implements StoragePort {
     await this.#run(() =>
       this.#db.draft.put({
         key: DRAFT_ROW_KEY,
-        value: toPersistableDraft(draft),
+        value: draft,
       }),
     );
   }
@@ -352,7 +359,7 @@ export class IndexedDbStorageAdapter implements StoragePort {
           if (input.loggingDraft !== undefined) {
             await this.#db.draft.put({
               key: DRAFT_ROW_KEY,
-              value: toPersistableDraft(input.loggingDraft),
+              value: input.loggingDraft,
             });
           }
           await this.#db.meta.put({

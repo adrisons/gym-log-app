@@ -5,6 +5,12 @@
  * per screen"). Reads/writes storage directly via `requireStorage()` and
  * the same use-cases the logging store wraps — this screen has no draft
  * state of its own, only catalogue reads and management writes.
+ *
+ * ADR-0010: also creates a brand-new exercise (name + set-entry template
+ * together, `CreateExercisePanel`) and edits an existing one's template
+ * (`ExerciseTemplatePanel`, from the management panel's own "Edit tracked
+ * fields…") — previously only reachable per-entry from Logging/
+ * SessionDetail.
  */
 import { useEffect, useState } from 'react';
 import { requireStorage } from '@/application/storage-access';
@@ -13,10 +19,14 @@ import { allStoredDataRange } from '@/application/date-range';
 import { searchExercises } from '@/application/search/exercise-search';
 import type { Exercise, Session } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
+import { useSetScreenTitle } from '@/presentation/nav/screen-title';
 import { ExerciseCataloguePanel } from '../logging/exercise-catalogue-panel';
+import { ExerciseTemplatePanel } from '../logging/exercise-template-panel';
+import { CreateExercisePanel } from './create-exercise-panel';
 import './catalogue.css';
 
 export function ExerciseCatalogueScreen() {
+  useSetScreenTitle('Exercises');
   // Rename/merge/delete all go through the logging store's own actions,
   // not the bare use-case functions directly: those actions also re-sync
   // the store's in-memory `draft`/`catalogue` from storage afterward.
@@ -33,10 +43,24 @@ export function ExerciseCatalogueScreen() {
   const deleteExerciseCascadeInSession = useLoggingSession(
     (s) => s.deleteExerciseCascade,
   );
+  // ADR-0010: creating an exercise and editing its template both go
+  // through the logging store's own actions too, for the same reason
+  // rename/merge/delete already do (this screen's own doc comment above) —
+  // otherwise LoggingScreen could search a stale catalogue missing a
+  // brand-new exercise, or keep recording sets under a template just
+  // changed here.
+  const createExerciseInSession = useLoggingSession((s) => s.createExercise);
+  const updateExerciseTemplateInSession = useLoggingSession(
+    (s) => s.updateExerciseTemplate,
+  );
   const [catalogue, setCatalogue] = useState<Exercise[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [query, setQuery] = useState('');
   const [managing, setManaging] = useState<Exercise | undefined>(undefined);
+  const [creating, setCreating] = useState(false);
+  const [editingTemplateFor, setEditingTemplateFor] = useState<
+    Exercise | undefined
+  >(undefined);
 
   // Deliberately not shared with the mount effect below (react-hooks'
   // set-state-in-effect rule flags a named, externally-reusable function
@@ -74,7 +98,14 @@ export function ExerciseCatalogueScreen() {
 
   return (
     <main className="catalogue-screen" aria-label="Manage exercises">
-      <h1>Exercises</h1>
+      <button
+        type="button"
+        className="logging-button logging-button--icon-label"
+        onClick={() => setCreating(true)}
+      >
+        <Icon name="plus" />
+        New exercise
+      </button>
 
       <label className="logging-screen__field-label">
         <span>Exercise name</span>
@@ -86,6 +117,36 @@ export function ExerciseCatalogueScreen() {
           placeholder="Search the catalogue"
         />
       </label>
+
+      {creating && (
+        <CreateExercisePanel
+          catalogue={catalogue}
+          onCreate={async (input) => {
+            await createExerciseInSession(input);
+            setCreating(false);
+            await refresh();
+          }}
+          onClose={() => setCreating(false)}
+        />
+      )}
+
+      {editingTemplateFor && (
+        <ExerciseTemplatePanel
+          key={editingTemplateFor.id}
+          exercise={editingTemplateFor}
+          onSave={(template) => {
+            updateExerciseTemplateInSession(editingTemplateFor.id, template)
+              .then(() => {
+                setEditingTemplateFor(undefined);
+                void refresh();
+              })
+              .catch((error: unknown) => {
+                console.error('Failed to save exercise template', error);
+              });
+          }}
+          onClose={() => setEditingTemplateFor(undefined)}
+        />
+      )}
 
       {results.length === 0 && (
         <p className="catalogue-screen__empty">
@@ -136,6 +197,10 @@ export function ExerciseCatalogueScreen() {
               setManaging(undefined);
               void refresh();
             });
+          }}
+          onEditTemplate={() => {
+            setEditingTemplateFor(managing);
+            setManaging(undefined);
           }}
           onClose={() => setManaging(undefined)}
         />

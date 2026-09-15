@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   createDraft,
   draftToSession,
-  toPersistableDraft,
   addExerciseEntry,
   prefillNextSet,
   addSet,
+  updateSet,
   addBlock,
   renameBlock,
   findBlockIdForEntry,
-  setBlockRounds,
+  reorderBlock,
   reorderBlockExercise,
   moveExerciseAcrossBlocks,
   deleteBlock,
@@ -21,11 +21,17 @@ import type { SessionId, ExerciseId } from '@/domain/ids';
 import { InvalidSetError } from '@/domain/errors';
 
 describe('LoggingDraft (data-model.md "LoggingDraft")', () => {
-  it('createDraft returns an empty draft dated `now`, with a fresh id every call', () => {
+  it('createDraft returns a draft dated `now`, seeded with one empty block (ADR-0011), with a fresh id every call', () => {
     const now = '2026-09-11T18:00:00.000Z';
     const a = createDraft(now);
     const b = createDraft(now);
-    expect(a.blocks).toEqual([]);
+    expect(a.blocks).toHaveLength(1);
+    expect(a.blocks[0]).toEqual({
+      id: a.blocks[0]!.id,
+      type: 'straightSets',
+      exercises: [],
+    });
+    expect(a.blocks[0]!.id).not.toBe(b.blocks[0]!.id);
     expect(a.dateTime).toBe(now);
     expect(a.lastEditedAt).toBe(now);
     expect(a.notes).toBe('');
@@ -100,106 +106,16 @@ describe('LoggingDraft (data-model.md "LoggingDraft")', () => {
     });
   });
 
-  it("draftToSession carries a block's rounds through to the persisted Session (ADR-0008)", () => {
-    const exerciseId = 'exercise-1' as ExerciseId;
-    const draft: LoggingDraft = {
-      id: 'draft-1',
-      dateTime: '2026-09-11T18:00:00.000Z',
-      lastEditedAt: '2026-09-11T18:00:00.000Z',
-      notes: '',
-      blocks: [
-        {
-          id: 'block-1',
-          type: 'circuit',
-          rounds: 3,
-          exercises: [],
-        },
-        {
-          id: 'block-2',
-          type: 'straightSets',
-          exercises: [
-            {
-              id: 'entry-1',
-              exerciseId,
-              notes: '',
-              sets: [],
-            },
-          ],
-        },
-      ],
-    };
-
-    const session = draftToSession(draft, 'session-1' as SessionId);
-
-    expect(session.blocks[0]?.rounds).toBe(3);
-    expect(session.blocks[1]).not.toHaveProperty('rounds');
-  });
-
   it('draftToSession handles a draft with zero blocks (FR-017 applies to a submitted draft too)', () => {
-    const draft = createDraft('2026-09-11T18:00:00.000Z');
+    // `createDraft` itself always seeds one block (ADR-0011) — built by
+    // hand here to still cover the zero-block case draftToSession must
+    // tolerate (e.g. a draft whose only block was since deleted).
+    const draft: LoggingDraft = {
+      ...createDraft('2026-09-11T18:00:00.000Z'),
+      blocks: [],
+    };
     const session = draftToSession(draft, 'session-2' as SessionId);
     expect(session.blocks).toEqual([]);
-  });
-
-  it('toPersistableDraft strips the presentation-only `loose` flag so it never reaches disk/IndexedDB (undocumented-schema-field regression)', () => {
-    const draft: LoggingDraft = {
-      id: 'draft-1',
-      dateTime: '2026-09-11T18:00:00.000Z',
-      lastEditedAt: '2026-09-11T18:00:00.000Z',
-      notes: '',
-      blocks: [
-        {
-          id: 'block-1',
-          loose: true,
-          type: 'straightSets',
-          exercises: [],
-        },
-        {
-          id: 'block-2',
-          name: 'Named block',
-          type: 'straightSets',
-          exercises: [],
-        },
-      ],
-    };
-
-    const persistable = toPersistableDraft(draft);
-
-    expect(persistable.blocks[0]).not.toHaveProperty('loose');
-    expect(persistable.blocks[1]).not.toHaveProperty('loose');
-    // Every other field survives unchanged.
-    expect(persistable.blocks[0]).toEqual({
-      id: 'block-1',
-      type: 'straightSets',
-      exercises: [],
-    });
-    expect(persistable.blocks[1]).toEqual({
-      id: 'block-2',
-      name: 'Named block',
-      type: 'straightSets',
-      exercises: [],
-    });
-  });
-
-  it("toPersistableDraft keeps a block's rounds (ADR-0008)", () => {
-    const draft: LoggingDraft = {
-      id: 'draft-1',
-      dateTime: '2026-09-11T18:00:00.000Z',
-      lastEditedAt: '2026-09-11T18:00:00.000Z',
-      notes: '',
-      blocks: [
-        {
-          id: 'block-1',
-          type: 'circuit',
-          rounds: 3,
-          exercises: [],
-        },
-      ],
-    };
-
-    const persistable = toPersistableDraft(draft);
-
-    expect(persistable.blocks[0]?.rounds).toBe(3);
   });
 });
 
@@ -242,7 +158,7 @@ describe('addExerciseEntry (FR-002; keeps US1 a flat single running list)', () =
     expect(updated.blocks[1]?.exercises).toHaveLength(0);
   });
 
-  it('with no blockId, starts a fresh unnamed block rather than nesting into a named last block', () => {
+  it('with no blockId, appends to the trailing block regardless of whether it is named (ADR-0011: no more "loose" distinction)', () => {
     let draft = addBlock(
       createDraft('2026-09-11T18:00:00.000Z'),
       'Legs',
@@ -252,7 +168,7 @@ describe('addExerciseEntry (FR-002; keeps US1 a flat single running list)', () =
 
     expect(draft.blocks).toHaveLength(2);
     expect(draft.blocks[0]?.exercises).toHaveLength(0);
-    expect(draft.blocks[1]?.name).toBeUndefined();
+    expect(draft.blocks[1]?.name).toBe('Legs');
     expect(draft.blocks[1]?.exercises).toHaveLength(1);
   });
 
@@ -393,21 +309,168 @@ describe('addSet (FR-003, FR-008, FR-019, FR-025, FR-026)', () => {
   });
 });
 
+describe('updateSet (ADR-0010: editing an already-recorded set in place)', () => {
+  function seed() {
+    const drafted = addExerciseEntry(
+      createDraft('2026-09-11T18:00:00.000Z'),
+      'ex-1' as ExerciseId,
+    );
+    const blockId = drafted.blocks[0]!.id;
+    const entryId = drafted.blocks[0]!.exercises[0]!.id;
+    const withSet = addSet(
+      drafted,
+      blockId,
+      entryId,
+      {
+        volume: { kind: 'reps', count: 5 },
+        load: { kind: 'weight', value: 100, unit: 'kg' },
+        setKind: 'working',
+      },
+      1000,
+      undefined,
+    );
+    const setId = withSet.blocks[0]!.exercises[0]!.sets[0]!.id;
+    return { draft: withSet, blockId, entryId, setId };
+  }
+
+  it("replaces the set's own load/volume/effort, keeping its id, without adding a new set", () => {
+    const { draft, blockId, entryId, setId } = seed();
+
+    const updated = updateSet(draft, blockId, entryId, setId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'weight', value: 110, unit: 'kg' },
+      effort: 4,
+      setKind: 'working',
+    });
+
+    const sets = updated.blocks[0]?.exercises[0]?.sets;
+    expect(sets).toHaveLength(1);
+    expect(sets?.[0]?.id).toBe(setId);
+    expect(sets?.[0]?.load).toEqual({ kind: 'weight', value: 110, unit: 'kg' });
+    expect(sets?.[0]?.volume).toEqual({ kind: 'reps', count: 8 });
+    expect(sets?.[0]?.effort).toBe(4);
+  });
+
+  it("preserves the existing set's setKind and completed — not input's always-'working'/true values (Copilot review, PR #27: FR-029's editable surface is load/volume/effort only)", () => {
+    const { draft, blockId, entryId, setId } = seed();
+    const withWarmup: LoggingDraft = {
+      ...draft,
+      blocks: draft.blocks.map((b) => ({
+        ...b,
+        exercises: b.exercises.map((e) => ({
+          ...e,
+          sets: e.sets.map((s) =>
+            s.id === setId
+              ? { ...s, setKind: 'warmUp' as const, completed: false }
+              : s,
+          ),
+        })),
+      })),
+    };
+
+    const updated = updateSet(withWarmup, blockId, entryId, setId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'weight', value: 110, unit: 'kg' },
+      setKind: 'working',
+    });
+
+    const set = updated.blocks[0]?.exercises[0]?.sets[0];
+    expect(set?.setKind).toBe('warmUp');
+    expect(set?.completed).toBe(false);
+    expect(set?.load).toEqual({ kind: 'weight', value: 110, unit: 'kg' });
+  });
+
+  it('leaves every other set in the entry untouched', () => {
+    const { draft, blockId, entryId } = seed();
+    const withSecond = addSet(
+      draft,
+      blockId,
+      entryId,
+      {
+        volume: { kind: 'reps', count: 3 },
+        load: { kind: 'weight', value: 50, unit: 'kg' },
+        setKind: 'working',
+      },
+      3000,
+      1000,
+    );
+    const firstId = withSecond.blocks[0]!.exercises[0]!.sets[0]!.id;
+    const secondId = withSecond.blocks[0]!.exercises[0]!.sets[1]!.id;
+
+    const updated = updateSet(withSecond, blockId, entryId, secondId, {
+      volume: { kind: 'reps', count: 9 },
+      load: { kind: 'weight', value: 55, unit: 'kg' },
+      setKind: 'working',
+    });
+
+    const sets = updated.blocks[0]?.exercises[0]?.sets;
+    expect(sets).toHaveLength(2);
+    expect(sets?.find((s) => s.id === firstId)?.load).toEqual({
+      kind: 'weight',
+      value: 100,
+      unit: 'kg',
+    });
+    expect(sets?.find((s) => s.id === secondId)?.load).toEqual({
+      kind: 'weight',
+      value: 55,
+      unit: 'kg',
+    });
+  });
+
+  it('throws InvalidSetError when the edited values have neither a volume nor a non-none load (FR-019)', () => {
+    const { draft, blockId, entryId, setId } = seed();
+
+    expect(() =>
+      updateSet(draft, blockId, entryId, setId, {
+        load: { kind: 'none' },
+        setKind: 'working',
+      }),
+    ).toThrow(InvalidSetError);
+  });
+
+  it('is a no-op, returning the same draft reference, when the setId does not resolve', () => {
+    const { draft, blockId, entryId } = seed();
+
+    const updated = updateSet(draft, blockId, entryId, 'no-such-set', {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'weight', value: 110, unit: 'kg' },
+      setKind: 'working',
+    });
+
+    expect(updated).toBe(draft);
+  });
+
+  it('is a no-op when the entry/block do not resolve', () => {
+    const { draft, setId } = seed();
+
+    const updated = updateSet(draft, 'no-block', 'no-entry', setId, {
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'weight', value: 110, unit: 'kg' },
+      setKind: 'working',
+    });
+
+    expect(updated).toBe(draft);
+  });
+});
+
 describe('addBlock/renameBlock (FR-006, FR-007)', () => {
   it('appends a block, unnamed when name is omitted', () => {
+    // `createDraft` itself seeds one unnamed block (ADR-0011); asserting
+    // against the newly-added trailing block, not index 0, keeps this
+    // test about `addBlock`'s own behavior regardless of that seed.
     const draft = createDraft('2026-09-11T18:00:00.000Z');
 
     const updated = addBlock(draft, undefined, 'straightSets');
 
-    expect(updated.blocks).toHaveLength(1);
-    expect(updated.blocks[0]?.name).toBeUndefined();
-    expect(updated.blocks[0]?.type).toBe('straightSets');
+    expect(updated.blocks).toHaveLength(2);
+    expect(updated.blocks.at(-1)?.name).toBeUndefined();
+    expect(updated.blocks.at(-1)?.type).toBe('straightSets');
   });
 
   it('appends a named block', () => {
     const draft = createDraft('2026-09-11T18:00:00.000Z');
     const updated = addBlock(draft, 'Squats', 'straightSets');
-    expect(updated.blocks[0]?.name).toBe('Squats');
+    expect(updated.blocks.at(-1)?.name).toBe('Squats');
   });
 
   it('renameBlock updates the name, or clears it when omitted', () => {
@@ -416,65 +479,36 @@ describe('addBlock/renameBlock (FR-006, FR-007)', () => {
       'Squats',
       'straightSets',
     );
-    const blockId = draft.blocks[0]!.id;
+    const blockId = draft.blocks.at(-1)!.id;
 
     const renamed = renameBlock(draft, blockId, 'Accessories');
-    expect(renamed.blocks[0]?.name).toBe('Accessories');
+    expect(renamed.blocks.at(-1)?.name).toBe('Accessories');
 
     const cleared = renameBlock(renamed, blockId, undefined);
-    expect(cleared.blocks[0]?.name).toBeUndefined();
+    expect(cleared.blocks.at(-1)?.name).toBeUndefined();
   });
 
-  it("setBlockRounds sets or clears a block's target round count (ADR-0008), preserving its name either way", () => {
+  it('reorderBlock moves a block within the session, by list position (ADR-0013)', () => {
+    let draft = addBlock(
+      createDraft('2026-09-11T18:00:00.000Z'),
+      'B',
+      'straightSets',
+    );
+    draft = addBlock(draft, 'C', 'straightSets');
+    // Block 1 (seeded, ADR-0011), B, C — move C (index 2) to the front.
+    expect(draft.blocks.map((b) => b.name)).toEqual([undefined, 'B', 'C']);
+
+    const reordered = reorderBlock(draft, 2, 0);
+    expect(reordered.blocks.map((b) => b.name)).toEqual(['C', undefined, 'B']);
+  });
+
+  it('reorderBlock is a no-op for an out-of-range fromIndex', () => {
     const draft = addBlock(
       createDraft('2026-09-11T18:00:00.000Z'),
-      'Circuit A',
-      'circuit',
+      'B',
+      'straightSets',
     );
-    const blockId = draft.blocks[0]!.id;
-
-    const withRounds = setBlockRounds(draft, blockId, 3);
-    expect(withRounds.blocks[0]?.rounds).toBe(3);
-    expect(withRounds.blocks[0]?.name).toBe('Circuit A');
-
-    const cleared = setBlockRounds(withRounds, blockId, undefined);
-    expect(cleared.blocks[0]?.rounds).toBeUndefined();
-    expect(cleared.blocks[0]?.name).toBe('Circuit A');
-  });
-
-  it("clearing rounds preserves a loose block's `loose` flag (undocumented-schema-field regression)", () => {
-    const draft: LoggingDraft = {
-      id: 'draft-1',
-      dateTime: '2026-09-11T18:00:00.000Z',
-      lastEditedAt: '2026-09-11T18:00:00.000Z',
-      notes: '',
-      blocks: [
-        {
-          id: 'block-1',
-          loose: true,
-          type: 'straightSets',
-          rounds: 3,
-          exercises: [],
-        },
-      ],
-    };
-
-    const cleared = setBlockRounds(draft, 'block-1', undefined);
-
-    expect(cleared.blocks[0]?.rounds).toBeUndefined();
-    expect(cleared.blocks[0]?.loose).toBe(true);
-  });
-
-  it('setBlockRounds does not validate — a draft may hold a transient, not-yet-valid value (validated at promotion, ADR-0008)', () => {
-    const draft = addBlock(
-      createDraft('2026-09-11T18:00:00.000Z'),
-      undefined,
-      'circuit',
-    );
-    const blockId = draft.blocks[0]!.id;
-
-    expect(() => setBlockRounds(draft, blockId, 0)).not.toThrow();
-    expect(setBlockRounds(draft, blockId, 0).blocks[0]?.rounds).toBe(0);
+    expect(reorderBlock(draft, 5, 0)).toEqual(draft);
   });
 });
 
@@ -486,9 +520,6 @@ describe('reorderBlockExercise/moveExerciseAcrossBlocks (FR-006)', () => {
       'straightSets',
     );
     const blockId = draft.blocks[0]!.id;
-    // Explicit `blockId`: an explicitly created block (even unnamed) is
-    // not `loose`, so a `blockId`-less add would open a fresh block of
-    // its own here instead of joining this one (FR-2).
     draft = addExerciseEntry(draft, 'ex-1' as ExerciseId, blockId);
     draft = addExerciseEntry(draft, 'ex-2' as ExerciseId, blockId);
     const [first, second] = draft.blocks[0]!.exercises;
@@ -573,11 +604,14 @@ describe('findBlockIdForEntry (stale-block-id-after-move regression)', () => {
 
 describe('deleteBlock/deleteExerciseEntry/deleteSet (FR-004, FR-023)', () => {
   it('deleteBlock removes the block and returns an undo that restores it at its original index', () => {
-    let draft = addBlock(
-      createDraft('2026-09-11T18:00:00.000Z'),
-      'A',
-      'straightSets',
-    );
+    // Starts from an explicitly empty block list — `createDraft`'s own
+    // seeded block (ADR-0011) would otherwise shift every index below and
+    // complicate the exact ['A', 'B', 'C'] comparisons this test makes.
+    let draft: LoggingDraft = {
+      ...createDraft('2026-09-11T18:00:00.000Z'),
+      blocks: [],
+    };
+    draft = addBlock(draft, 'A', 'straightSets');
     draft = addBlock(draft, 'B', 'straightSets');
     draft = addBlock(draft, 'C', 'straightSets');
     const blockBId = draft.blocks[1]!.id;
@@ -592,12 +626,15 @@ describe('deleteBlock/deleteExerciseEntry/deleteSet (FR-004, FR-023)', () => {
   });
 
   it('a session with zero blocks after deletion is valid (FR-017, Acceptance Scenario US2-5)', () => {
-    const draft = addBlock(
-      createDraft('2026-09-11T18:00:00.000Z'),
-      undefined,
-      'straightSets',
+    const draft: LoggingDraft = {
+      ...createDraft('2026-09-11T18:00:00.000Z'),
+      blocks: [],
+    };
+    const withBlock = addBlock(draft, undefined, 'straightSets');
+    const { draft: afterDelete } = deleteBlock(
+      withBlock,
+      withBlock.blocks[0]!.id,
     );
-    const { draft: afterDelete } = deleteBlock(draft, draft.blocks[0]!.id);
     expect(afterDelete.blocks).toEqual([]);
   });
 

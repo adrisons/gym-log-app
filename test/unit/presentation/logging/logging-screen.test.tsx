@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { LoggingScreen } from '@/presentation/logging/logging-screen';
 import { useLoggingSession } from '@/application/logging/logging-store';
+import type { ExerciseId } from '@/domain/ids';
 import { InMemoryStorage } from '../../../support';
 
 function renderAtLog() {
@@ -35,6 +36,32 @@ describe('LoggingScreen (FR-001)', () => {
     expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
   });
 
+  it('opens with one default block (Block 1) already present, ready to add exercises to (ADR-0011)', async () => {
+    const storage = new InMemoryStorage();
+    useLoggingSession.getState().configure(storage);
+    render(
+      <MemoryRouter>
+        <LoggingScreen />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Block 1')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /rename/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /delete block/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
+    ).toBeInTheDocument();
+    // No separate top-level "Add exercise" control any more — every
+    // exercise goes through a block's own footer control.
+    expect(
+      screen.queryByRole('button', { name: 'Add exercise' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('lets a user find/create an exercise and log a set end to end', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
@@ -46,10 +73,12 @@ describe('LoggingScreen (FR-001)', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: 'Add exercise' }),
+        screen.getByRole('button', { name: 'Add exercise to Block 1' }),
       ).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
+    );
 
     await userEvent.type(
       screen.getByPlaceholderText(/search or create an exercise/i),
@@ -63,8 +92,13 @@ describe('LoggingScreen (FR-001)', () => {
       ).toBeInTheDocument();
     });
 
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /weight/i }),
+      '60',
+    );
     await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
     await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
 
     await waitFor(async () => {
       const draft = await storage.getDraft();
@@ -83,10 +117,12 @@ describe('LoggingScreen (FR-001)', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: 'Add exercise' }),
+        screen.getByRole('button', { name: 'Add exercise to Block 1' }),
       ).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
+    );
     await userEvent.type(
       screen.getByPlaceholderText(/search or create an exercise/i),
       'Deadlift',
@@ -98,20 +134,29 @@ describe('LoggingScreen (FR-001)', () => {
       ).toBeInTheDocument();
     });
 
+    await userEvent.type(
+      screen.getByRole('spinbutton', { name: /weight/i }),
+      '60',
+    );
     await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
     await userEvent.keyboard('{ArrowDown}'.repeat(5));
+    await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
     await waitFor(async () => {
       const draft = await storage.getDraft();
       expect(draft?.blocks[0]?.exercises[0]?.sets).toHaveLength(1);
     });
 
-    // A fresh SetRow mounts for the next set (keyed on the entry's set
-    // count) — logging a second set must move the animation marker to it
-    // instead of leaving (or also adding) it on the first. (It prefills
-    // from the repeat-last-set value, so this only needs *a* further edit,
-    // not any particular rep count.)
+    // Confirming the first set collapsed the form to a "+ Add set" button
+    // (ADR-0010) — a fresh SetRow mounts once it's reopened, pre-filled
+    // from the previous set (FR-008). One further edit (a different rep
+    // count, so FR-025's identical-within-1s debounce doesn't treat this
+    // as a repeat of the same commit) plus Confirm logs this second set,
+    // which must move the animation marker to it instead of leaving (or
+    // also adding) it on the first.
+    await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
     await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
     await userEvent.keyboard('{ArrowDown}');
+    await userEvent.click(screen.getByRole('button', { name: 'Add set' }));
     // One `waitFor`, not two: the animation marker is intentionally
     // consumed once the marked row's own entrance animation ends (or
     // immediately under reduced motion), so asserting the DOM in a
@@ -132,7 +177,7 @@ describe('LoggingScreen (FR-001)', () => {
     });
   });
 
-  it('a block created via "Add block" keeps its header/controls after an exercise is added to it (FR-2 regression)', async () => {
+  it('"Add block" appends a second, independent block (Block 2) alongside the default Block 1', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
     render(
@@ -142,25 +187,24 @@ describe('LoggingScreen (FR-001)', () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: 'Add block' }),
-      ).toBeInTheDocument();
+      expect(screen.getByText('Block 1')).toBeInTheDocument();
     });
     await userEvent.click(screen.getByRole('button', { name: 'Add block' }));
 
-    // Still unnamed, still explicitly created: FR-2 requires it to show
-    // its position label and stay renameable/deletable — never collapse
-    // to "bare" (chrome-less) rendering just because it has no name yet.
     await waitFor(() => {
-      expect(screen.getByText('Block 1')).toBeInTheDocument();
+      expect(screen.getByText('Block 2')).toBeInTheDocument();
     });
-    expect(screen.getByRole('button', { name: /rename/i })).toBeInTheDocument();
+    // Still unnamed, still explicitly created: FR-2 requires it to show
+    // its position label and stay renameable/deletable.
     expect(
-      screen.getByRole('button', { name: /delete block/i }),
-    ).toBeInTheDocument();
+      screen.getAllByRole('button', { name: /rename/i }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole('button', { name: /delete block/i }).length,
+    ).toBeGreaterThan(0);
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
+      screen.getByRole('button', { name: 'Add exercise to Block 2' }),
     );
     await userEvent.type(
       screen.getByPlaceholderText(/search or create an exercise/i),
@@ -176,14 +220,10 @@ describe('LoggingScreen (FR-001)', () => {
 
     // The block this exercise landed in must still be a real block, not
     // a bare/chrome-less one, even though it's unnamed and now non-empty.
-    expect(screen.getByText('Block 1')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /rename/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /delete block/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Block 2')).toBeInTheDocument();
   });
 
-  it('numbers the first explicit block "Block 1" even after a loose exercise already exists (loose-block-numbering regression)', async () => {
+  it("reorders blocks via a block's own Move up/Move down menu items (ADR-0013)", async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
     render(
@@ -192,36 +232,35 @@ describe('LoggingScreen (FR-001)', () => {
       </MemoryRouter>,
     );
 
-    // Add a loose exercise first — it renders bare, with no "Block N"
-    // label of its own, but it still occupies index 0 in `draft.blocks`.
-    await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: 'Add exercise' }),
-      ).toBeInTheDocument();
-    });
-    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
-    await userEvent.type(
-      screen.getByPlaceholderText(/search or create an exercise/i),
-      'Lat pulldown',
-    );
-    await userEvent.click(screen.getByText('Create "Lat pulldown"'));
-    await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: 'Lat pulldown' }),
-      ).toBeInTheDocument();
-    });
-
-    // The first explicitly created block must still be numbered "Block 1"
-    // — the loose container ahead of it in the array has no label and
-    // must not be counted.
-    await userEvent.click(screen.getByRole('button', { name: 'Add block' }));
     await waitFor(() => {
       expect(screen.getByText('Block 1')).toBeInTheDocument();
     });
-    expect(screen.queryByText('Block 2')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Add block' }));
+    await waitFor(() => {
+      expect(screen.getByText('Block 2')).toBeInTheDocument();
+    });
+    const [firstId, secondId] =
+      useLoggingSession.getState().draft?.blocks.map((b) => b.id) ?? [];
+
+    // Block 1 can't move up (it's already first).
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Block 1 actions' }),
+    );
+    expect(screen.getByRole('button', { name: 'Move up' })).toBeDisabled();
+    await userEvent.keyboard('{Escape}');
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Block 2 actions' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Move up' }));
+
+    await waitFor(() => {
+      const draft = useLoggingSession.getState().draft;
+      expect(draft?.blocks.map((b) => b.id)).toEqual([secondId, firstId]);
+    });
   });
 
-  it('a loose block stays chrome-less even after its last exercise is deleted (empty-loose-block regression)', async () => {
+  it('the default block (Block 1) keeps its header/controls even after its only exercise is deleted (ADR-0011: no more chrome-less/"loose" rendering)', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
     render(
@@ -232,10 +271,12 @@ describe('LoggingScreen (FR-001)', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: 'Add exercise' }),
+        screen.getByRole('button', { name: 'Add exercise to Block 1' }),
       ).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
+    );
     await userEvent.type(
       screen.getByPlaceholderText(/search or create an exercise/i),
       'Lat pulldown',
@@ -247,8 +288,7 @@ describe('LoggingScreen (FR-001)', () => {
         screen.getByRole('heading', { name: 'Lat pulldown' }),
       ).toBeInTheDocument();
     });
-    // Loose block: no header/controls for it.
-    expect(screen.queryByText('Block 1')).not.toBeInTheDocument();
+    expect(screen.getByText('Block 1')).toBeInTheDocument();
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Lat pulldown actions' }),
@@ -257,41 +297,44 @@ describe('LoggingScreen (FR-001)', () => {
       screen.getByRole('button', { name: 'Delete exercise' }),
     );
 
-    // Now empty, but still loose: must stay invisible, not suddenly gain
-    // a "Block 1" header with rename/delete controls.
+    // Now empty, but still a real block: Block 1 and its rename/delete
+    // controls stay visible, unlike the old "loose" container.
     await waitFor(() => {
       expect(
         screen.queryByRole('heading', { name: 'Lat pulldown' }),
       ).not.toBeInTheDocument();
     });
-    expect(screen.queryByText('Block 1')).not.toBeInTheDocument();
+    expect(screen.getByText('Block 1')).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /^rename$/i }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: /^rename$/i }),
+    ).toBeInTheDocument();
   });
 });
 
-describe('LoggingScreen "Log workout" (FR-027; ADR-0008)', () => {
-  it('is not offered while the active draft has no block, and appears once one is added', async () => {
+describe('LoggingScreen "Log workout" (FR-027; ADR-0008, ADR-0011, ADR-0012)', () => {
+  it('stays visible but disabled while the active draft has no exercise (an empty default block is not content), and enables once one is added', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
     renderAtLog();
 
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: 'Add exercise' }),
+        screen.getByRole('button', { name: 'Add exercise to Block 1' }),
       ).toBeInTheDocument();
     });
-    expect(
-      screen.queryByRole('button', { name: 'Log workout' }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Log workout' })).toBeDisabled();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add block' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
+    );
+    await userEvent.type(
+      screen.getByPlaceholderText(/search or create an exercise/i),
+      'Back squat',
+    );
+    await userEvent.click(screen.getByText('Create "Back squat"'));
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: 'Log workout' }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Log workout' })).toBeEnabled();
     });
   });
 
@@ -302,10 +345,12 @@ describe('LoggingScreen "Log workout" (FR-027; ADR-0008)', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: 'Add exercise' }),
+        screen.getByRole('button', { name: 'Add exercise to Block 1' }),
       ).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Add exercise' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
+    );
     await userEvent.type(
       screen.getByPlaceholderText(/search or create an exercise/i),
       'Back squat',
@@ -338,12 +383,15 @@ describe('LoggingScreen "Log workout" (FR-027; ADR-0008)', () => {
   });
 });
 
-describe('LoggingScreen pending-draft recovery banner (FR-024, FR-028; ADR-0008)', () => {
+describe('LoggingScreen pending-draft recovery banner (FR-024, FR-028; ADR-0008, ADR-0011)', () => {
   it('offers Recover/Discard for a stored draft, blocks new content until resolved, and Recover fills the form', async () => {
     const storage = new InMemoryStorage();
     useLoggingSession.getState().configure(storage);
     await useLoggingSession.getState().initialize();
     await useLoggingSession.getState().addBlock('Legs', 'straightSets');
+    // An empty block alone is not content worth persisting (ADR-0011) —
+    // add an exercise too, so this draft actually gets offered back.
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
     // Re-initialize (as a fresh mount of this screen would) so the block
     // just added is offered back as a pending draft rather than active.
     await useLoggingSession.getState().initialize();
@@ -355,12 +403,17 @@ describe('LoggingScreen pending-draft recovery banner (FR-024, FR-028; ADR-0008)
         screen.getByText(/unregistered workout from a previous visit/i),
       ).toBeInTheDocument();
     });
+    // The active (fresh) draft's own default block still renders, but its
+    // "Add exercise" control must stay unavailable while unresolved.
     expect(
-      screen.queryByRole('button', { name: 'Add exercise' }),
+      screen.queryByRole('button', { name: /add exercise to/i }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Add block' }),
     ).not.toBeInTheDocument();
+    // ADR-0012: "Log workout" itself stays visible, never hidden, but is
+    // disabled while the recovery banner is unresolved.
+    expect(screen.getByRole('button', { name: 'Log workout' })).toBeDisabled();
 
     await userEvent.click(screen.getByRole('button', { name: 'Recover' }));
 
@@ -377,6 +430,7 @@ describe('LoggingScreen pending-draft recovery banner (FR-024, FR-028; ADR-0008)
     useLoggingSession.getState().configure(storage);
     await useLoggingSession.getState().initialize();
     await useLoggingSession.getState().addBlock('Legs', 'straightSets');
+    await useLoggingSession.getState().addExerciseEntry('ex-1' as ExerciseId);
     await useLoggingSession.getState().initialize();
 
     renderAtLog();

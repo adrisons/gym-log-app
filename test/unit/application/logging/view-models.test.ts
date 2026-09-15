@@ -44,10 +44,10 @@ describe('view-models formatters (data-model.md "View models")', () => {
     expect(formatEffort(undefined)).toBeUndefined();
   });
 
-  it('toSetSummaryViewModel omits effortLabel entirely when effort is absent (exactOptionalPropertyTypes)', () => {
+  it('toSetSummaryViewModel combines a compact volume and load into one "x"-joined line (ADR-0013), with no effortTone when effort is absent', () => {
     const set: DraftSet = {
       id: 'set-1',
-      load: { kind: 'weight', value: 60, unit: 'kg' },
+      load: { kind: 'weight', value: 70, unit: 'kg' },
       volume: { kind: 'reps', count: 8 },
       setKind: 'working',
       completed: true,
@@ -55,24 +55,98 @@ describe('view-models formatters (data-model.md "View models")', () => {
     const vm = toSetSummaryViewModel(set);
     expect(vm).toEqual({
       id: 'set-1',
-      loadLabel: '60 kg',
-      volumeLabel: '8 reps',
+      summaryLine: '8 x 70kg',
       setKind: 'working',
     });
-    expect('effortLabel' in vm).toBe(false);
+    expect('effortTone' in vm).toBe(false);
   });
 
-  it('toSetSummaryViewModel includes effortLabel when present', () => {
+  it('toSetSummaryViewModel appends " - <effort word>" and sets effortTone when effort is recorded', () => {
     const set: DraftSet = {
       id: 'set-2',
-      load: { kind: 'none' },
+      load: { kind: 'weight', value: 70, unit: 'kg' },
       volume: { kind: 'reps', count: 8 },
-      effort: 3,
+      effort: 2,
       setKind: 'working',
       completed: true,
     };
     const vm = toSetSummaryViewModel(set);
-    expect(vm.effortLabel).toBe('3 — Moderate');
+    expect(vm.summaryLine).toBe('8 x 70kg - Light');
+    expect(vm.effortTone).toBe('success');
+  });
+
+  it.each([
+    [1, 'success'],
+    [2, 'success'],
+    [3, 'warning'],
+    [4, 'warning'],
+    [5, 'danger'],
+  ] as const)('effort level %i maps to the %s tone', (effort, tone) => {
+    const vm = toSetSummaryViewModel({
+      id: 'set-tone',
+      load: { kind: 'none' },
+      volume: { kind: 'reps', count: 8 },
+      effort,
+      setKind: 'working',
+      completed: true,
+    });
+    expect(vm.effortTone).toBe(tone);
+  });
+
+  it('toSetSummaryViewModel shows only the volume, with no "x", for a none-kind load', () => {
+    const set: DraftSet = {
+      id: 'set-3',
+      load: { kind: 'none' },
+      volume: { kind: 'reps', count: 8 },
+      setKind: 'working',
+      completed: true,
+    };
+    const vm = toSetSummaryViewModel(set);
+    expect(vm.summaryLine).toBe('8');
+  });
+
+  it('toSetSummaryViewModel shows only the load, with no "x", for a valid load-only set with no volume (FR-3/FR-019, Copilot review)', () => {
+    const set: DraftSet = {
+      id: 'set-load-only',
+      load: { kind: 'weight', value: 70, unit: 'kg' },
+      setKind: 'working',
+      completed: true,
+    };
+    const vm = toSetSummaryViewModel(set);
+    expect(vm.summaryLine).toBe('70kg');
+  });
+
+  it('toSetSummaryViewModel formats duration/distance volume compactly (no unit word)', () => {
+    expect(
+      toSetSummaryViewModel({
+        id: 'set-4',
+        load: { kind: 'none' },
+        volume: { kind: 'duration', seconds: 45 },
+        setKind: 'working',
+        completed: true,
+      }).summaryLine,
+    ).toBe('45s');
+    expect(
+      toSetSummaryViewModel({
+        id: 'set-5',
+        load: { kind: 'none' },
+        volume: { kind: 'distance', metres: 400 },
+        setKind: 'working',
+        completed: true,
+      }).summaryLine,
+    ).toBe('400m');
+  });
+
+  it('toSetSummaryViewModel keeps non-weight load kinds as their full formatLoad text', () => {
+    expect(
+      toSetSummaryViewModel({
+        id: 'set-6',
+        load: { kind: 'band', label: 'Red' },
+        volume: { kind: 'reps', count: 12 },
+        setKind: 'working',
+        completed: true,
+      }).summaryLine,
+    ).toBe('12 x Band: Red');
   });
 });
 

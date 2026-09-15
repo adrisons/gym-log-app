@@ -1,64 +1,43 @@
 /**
- * The "add a new set" row for one exercise entry. Shows exactly the load
+ * The "add/edit a set" form for one exercise entry. Shows exactly the load
  * input and volume control the exercise's set-entry template says
  * (ADR-0006) — for a fresh exercise, that's Weight + Reps and nothing
- * else. There is no per-set switch between load types or volume kinds
- * any more; that only happens through the exercise's own "Edit tracked
- * fields" menu item (`ExerciseTemplatePanel`). Effort only appears when
- * the template tracks it. Pre-filled from the entry's previous set
- * (FR-008, load/volume only, never effort).
+ * else. There is no per-set switch between load types or volume kinds any
+ * more; that only happens through the exercise's own "Edit tracked fields"
+ * menu item (`ExerciseTemplatePanel`). Effort only appears when the
+ * template tracks it.
  *
- * ADR-0007: there is no confirm button. Every field's edit schedules one
- * shared, short (`COMMIT_DEBOUNCE_MS`) debounced commit for the row,
- * reset on each further edit to any field — so filling in weight, then
- * reps, then effort in quick succession still produces exactly one set
- * with all three, not one set per field. This is why no single control
- * commits on its own `onChange`: a wheel driven by repeated arrow-key
- * presses (or a quick-increment button tapped several times) fires
- * `onChange` once per step, and committing immediately on each step would
- * otherwise record a distinct set per intermediate value on the way to
- * the one the user actually meant (a real bug caught testing this in a
- * browser — dialing reps to 5 via arrow keys produced five 1-rep sets
- * before this fix). Deliberately no commit-on-blur either: leaving the
- * weight field to tab into reps is the ordinary way to fill this row, and
- * flushing right there would record the weight alone before reps ever
- * gets touched — the same fragmentation bug in a different guise. The
- * debounce is intentionally NOT cancelled on unmount either: a value the
- * user actually typed should still land even if they navigate away within
- * the window (constitution Principle II — closing the app, or leaving the
- * screen, must lose nothing already entered).
+ * ADR-0010 (superseding ADR-0007): recording a set is an explicit action
+ * again. Filling in one field of a multi-field set (e.g. reps, before
+ * weight is even touched) no longer saves anything on its own — every
+ * field edit only updates this row's own local state; nothing reaches
+ * `onConfirm` until the **Confirm** button is pressed. That button is
+ * `disabled` (with a status line explaining why) until the row holds
+ * every value the exercise's current template actually asks for — see
+ * `buildRequirement` below.
  *
- * Either way, the moment the pending result is valid (FR-019) it's what
- * gets committed, straight to `onConfirm` (this component has no
- * `StoragePort` access — `docs/architecture.md`'s presentation row). A row
- * that is already valid but untouched never schedules anything on its
- * own — nothing here ever fires from mounting with a prefilled value, only
- * from a real edit — so the one remaining tap, `RepeatLastSetControl`,
- * covers that case and disappears the instant the user changes anything.
- * Two situations reach "valid but untouched": a pre-filled row (FR-008's
- * "single tap" repeat), and a fresh Bodyweight-load row with no previous
- * set at all — Bodyweight counts as "present" with no component entered
- * (`domain/load.ts`), so it is already a legal `Set` before any field is
- * touched, and with nothing to edit there would otherwise be no way to
- * record it at all. The control's label tells the two apart.
+ * Add vs. edit mode: `editingSet`, when given, switches this row into
+ * editing an already-recorded set in place — a capability sessions/
+ * exercises didn't have before ADR-0010. In that mode the row's load/
+ * volume kind come from the set being edited (`editingSet.load.kind`/
+ * `editingSet.volume?.kind`), never the exercise's *current* template —
+ * an already-recorded `Set` keeps exactly the kind it was given (ADR-0006);
+ * editing lets the user correct its values, not silently re-kind it to
+ * whatever the template has since become. Editing also only ever requires
+ * the domain minimum (a load or a volume, FR-019) rather than the fuller
+ * add-mode requirement below — the row starts pre-filled from an already
+ * valid set, so there is no "half-entered" state to guard against, and
+ * the exercise's template may have moved on since this particular set was
+ * recorded.
  *
- * `onConfirm` identifies the entry only by its own id (`logging-screen.tsx`
- * calls the store's `addSet(entry.id, input)`, never `block.id`) — a set's
- * commit resolves which block the entry currently lives under fresh, at
- * the moment it actually fires (`draft.ts`'s `findBlockIdForEntry`), not
- * from whatever this row's props happened to close over when the edit was
- * made. This matters because moving the exercise entry to a different
- * block (`moveExerciseAcrossBlocks`) unmounts this component entirely and
- * mounts a new one under the new block — a pending debounced commit is a
- * plain `setTimeout` that outlives that unmount (deliberately, see above),
- * so nothing about *this instance's own props* can be "kept fresh" for it;
- * the fix has to live where the commit is finally applied, not here.
- *
- * Keyed by the parent on the entry's set count (`key={entryId}-${sets.length}`)
- * so this component remounts, and its local input state re-initializes
- * from a fresh `prefill`, every time a set is actually added.
+ * `prefill` (add mode only, FR-008) carries the previous set's load/volume
+ * forward so confirming an identical repeat is immediate: fill nothing,
+ * just press Confirm. Effort is deliberately never carried forward this
+ * way (spec.md Clarifications, 2026-09-09) — only `editingSet` ever
+ * pre-fills effort, since that is genuinely the value already recorded on
+ * this exact set, not a guess forwarded from a different one.
  */
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { WeightLoadInput } from './weight-load-input';
 import { BandLoadInput } from './band-load-input';
 import { BodyweightLoadInput } from './bodyweight-load-input';
@@ -66,39 +45,112 @@ import { FreeTextLoadInput } from './free-text-load-input';
 import { VolumeInput, MAX_REPS } from './volume-input';
 import type { VolumeKind } from './volume-input';
 import { EffortPicker } from './effort-picker';
-import { RepeatLastSetControl } from './repeat-last-set-control';
+import { Icon } from '@/presentation/design/icons';
 import type { AddSetInput, SetPrefill } from '@/application/logging/draft';
-import type { Load } from '@/application/logging/use-cases';
+import type { Load, Volume, Effort } from '@/application/logging/use-cases';
 import './logging.css';
 
-export const COMMIT_DEBOUNCE_MS = 500;
+export interface EditingSet {
+  load: Load;
+  volume?: Volume;
+  effort?: Effort;
+}
 
 export interface SetRowProps {
   prefill: SetPrefill | undefined;
+  /** Switches this row into editing an already-recorded set in place
+   * (ADR-0010) — omit/undefined for the ordinary "add a new set" row. */
+  editingSet?: EditingSet | undefined;
   loadKind: Load['kind'];
   volumeKind: VolumeKind;
   trackEffort: boolean;
   bandLabels: string[];
   freeTextSuggestions: string[];
   onConfirm: (input: AddSetInput) => void;
+  /** Shown as a Cancel button alongside Confirm when given.
+   * `ExerciseSetList` passes this for both add and edit — closing the form
+   * without entering/changing anything. */
+  onCancel?: (() => void) | undefined;
   onSaveBandLabels: (labels: string[]) => void;
 }
 
-function initialVolumeValue(
-  prefill: SetPrefill | undefined,
+const VOLUME_KIND_WORDS: Record<VolumeKind, string> = {
+  reps: 'a rep count',
+  duration: 'a duration',
+  distance: 'a distance',
+};
+
+/** Only these load kinds require the user to actually type/pick a value —
+ * Bodyweight is "present" on its own with nothing entered, and None has no
+ * field to fill at all (`domain/load.ts`'s `createLoad`). */
+const LOAD_KIND_WORDS: Partial<Record<Load['kind'], string>> = {
+  weight: 'a weight',
+  band: 'a band',
+  freeText: 'a value',
+};
+
+/**
+ * Builds the edit-mode status message for a row that isn't yet
+ * confirmable — the domain-minimum OR rule (FR-019), described in terms of
+ * the set actually being edited: `effectiveVolumeKind` (which can be
+ * Duration or Distance, not just Reps) and no "or a load" alternative at
+ * all when `effectiveLoadKind` is `none` (there is no load control shown
+ * to fill in that case).
+ */
+function editRequirementMessage(
+  loadKind: Load['kind'],
   volumeKind: VolumeKind,
+): string {
+  const loadWord = LOAD_KIND_WORDS[loadKind];
+  const volumeWord = VOLUME_KIND_WORDS[volumeKind];
+  return loadWord
+    ? `Enter ${loadWord} or ${volumeWord} to record this set.`
+    : `Enter ${volumeWord} to record this set.`;
+}
+
+/**
+ * Builds the add-mode status message for a row that isn't yet confirmable,
+ * naming exactly what the exercise's current template still needs (ADR-
+ * 0010) — never the old blanket "a load or a rep count", which was untrue
+ * the moment a template tracked both and the user had only filled one.
+ */
+function missingFieldsMessage(
+  loadKind: Load['kind'],
+  volumeKind: VolumeKind,
+  loadPresent: boolean,
+  volumePresent: boolean,
+): string | undefined {
+  const missing: string[] = [];
+  const loadWord = LOAD_KIND_WORDS[loadKind];
+  if (loadWord && !loadPresent) missing.push(loadWord);
+  if (!volumePresent) missing.push(VOLUME_KIND_WORDS[volumeKind]);
+  if (missing.length === 0) return undefined;
+  return `Enter ${missing.join(' and ')} to record this set.`;
+}
+
+function initialVolumeValue(
+  volume: Volume | undefined,
+  volumeKind: VolumeKind,
+  preserveOutOfRange: boolean,
 ): number | undefined {
-  const volume = prefill?.volume;
   if (!volume || volume.kind !== volumeKind) return undefined;
   if (volume.kind === 'reps') {
     // A legal historical `Set` can hold a rep count the reps wheel
     // doesn't offer (it only goes to `MAX_REPS` — domain `createVolume`
-    // has no upper bound). Left as-is, `WheelPicker` would silently fall
-    // back to its "unset" position while this out-of-range value stayed
-    // held here, letting an edit elsewhere auto-commit it despite the
-    // wheel visibly showing nothing selected. Normalizing to `undefined`
-    // here keeps what's held in sync with what's shown.
-    return volume.count <= MAX_REPS ? volume.count : undefined;
+    // has no upper bound). In add mode (a stale FR-008 prefill),
+    // normalizing to `undefined` keeps what's held in sync with what's
+    // shown — `WheelPicker` would otherwise silently fall back to its
+    // "unset" position while this out-of-range value stayed held here,
+    // letting a further edit confirm it despite the wheel visibly showing
+    // nothing selected. In edit mode (`preserveOutOfRange`), the opposite
+    // matters more: this is the set's own already-recorded count, and
+    // discarding it here would let "Save changes" with reps left untouched
+    // silently delete a real, valid value just because the wheel can't
+    // visually represent it — so it's kept exactly as recorded until the
+    // user explicitly changes the wheel themselves.
+    return volume.count <= MAX_REPS || preserveOutOfRange
+      ? volume.count
+      : undefined;
   }
   if (volume.kind === 'duration') return volume.seconds;
   return volume.metres;
@@ -115,49 +167,62 @@ interface FieldSnapshot {
 
 export function SetRow({
   prefill,
+  editingSet,
   loadKind,
   volumeKind,
   trackEffort,
   bandLabels,
   freeTextSuggestions,
   onConfirm,
+  onCancel,
   onSaveBandLabels,
 }: SetRowProps) {
-  const prefillMatchesLoadKind = prefill?.load.kind === loadKind;
+  // An already-recorded set keeps exactly the kind it was given (ADR-0006)
+  // — editing it must use *that* kind, never the exercise's current
+  // template, which may have moved on since. Add mode has no such history
+  // to defer to, so it always uses the template's current kind.
+  const effectiveLoadKind = editingSet ? editingSet.load.kind : loadKind;
+  const effectiveVolumeKind: VolumeKind = editingSet?.volume
+    ? editingSet.volume.kind
+    : volumeKind;
+
+  const initialLoad = editingSet?.load ?? prefill?.load;
+  const loadMatchesEffectiveKind = initialLoad?.kind === effectiveLoadKind;
+
   const [weightKg, setWeightKg] = useState<number | undefined>(
-    prefillMatchesLoadKind && prefill!.load.kind === 'weight'
-      ? prefill!.load.value
+    loadMatchesEffectiveKind && initialLoad!.kind === 'weight'
+      ? initialLoad!.value
       : undefined,
   );
   const [bandLabel, setBandLabel] = useState<string | undefined>(
-    prefillMatchesLoadKind && prefill!.load.kind === 'band'
-      ? prefill!.load.label
+    loadMatchesEffectiveKind && initialLoad!.kind === 'band'
+      ? initialLoad!.label
       : undefined,
   );
   const [bodyweightKg, setBodyweightKg] = useState<number | undefined>(
-    prefillMatchesLoadKind && prefill!.load.kind === 'bodyweight'
-      ? prefill!.load.addedOrAssistedKg
+    loadMatchesEffectiveKind && initialLoad!.kind === 'bodyweight'
+      ? initialLoad!.addedOrAssistedKg
       : undefined,
   );
   const [freeText, setFreeText] = useState<string>(
-    prefillMatchesLoadKind && prefill!.load.kind === 'freeText'
-      ? prefill!.load.text
+    loadMatchesEffectiveKind && initialLoad!.kind === 'freeText'
+      ? initialLoad!.text
       : '',
   );
   const [volumeValue, setVolumeValue] = useState<number | undefined>(
-    initialVolumeValue(prefill, volumeKind),
+    initialVolumeValue(
+      editingSet?.volume ?? prefill?.volume,
+      effectiveVolumeKind,
+      editingSet !== undefined,
+    ),
   );
   const [effort, setEffort] = useState<1 | 2 | 3 | 4 | 5 | undefined>(
-    undefined,
-  );
-  const [touched, setTouched] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
+    editingSet?.effort,
   );
 
   const buildInput = (fields: FieldSnapshot): AddSetInput | undefined => {
     const load: { kind: Load['kind']; present: boolean } = (() => {
-      switch (loadKind) {
+      switch (effectiveLoadKind) {
         case 'weight':
           return { kind: 'weight', present: fields.weightKg !== undefined };
         case 'band':
@@ -171,38 +236,48 @@ export function SetRow({
       }
     })();
 
-    const canConfirm = load.present || fields.volumeValue !== undefined;
-    if (!canConfirm) return undefined;
+    const domainValid = load.present || fields.volumeValue !== undefined;
+    if (!domainValid) return undefined;
 
     const builtLoad: AddSetInput['load'] =
-      loadKind === 'weight' && fields.weightKg !== undefined
+      effectiveLoadKind === 'weight' && fields.weightKg !== undefined
         ? { kind: 'weight', value: fields.weightKg, unit: 'kg' }
-        : loadKind === 'band' && fields.bandLabel
+        : effectiveLoadKind === 'band' && fields.bandLabel
           ? { kind: 'band', label: fields.bandLabel }
-          : loadKind === 'bodyweight'
+          : effectiveLoadKind === 'bodyweight'
             ? {
                 kind: 'bodyweight',
                 ...(fields.bodyweightKg !== undefined
                   ? { addedOrAssistedKg: fields.bodyweightKg }
                   : {}),
               }
-            : loadKind === 'freeText' && fields.freeText.trim() !== ''
+            : effectiveLoadKind === 'freeText' && fields.freeText.trim() !== ''
               ? { kind: 'freeText', text: fields.freeText.trim() }
               : { kind: 'none' };
 
     const builtVolume: AddSetInput['volume'] =
       fields.volumeValue === undefined
         ? undefined
-        : volumeKind === 'reps'
+        : effectiveVolumeKind === 'reps'
           ? { kind: 'reps', count: fields.volumeValue }
-          : volumeKind === 'duration'
+          : effectiveVolumeKind === 'duration'
             ? { kind: 'duration', seconds: fields.volumeValue }
             : { kind: 'distance', metres: fields.volumeValue };
+
+    // Preserves an already-recorded effort even if the template no longer
+    // tracks it (so `EffortPicker` isn't shown to change/clear it) — this
+    // is an edit to a specific historical value, not a template change,
+    // and ADR-0006's "template changes never touch history" cuts both
+    // ways: it must not silently drop what this exact set already had.
+    const effort =
+      trackEffort || editingSet === undefined
+        ? fields.effort
+        : editingSet.effort;
 
     return {
       ...(builtVolume !== undefined ? { volume: builtVolume } : {}),
       load: builtLoad,
-      ...(fields.effort !== undefined ? { effort: fields.effort } : {}),
+      ...(effort !== undefined ? { effort } : {}),
       setKind: 'working',
     };
   };
@@ -215,98 +290,106 @@ export function SetRow({
     volumeValue,
     effort,
   };
-  const liveInput = buildInput(currentFields);
-
-  function clearPendingCommit() {
-    if (debounceRef.current !== undefined) {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = undefined;
+  const load: { present: boolean } = (() => {
+    switch (effectiveLoadKind) {
+      case 'weight':
+        return { present: weightKg !== undefined };
+      case 'band':
+        return { present: Boolean(bandLabel) };
+      case 'bodyweight':
+        return { present: true };
+      case 'freeText':
+        return { present: freeText.trim() !== '' };
+      case 'none':
+        return { present: false };
     }
-  }
+  })();
+  const volumePresent = volumeValue !== undefined;
 
-  /** Marks the row touched, stores a field's new value, and (re)schedules
-   * the row's one shared debounced commit — computed now, from `value`
-   * substituted in explicitly alongside this render's other fields, not
-   * read back off state later when the timer fires (state may have moved
-   * on by then; `value` and the other fields as of *this* edit are what
-   * this specific commit should reflect). */
-  function updateField<K extends keyof FieldSnapshot>(
-    field: K,
-    value: FieldSnapshot[K],
-    setter: (value: FieldSnapshot[K]) => void,
-  ) {
-    setTouched(true);
-    setter(value);
-    clearPendingCommit();
-    const input = buildInput({ ...currentFields, [field]: value });
-    if (input) {
-      debounceRef.current = setTimeout(() => {
-        debounceRef.current = undefined;
-        onConfirm(input);
-      }, COMMIT_DEBOUNCE_MS);
-    }
-  }
+  // Editing an existing set only ever needs the domain minimum (FR-019) —
+  // it started out already valid, and the template it was recorded under
+  // may since have moved on. A fresh add needs every field the *current*
+  // template actually asks for (ADR-0010) — the bug this whole change
+  // exists to fix was a set silently saved with only one of two required
+  // values.
+  const canConfirm = editingSet
+    ? load.present || volumePresent
+    : (LOAD_KIND_WORDS[effectiveLoadKind] === undefined || load.present) &&
+      volumePresent;
 
-  // Valid without any edit: either a pre-filled repeat (FR-008), or a
-  // fresh Bodyweight-only row with nothing else required (see file
-  // doc comment) — the two cases `RepeatLastSetControl` covers.
-  const untouchedValidInput = !touched ? liveInput : undefined;
+  const requirementMessage = canConfirm
+    ? undefined
+    : editingSet
+      ? editRequirementMessage(effectiveLoadKind, effectiveVolumeKind)
+      : missingFieldsMessage(
+          effectiveLoadKind,
+          effectiveVolumeKind,
+          load.present,
+          volumePresent,
+        );
+
+  function handleConfirm() {
+    const input = buildInput(currentFields);
+    if (input) onConfirm(input);
+  }
 
   return (
     <div className="set-row">
-      {loadKind === 'weight' && (
-        <WeightLoadInput
-          valueKg={weightKg}
-          onChange={(value) => updateField('weightKg', value, setWeightKg)}
-        />
+      {effectiveLoadKind === 'weight' && (
+        <WeightLoadInput valueKg={weightKg} onChange={setWeightKg} />
       )}
-      {loadKind === 'band' && (
+      {effectiveLoadKind === 'band' && (
         <BandLoadInput
           bandLabels={bandLabels}
           selectedLabel={bandLabel}
-          onSelectLabel={(value) =>
-            updateField('bandLabel', value, setBandLabel)
-          }
+          onSelectLabel={setBandLabel}
           onSaveBandLabels={onSaveBandLabels}
         />
       )}
-      {loadKind === 'bodyweight' && (
+      {effectiveLoadKind === 'bodyweight' && (
         <BodyweightLoadInput
           addedOrAssistedKg={bodyweightKg}
-          onChange={(value) =>
-            updateField('bodyweightKg', value, setBodyweightKg)
-          }
+          onChange={setBodyweightKg}
         />
       )}
-      {loadKind === 'freeText' && (
+      {effectiveLoadKind === 'freeText' && (
         <FreeTextLoadInput
           text={freeText}
           suggestions={freeTextSuggestions}
-          onChange={(value) => updateField('freeText', value, setFreeText)}
+          onChange={setFreeText}
         />
       )}
       <VolumeInput
-        kind={volumeKind}
+        kind={effectiveVolumeKind}
         value={volumeValue}
-        onValueChange={(value) =>
-          updateField('volumeValue', value, setVolumeValue)
-        }
+        onValueChange={setVolumeValue}
       />
-      {trackEffort && (
-        <EffortPicker
-          value={effort}
-          onChange={(value) => updateField('effort', value, setEffort)}
-        />
-      )}
-      {untouchedValidInput && (
-        <RepeatLastSetControl
-          onRepeat={() => onConfirm(untouchedValidInput)}
-          {...(prefillMatchesLoadKind ? {} : { label: 'Log this set' })}
-        />
-      )}
-      {!liveInput && (
+      {trackEffort && <EffortPicker value={effort} onChange={setEffort} />}
+      <div className="set-row__inputs">
+        <button
+          type="button"
+          className="logging-button logging-button--primary logging-button--icon-label"
+          disabled={!canConfirm}
+          aria-disabled={!canConfirm}
+          onClick={handleConfirm}
+        >
+          <Icon name="check" />
+          {editingSet ? 'Save changes' : 'Add set'}
+        </button>
+        {onCancel && (
+          <button
+            type="button"
+            className="logging-button logging-button--icon-label"
+            onClick={onCancel}
+          >
+            <Icon name="close" />
+            Cancel
+          </button>
+        )}
+      </div>
+      {requirementMessage && (
         <p className="logging-screen__field-label" role="status">
-          Enter a load or a rep count to record this set.
+          {requirementMessage}
         </p>
       )}
     </div>

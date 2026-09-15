@@ -75,6 +75,7 @@ describe('DiaryScreen (FR-001..006)', () => {
       id: exerciseId,
       canonicalName: 'Squat',
       aliases: [],
+      movementPattern: 'squat',
       defaultLoadType: 'weight',
       defaultVolumeKind: 'reps',
       trackEffort: false,
@@ -122,7 +123,10 @@ describe('DiaryScreen (FR-001..006)', () => {
     await waitFor(() => {
       expect(screen.getByText('Squat')).toBeInTheDocument();
     });
-    expect(screen.getByText('1 sets')).toBeInTheDocument();
+    // ADR-0011: the one-line summary no longer shows a set count — just
+    // the kind-of-work label derived from the exercise's movement pattern.
+    expect(screen.getByText('squat')).toBeInTheDocument();
+    expect(screen.queryByText(/\d+ sets?/)).not.toBeInTheDocument();
     expect(screen.getByText('2026-09')).toBeInTheDocument();
   });
 

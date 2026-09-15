@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { HeaderNav } from '@/presentation/nav/header-nav';
+import {
+  ScreenTitleProvider,
+  useSetScreenTitle,
+} from '@/presentation/nav/screen-title';
 
 describe('HeaderNav', () => {
   it('renders a closed menu behind a right-aligned hamburger button', () => {
@@ -13,6 +17,33 @@ describe('HeaderNav', () => {
 
     expect(screen.getByRole('button', { name: 'Menu' })).toBeInTheDocument();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('renders no title when nothing has registered one (e.g. outside a ScreenTitleProvider)', () => {
+    render(
+      <MemoryRouter>
+        <HeaderNav />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+  });
+
+  it("shows the current screen's title, registered via useSetScreenTitle, to the left of the menu button", () => {
+    function Screen() {
+      useSetScreenTitle('Insights');
+      return null;
+    }
+    render(
+      <MemoryRouter>
+        <ScreenTitleProvider>
+          <HeaderNav />
+          <Screen />
+        </ScreenTitleProvider>
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Insights' }),
+    ).toBeInTheDocument();
   });
 
   it('opens the menu with exactly Diary, Insights, Exercises, Settings — no Search (ADR-0009, spec 006 FR-001/006)', () => {

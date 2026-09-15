@@ -50,6 +50,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent, PointerEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/presentation/design/icons';
+import { useSetScreenTitle } from '@/presentation/nav/screen-title';
 import { formatDiaryDate } from '@/presentation/design/format-date';
 import { requireStorage } from '@/application/storage-access';
 import { useLoggingSession } from '@/application/logging/logging-store';
@@ -88,6 +89,7 @@ interface PendingDeleteBatch {
 }
 
 export function DiaryScreen() {
+  useSetScreenTitle('Diary');
   // Read reactively, not just once at mount: `LoggingScreen`'s "Log
   // workout" control (ADR-0009) awaits `registerWorkout()` before
   // navigating here, so in practice the flag is already true by the time
@@ -394,7 +396,6 @@ export function DiaryScreen() {
   if (summaries.length === 0) {
     return (
       <main className="diary-screen" aria-label="Diary">
-        <h1>Diary</h1>
         <p className="diary-screen__empty">
           No sessions logged yet — sessions you log will show up here.
         </p>
@@ -422,7 +423,6 @@ export function DiaryScreen() {
 
   return (
     <main className="diary-screen" aria-label="Diary">
-      <h1>Diary</h1>
       <label className="diary-screen__search">
         <span className="diary-screen__search-label">
           <Icon name="search" />
@@ -508,10 +508,11 @@ export function DiaryScreen() {
                         <span className="diary-screen__session-link-detail">
                           {session.mainExerciseNames.join(', ')}
                         </span>
-                        <span className="diary-screen__session-link-detail">
-                          {session.setCount} sets
-                          {session.kindOfWork && ` · ${session.kindOfWork}`}
-                        </span>
+                        {session.kindOfWork && (
+                          <span className="diary-screen__session-link-detail">
+                            {session.kindOfWork}
+                          </span>
+                        )}
                       </span>
                       <Icon name="chevron-right" />
                     </Link>

@@ -25,7 +25,7 @@ import type { Exercise } from '@/domain/exercise';
  * 006), read it from here so they can never disagree about what "current"
  * means.
  */
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 
 export type SchemaAction = 'migrate' | 'open' | 'refuse';
 
@@ -68,10 +68,11 @@ export function migrateExerciseTemplateDefaults(exercise: Exercise): Exercise {
  * Migrates a whole Exercise catalogue from `storedVersion` up to whatever
  * this build understands, applying every version step's backfill in
  * order. `storedVersion < 2` runs the v1->v2 backfill (ADR-0006); v2->v3
- * (ADR-0008: `Block.rounds`) needs no `Exercise`-level backfill at all —
- * `rounds` is optional everywhere it's read, so its absence in
- * already-stored data is already valid v3 data, not a gap (matches both
- * adapters' own `#checkSchema` comments).
+ * (ADR-0008: `Block` gained `rounds`) and v3->v4 (ADR-0013: `rounds`
+ * removed again) both need no `Exercise`-level backfill at all — neither
+ * step touches the `Exercise` shape, and `Block.rounds`'s own
+ * addition/removal round-trips through storage with no rewrite either way
+ * (matches both adapters' own `#checkSchema` comments).
  */
 export function migrateExerciseCatalogue(
   exercises: Exercise[],

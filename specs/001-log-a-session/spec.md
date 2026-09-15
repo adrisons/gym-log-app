@@ -205,11 +205,17 @@ core value on its own.
    only one set is recorded; a deliberate second identical set after that
    window records normally. _(Amended by ADR-0007: "the confirm control" is
    now "Repeat last set"; the debounce guarantee is otherwise unchanged.)_
-10. **Given** the active draft has at least one block, **When** the user
+10. **Given** the active draft has at least one exercise, **When** the user
     presses "Log workout", **Then** the draft becomes a permanent Session in
     the diary, the stored draft (if any) is cleared, and the active form
-    resets to a fresh, empty, unsaved state; there is no such control while
-    the active draft has no block at all. _(Added by ADR-0008.)_
+    resets to a fresh, empty, unsaved state; the control stays visible but
+    `disabled` while the active draft has no exercise at all. _(Added by
+    ADR-0008. Threshold amended by ADR-0011: the form always seeds one
+    empty block, so "at least one block" stopped distinguishing an
+    untouched draft from one worth registering — the gate is the exercise
+    itself. Visibility amended by ADR-0012: the control is always
+    rendered, disabled rather than removed, matching FR-019's own
+    disabled-not-hidden convention.)_
 11. **Given** the user opens the logging form and leaves without entering
     any data, **When** they close or navigate away, **Then** nothing is
     stored — there is no draft to recover on a later visit. _(Added by
@@ -464,7 +470,11 @@ result — independently verifiable without blocks, load types, or effort.
   and MUST let the user create a new exercise from that same search field.
 - **FR-003**: The system MUST persist every change (set added, block
   created, exercise added, etc.) automatically, with no explicit save
-  action exposed anywhere in the logging flow.
+  action exposed anywhere in the logging flow. _(Amended by ADR-0010: a set
+  specifically is the one exception now — it requires an explicit Confirm
+  tap (see FR-019, FR-025 below); every other change in this list (block/
+  exercise creation, rename, reorder, etc.) is still saved automatically
+  with no confirm step, unchanged.)_
 - **FR-004**: The system MUST make every destructive action on the logging
   screen (deleting a set, an exercise entry, or a block) undoable for at
   least 5 seconds from the same screen before the undo option disappears.
@@ -477,20 +487,23 @@ result — independently verifiable without blocks, load types, or effort.
   close even though it is not a stored Session.
 - **FR-006**: The system MUST let the user create, rename, reorder, and
   delete blocks within a session, and reorder exercises within a block and
-  across blocks. _(Amended by ADR-0008: a block may also carry an optional
-  target round count — e.g. "3 rounds" of a circuit — editable immediately
-  with no confirm step, independent of and never derived from how many
-  sets each exercise entry in it actually has logged.)_
+  across blocks. Block reordering (ADR-0013) is Move up/Move down menu
+  items on the block's own menu, mirroring the exercise-entry menu's own
+  Move up/Move down — not drag-and-drop. _(ADR-0008 amended this FR to add
+  an optional target round count on a block; ADR-0013 removed it again as
+  redundant with each exercise entry's own set count, which already says
+  how many times it was actually done — this FR's own reorder/rename/
+  delete text is unaffected either way.)_
 - **FR-007**: The system MUST display an unnamed block by its position
   (e.g. "Block 2"), never as "Untitled" or blank.
 - **FR-008**: The system MUST pre-fill a new set for an exercise with the
   previous set's load and volume for that same exercise, so confirming an
   identical set is a single tap. Effort is deliberately NOT carried forward
-  — it is re-entered or left blank on each set. _(Amended by ADR-0007: there
-  is no general confirm control any more — a freshly-edited valid set
-  commits on its own. "Single tap" now names the dedicated "Repeat last
-  set" control, offered only for a pre-filled row the user has not
-  touched.)_
+  — it is re-entered or left blank on each set. _(Amended by ADR-0007, in
+  turn superseded by ADR-0010: there is a general confirm control again
+  ("Add set"/`SetConfirmControl`) — a pre-filled row is simply already
+  enabled, so "single tap" is satisfied by pressing that same control once,
+  with no separately-labelled "Repeat last set" control needed.)_
 - **FR-009**: The system MUST let the user choose a load type per exercise
   (Weight, Band, Bodyweight, Free text, or None), remember it as that
   exercise's default, and allow overriding it per individual set. _(Amended
@@ -536,9 +549,14 @@ result — independently verifiable without blocks, load types, or effort.
   volume MUST NOT be stored (per `docs/requirements.md` §3.3). Confirming
   such a set MUST store nothing: the confirm action is a silent no-op, or
   the confirm control is unavailable, until the set is valid. _(Amended by
-  ADR-0007: with no general confirm control, this means an edit that still
-  leaves the set invalid simply does not commit anything — same rule,
-  nothing left to tap.)_
+  ADR-0007, in turn superseded by ADR-0010: the confirm control
+  (`SetConfirmControl`) is back, `disabled` rather than unavailable, until
+  the set is valid — this rule's substance (nothing is stored for an
+  invalid set) is unchanged. `docs/requirements.md`'s FR-3 also amends this
+  rule further for *adding* a set specifically: the exercise's current
+  template can require more than this FR's domain-minimum "either one
+  present" — see that document for the fuller add-mode requirement, which
+  does not apply to editing an already-recorded set.)_
 - **FR-020**: Renaming a catalogue exercise MUST NOT change what any past
   set refers to — references are by identifier, never by name.
 - **FR-021**: The system MUST allow more than one session per calendar day,
@@ -558,12 +576,13 @@ result — independently verifiable without blocks, load types, or effort.
   resurrect that set — the two undo timers are independent.
 - **FR-024**: If the user opens the logging form and leaves without
   registering the workout (FR-027), and the *active* form (the one they
-  are directly editing — FR-028) has at least one block (the same
+  are directly editing — FR-028) has at least one exercise (the same
   threshold FR-027 uses), the system MUST retain that input as a single
   pending draft — a state of the logging screen, not a stored Session, but
   still held in durable on-device storage so it survives an app close,
-  background, or kill. Editing only the session's date-time, with no block
-  ever added, MUST NOT by itself cause anything to be stored. Opening the
+  background, or kill. Editing only the session's date-time, with no
+  exercise ever added, MUST NOT by itself cause anything to be stored —
+  nor does the block the form seeds by default (ADR-0011). Opening the
   logging form MUST offer, but MUST NOT silently apply, recovery of an
   existing pending draft (FR-028). Discarding the draft MUST remove it and
   its data. At most one pending draft exists at a time. A catalogue merge
@@ -578,22 +597,31 @@ result — independently verifiable without blocks, load types, or effort.
   loads whatever the draft currently is). _(Amended by ADR-0008: the
   "no data ⇒ nothing stored" and "opt-in, not automatic, recovery" clauses
   are new; the day-rollover auto-promotion this FR previously implied via
-  FR-001 is removed — see FR-027.)_
+  FR-001 is removed — see FR-027. Threshold amended by ADR-0011 from "at
+  least one block" to "at least one exercise", since the form now always
+  seeds one empty block.)_
 - **FR-027**: The system MUST offer an explicit "Log workout" action once
-  the active draft has at least one block. Activating it MUST convert the
-  active draft into a permanent Session (visible in the diary), clear the
-  pending draft in storage, reset the active form to a fresh, empty,
+  the active draft has at least one exercise. Activating it MUST convert
+  the active draft into a permanent Session (visible in the diary), clear
+  the pending draft in storage, reset the active form to a fresh, empty,
   unsaved state, and return the user to the diary with the save
   acknowledgement (`docs/design.md` §1.1's bounded exception) — the same
   acknowledgement spec.md previously showed on leaving the form after any
-  set, now tied to this explicit action instead. There MUST be no such
-  action while the active draft has no block at all (FR-019's "unavailable
-  rather than rejected" convention, applied one level up: an empty draft
-  has nothing worth registering, the same threshold FR-024 already uses to
-  decide whether there is "at least one change" to persist). This is the
+  set, now tied to this explicit action instead. The control itself MUST
+  stay visible at all times on this form and be `disabled`, never removed
+  from the page, while the active draft has no exercise at all or while a
+  pending-draft recovery banner is unresolved (FR-019's own "unavailable"
+  convention, which already means disabled-not-hidden there — SetRow's
+  own Confirm control — applied one level up here too, replacing this
+  control's earlier show/hide behavior, ADR-0012): an empty draft has
+  nothing worth registering, the same threshold FR-024 already uses to
+  decide whether there is "at least one change" to persist. This is the
   only way a Session is created from the logging screen — there is no
   time- or day-based automatic promotion.
-  _(Added by ADR-0008.)_
+  _(Added by ADR-0008. Threshold amended by ADR-0011: the form always
+  seeds one empty block, so "at least one block" is true from the moment
+  the form opens and can no longer serve as the gate — the exercise
+  itself is.)_
 - **FR-028**: When the logging form is opened and a pending draft (FR-024)
   exists, the system MUST show it as a dismissible option at the top of
   the screen — not a modal dialog — offering "Recover" (loads the pending
@@ -609,12 +637,24 @@ result — independently verifiable without blocks, load types, or effort.
 - **FR-025**: When the user confirms a set, the system MUST ignore an
   identical confirmation repeated within a short debounce window (~1
   second); a subsequent identical set confirmed after that window MUST be
-  recorded as a new set. _(Amended by ADR-0007: "confirms" now covers
-  either the automatic commit on a valid edit or a tap on "Repeat last
-  set" — the debounce mechanism is unchanged and applies to both.)_
+  recorded as a new set. _(Amended by ADR-0007, in turn superseded by
+  ADR-0010: "confirms" now means only an explicit tap on
+  `SetConfirmControl` — there is no automatic commit on a valid edit any
+  more, and no separate "Repeat last set" control. The debounce mechanism
+  itself is unchanged, and still exists mainly to guard a double-tap on
+  that one button.)_
 - **FR-026**: A numeric Volume value MUST be greater than 0. A numeric Load
   value (Weight, or the added side of a Bodyweight component) MUST be
   greater than or equal to 0.
+- **FR-029**: The system MUST let the user edit an already-recorded set's
+  load, volume, and effort in place, not only add a new one or delete it.
+  Editing MUST use the set's own load kind and volume kind — never the
+  exercise's *current* template, which may have changed since (ADR-0006) —
+  and MUST accept any edited result that meets FR-019's domain-minimum rule
+  (a load or a volume present), not the fuller per-field requirement FR-003/
+  `docs/requirements.md` FR-3 impose when *adding* a set. An edit that
+  would leave neither present MUST NOT be stored (same as FR-019). _(Added
+  by ADR-0010.)_
 
 ### Key Entities *(include if feature involves data)*
 

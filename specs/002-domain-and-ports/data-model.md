@@ -89,10 +89,15 @@ No open/closed lifecycle field (FR-002).
 interface Block {
   name?: string;
   type: 'straightSets' | 'superset' | 'circuit';
-  rounds?: number; // added by ADR-0008 (schema v3) — target round count for the whole block; positive integer or absent, never derived from exercises' own set counts
   exercises: ExerciseEntry[]; // ordered; [] is valid (FR-017)
 }
 ```
+
+**(ADR-0013, schema v4)** `rounds` — added by ADR-0008 (schema v3) as an
+optional target round count for the whole block — is removed again:
+redundant with each exercise entry's own set count, which already says
+how many times it was actually done. No replacement field; a v3 record's
+leftover `rounds` key is simply never read through this type again.
 
 ### `Exercise entry` (FR-004)
 

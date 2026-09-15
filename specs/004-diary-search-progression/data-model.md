@@ -24,7 +24,6 @@ interface DiarySessionSummary {
   dateTime: string; // Session.dateTime, unchanged
   mainExerciseNames: string[]; // distinct Exercise.canonicalName, in
                                  // first-referenced order
-  setCount: number; // total Sets across every Block/ExerciseEntry
   kindOfWork: string | undefined; // derived from referenced Exercises'
                                     // movementPattern; undefined when none
                                     // of the session's exercises have one
@@ -32,15 +31,17 @@ interface DiarySessionSummary {
 }
 ```
 
+**(ADR-0011, supersedes the shape above)**: `setCount` is removed —
+dropped from the diary row's one-line summary for a flatter, less
+numbers-heavy presentation (FR-002 amended accordingly). No schema change:
+this is a derived, presentation-facing type, never persisted.
+
 **Validation / derivation rules** (FR-002, spec.md Assumptions):
 
 - `mainExerciseNames` MUST list every distinct `Exercise` referenced by the
   session's `ExerciseEntry`s (by `exerciseId`, resolved through the
   supplied map) — never a truncated set at the data layer (truncation for
   display, e.g. "+2 more", is a `presentation/` concern only).
-- `setCount` MUST equal the sum of `sets.length` across every `Block` and
-  `ExerciseEntry` in the session, including non-working (warm-up) sets —
-  FR-002 says "set count," not "working set count."
 - `kindOfWork` is never a stored/settable field; it is always recomputed
   from the current state of the referenced `Exercise`s at render time, so
   a later change to an exercise's `movementPattern` (or a merge/rename)

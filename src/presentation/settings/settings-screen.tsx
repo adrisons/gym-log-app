@@ -4,6 +4,7 @@
  */
 import { useEffect } from 'react';
 import { useSettingsStore } from '@/application/settings-store';
+import { useSetScreenTitle } from '@/presentation/nav/screen-title';
 import { UnitAndIncrementsSection } from './unit-and-increments-section';
 import { ThemeSection } from './theme-section';
 import { FirstDayOfWeekSection } from './first-day-of-week-section';
@@ -12,6 +13,7 @@ import { DataSection } from './data-section';
 import './settings.css';
 
 export function SettingsScreen() {
+  useSetScreenTitle('Settings');
   const load = useSettingsStore((state) => state.load);
   const loaded = useSettingsStore((state) => state.loaded);
 
@@ -25,7 +27,6 @@ export function SettingsScreen() {
 
   return (
     <main className="settings-screen" aria-label="Settings">
-      <h1>Settings</h1>
       <UnitAndIncrementsSection />
       <ThemeSection />
       <FirstDayOfWeekSection />

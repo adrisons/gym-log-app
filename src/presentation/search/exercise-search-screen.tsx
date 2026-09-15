@@ -8,9 +8,11 @@ import { requireStorage } from '@/application/storage-access';
 import { searchExercises } from '@/application/search/exercise-search';
 import type { Exercise } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
+import { useSetScreenTitle } from '@/presentation/nav/screen-title';
 import './search.css';
 
 export function ExerciseSearchScreen() {
+  useSetScreenTitle('Search exercises');
   const [catalogue, setCatalogue] = useState<Exercise[]>([]);
   const [query, setQuery] = useState('');
 
@@ -22,7 +24,6 @@ export function ExerciseSearchScreen() {
 
   return (
     <main className="exercise-search-screen" aria-label="Exercise search">
-      <h1>Search exercises</h1>
       <label className="logging-screen__field-label">
         <span>Exercise name</span>
         <input

@@ -248,3 +248,275 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
     expect(renamed?.canonicalName).toBe('Barbell back squat');
   });
 });
+
+describe('ExerciseCatalogueScreen creating a new exercise (ADR-0010)', () => {
+  it('opens the creation form from "New exercise", and lists the exercise once created', async () => {
+    const storage = await seededStorage();
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'New exercise' }));
+    expect(
+      screen.getByRole('dialog', { name: /new exercise/i }),
+    ).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText(/^name$/i), 'Romanian deadlift');
+    await userEvent.click(screen.getByRole('radio', { name: 'Duration' }));
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /track effort/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /create exercise/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Romanian deadlift')).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole('dialog', { name: /new exercise/i }),
+    ).not.toBeInTheDocument();
+
+    const saved = await storage.listExercises();
+    const created = saved.find((e) => e.canonicalName === 'Romanian deadlift');
+    expect(created?.defaultVolumeKind).toBe('duration');
+    expect(created?.trackEffort).toBe(true);
+
+    // The logging store's own in-memory catalogue must include it too, the
+    // same reason renaming/merging already re-sync it (this screen's own
+    // doc comment) — otherwise LoggingScreen could offer to create a
+    // duplicate.
+    expect(
+      useLoggingSession
+        .getState()
+        .catalogue.some((e) => e.canonicalName === 'Romanian deadlift'),
+    ).toBe(true);
+  });
+
+  it('the Create button stays disabled until a name is entered', async () => {
+    useStorageAccess.getState().configure(await seededStorage());
+    useLoggingSession.getState().configure(new InMemoryStorage());
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'New exercise' }));
+
+    expect(
+      screen.getByRole('button', { name: /create exercise/i }),
+    ).toBeDisabled();
+  });
+
+  it('restores focus to the "New exercise" trigger when the dialog closes (Copilot review, PR #27)', async () => {
+    useStorageAccess.getState().configure(await seededStorage());
+    useLoggingSession.getState().configure(new InMemoryStorage());
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+    const trigger = screen.getByRole('button', { name: 'New exercise' });
+    trigger.focus();
+    await userEvent.click(trigger);
+    await userEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('Cancel closes the form without creating anything', async () => {
+    const storage = await seededStorage();
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'New exercise' }));
+    await userEvent.type(screen.getByLabelText(/^name$/i), 'Nope');
+    await userEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+    expect(
+      screen.queryByRole('dialog', { name: /new exercise/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Nope')).not.toBeInTheDocument();
+  });
+
+  it('blocks creating a name/alias collision with an existing exercise, naming which one (Copilot review, PR #27)', async () => {
+    const storage = await seededStorage();
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'New exercise' }));
+    // Case/accent-insensitive match against the existing "Back squat".
+    await userEvent.type(screen.getByLabelText(/^name$/i), 'back SQUAT');
+
+    expect(
+      screen.getByRole('button', { name: /create exercise/i }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/already used by "Back squat"/i),
+    ).toBeInTheDocument();
+
+    const before = await storage.listExercises();
+    await userEvent.click(
+      screen.getByRole('button', { name: /create exercise/i }),
+    );
+    const after = await storage.listExercises();
+    expect(after).toHaveLength(before.length);
+  });
+
+  it('disables Create while the write is in flight, so a double tap cannot create the exercise twice (Copilot review, PR #27)', async () => {
+    const storage = await seededStorage();
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+
+    let releaseSave: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseSave = resolve;
+    });
+    const realSaveExercise = storage.saveExercise.bind(storage);
+    storage.saveExercise = async (exercise) => {
+      await gate;
+      return realSaveExercise(exercise);
+    };
+
+    render(<ExerciseCatalogueScreen />);
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'New exercise' }));
+    await userEvent.type(screen.getByLabelText(/^name$/i), 'Nordic curl');
+
+    const createButton = screen.getByRole('button', {
+      name: /create exercise/i,
+    });
+    await userEvent.click(createButton);
+    // Still pending (the gated save hasn't resolved) — the button must
+    // already be disabled, so a second tap here is a no-op rather than a
+    // second `createExercise` call.
+    expect(createButton).toBeDisabled();
+    await userEvent.click(createButton);
+
+    releaseSave();
+    await waitFor(async () => {
+      const saved = await storage.listExercises();
+      expect(
+        saved.filter((e) => e.canonicalName === 'Nordic curl'),
+      ).toHaveLength(1);
+    });
+  });
+
+  it("still creates the exercise when the logging store's catalogue cache is cold (a direct /exercises visit, no prior /log initialize())", async () => {
+    // Deliberately does NOT call useLoggingSession.getState().initialize()
+    // — `createExercise` doesn't depend on the cache being warm (unlike
+    // the pre-fix `updateExerciseTemplate`, see the sibling describe
+    // block below), but this guards the creation path against the same
+    // class of regression.
+    const storage = await seededStorage();
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'New exercise' }));
+    await userEvent.type(screen.getByLabelText(/^name$/i), 'Sissy squat');
+    await userEvent.click(
+      screen.getByRole('button', { name: /create exercise/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Sissy squat')).toBeInTheDocument();
+    });
+  });
+});
+
+describe("ExerciseCatalogueScreen editing an existing exercise's tracked fields (ADR-0010)", () => {
+  it('opens the template editor from the management panel and re-syncs both storage and the logging store', async () => {
+    const storage = await seededStorage();
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+    await useLoggingSession.getState().initialize();
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Manage Back squat' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /edit tracked fields/i }),
+    );
+    expect(
+      screen.getByRole('dialog', { name: /edit back squat's tracked fields/i }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /track effort/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    await waitFor(async () => {
+      const saved = await storage.getExercise('ex-1' as ExerciseId);
+      expect(saved?.trackEffort).toBe(true);
+    });
+    expect(
+      useLoggingSession.getState().catalogue.find((e) => e.id === 'ex-1')
+        ?.trackEffort,
+    ).toBe(true);
+  });
+
+  it('still saves the template edit when the logging store has never been initialized (a direct /exercises visit — Copilot review, PR #27)', async () => {
+    const storage = await seededStorage();
+    useStorageAccess.getState().configure(storage);
+    // Configured, like the composition root always does, but deliberately
+    // never `initialize()`d — `useLoggingSession.catalogue` starts empty,
+    // the exact "cold cache" this regression needs. Every other test in
+    // this file's `describe` blocks calls `initialize()` first, which is
+    // why this one bug went uncaught by them.
+    useLoggingSession.getState().configure(storage);
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Manage Back squat' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /edit tracked fields/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /track effort/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    await waitFor(async () => {
+      const saved = await storage.getExercise('ex-1' as ExerciseId);
+      expect(saved?.trackEffort).toBe(true);
+    });
+    expect(
+      screen.queryByRole('dialog', {
+        name: /edit back squat's tracked fields/i,
+      }),
+    ).not.toBeInTheDocument();
+  });
+});

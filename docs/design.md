@@ -102,7 +102,12 @@ interface follows these:
   actions, the floating action); structural cards stay at the base radius.
   Superseded: the original identity's opposite convention (square
   structural surfaces, small radius reserved for interactive elements) —
-  see the refinement note below.
+  see the refinement note below. Scoped exception (ADR-0011): the
+  logging/session-detail block card (`.block-card--collapsible`) spans the
+  full screen width with square corners, to reclaim horizontal space on a
+  surface that repeats once per block — a narrow, single-surface departure,
+  not a reopening of the rounded identity; every other structural card
+  keeps the base radius.
 
 **Visual identity, decided**: the concrete values realizing the criteria
 above (palette, the two type roles, the corner-radius system) were chosen
@@ -320,13 +325,17 @@ prominent tap away, so the navigation never carries a tab that sits idle
 between sessions.
 
 Primary navigation (ADR-0009, superseding an earlier always-visible bottom
-tab bar) is a hamburger menu, right-aligned in a slim header at the top of
-every screen, opening a short list of the destinations the user returns to
-repeatedly: Diary, Insights, Exercises. Exercise search-by-catalogue stays
-reachable (from a session's own logged exercises, and from Insights' cards)
-but no longer occupies its own primary-nav entry — the diary's own search
-(FR-6) now covers "find a session by exercise", which was that entry's most
-common use.
+tab bar) is a hamburger menu in a slim header at the top of every screen,
+opening a short list of the destinations the user returns to repeatedly:
+Diary, Insights, Exercises. Exercise search-by-catalogue stays reachable
+(from a session's own logged exercises, and from Insights' cards) but no
+longer occupies its own primary-nav entry — the diary's own search (FR-6)
+now covers "find a session by exercise", which was that entry's most
+common use. **(ADR-0012)** That same header also carries the current
+screen's own title, to the left of the menu button — saving each screen
+the vertical space its own heading row used to take — so the hamburger
+button itself is the header's only fixed right-aligned element now, not
+the whole header.
 
 Text wraps; it never scrolls sideways to be read.
 

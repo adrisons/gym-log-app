@@ -4,17 +4,14 @@
  * `application/diary/session-editing.ts`'s doc comment for the exact
  * editable surface and why undo is out of scope here.
  *
- * Mirrors LoggingScreen's layout conventions: a `loose` block (an implicit,
- * presentation-only container for an exercise added outside any block —
- * `application/ports/logging-draft.ts`'s `DraftBlock.loose`, never part of
- * the persisted `Block`) renders `bare` (no header/menu), even while
- * empty; an explicitly created block that just hasn't been named yet is
- * never `loose` and always keeps its header (FR-2). "Add exercise"/"Add
- * block" sit at the bottom, and each exercise's set-entry template
+ * Mirrors LoggingScreen's layout conventions (ADR-0011): every exercise
+ * belongs to a real block — there is no implicit "loose" container any
+ * more. "Add block" sits at the bottom; each block has its own "Add
+ * exercise to …" footer control, and each exercise's set-entry template
  * (ADR-0006) is editable through its own menu.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { requireStorage } from '@/application/storage-access';
 import { useLoggingSession } from '@/application/logging/logging-store';
 import {
@@ -24,37 +21,20 @@ import {
 } from '@/application/diary/session-editing';
 import type { EditableSession } from '@/application/diary/session-editing';
 import { searchExercises } from '@/application/search/exercise-search';
-import {
-  toBlockViewModel,
-  toSetSummaryViewModel,
-} from '@/application/logging/view-models';
+import { toBlockViewModel } from '@/application/logging/view-models';
 import type {
   Exercise,
   Session,
   SessionId,
 } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
+import { useSetScreenTitle } from '@/presentation/nav/screen-title';
 import { BlockCard } from '../logging/block-card';
 import { ExerciseEntryCard } from '../logging/exercise-entry-card';
-import { SetRow } from '../logging/set-row';
+import { ExerciseSetList } from '../logging/exercise-set-list';
 import { AddExerciseControl } from '../logging/add-exercise-control';
 import { ExerciseTemplatePanel } from '../logging/exercise-template-panel';
-import type { DraftBlock } from '@/application/logging/draft';
 import './diary.css';
-
-/** ADR-0008: rebuilds a block without `rounds`, for clearing it — mirrors
- * `application/logging/draft.ts`'s own `withoutRounds` (this screen edits
- * an `EditableSession` locally rather than going through that module's
- * actions, so it needs its own copy of the same shape-preserving rebuild). */
-function withoutRounds(block: DraftBlock): DraftBlock {
-  return {
-    id: block.id,
-    ...(block.name !== undefined ? { name: block.name } : {}),
-    ...(block.loose !== undefined ? { loose: block.loose } : {}),
-    type: block.type,
-    exercises: block.exercises,
-  };
-}
 
 export function SessionDetailScreen() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -82,6 +62,12 @@ export function SessionDetailScreen() {
   const [editingTemplateFor, setEditingTemplateFor] = useState<
     Exercise | undefined
   >(undefined);
+
+  useSetScreenTitle(
+    editable
+      ? `Session — ${new Date(editable.dateTime).toLocaleString()}`
+      : 'Session',
+  );
 
   // Guards the very first `editable` a load populates from re-triggering
   // the persist effect below with an unchanged snapshot — set right
@@ -180,42 +166,13 @@ export function SessionDetailScreen() {
     }));
   };
 
-  // Attaches to the trailing block only if it's itself `loose` — an
-  // implicit container this same path created earlier — or creates a
-  // fresh `loose` one WITH the exercise already in it. An explicitly
-  // created block the user hasn't named yet is NOT `loose` and must stay
-  // its own block (FR-2: an unnamed block still shows its position and
-  // stays renameable/deletable), never silently absorb a loose add just
-  // because it currently has no name. Computed entirely inside the
-  // updater (see `persist`'s own doc comment) so both the "which block is
-  // trailing" decision and the append happen against the true latest
-  // state, never a stale render-time snapshot.
-  const addExerciseAtTopLevel = (exerciseId: Exercise['id']) => {
+  const moveBlock = (fromIndex: number, toIndex: number) => {
     persist((current) => {
-      const lastBlock = current.blocks.at(-1);
-      const newEntry = {
-        id: newEditableItemId(),
-        exerciseId,
-        notes: '',
-        sets: [],
-      };
-      if (lastBlock && lastBlock.loose === true) {
-        return {
-          ...current,
-          blocks: current.blocks.map((b) =>
-            b.id === lastBlock.id
-              ? { ...b, exercises: [...b.exercises, newEntry] }
-              : b,
-          ),
-        };
-      }
-      const block = {
-        id: newEditableItemId(),
-        loose: true,
-        type: 'straightSets' as const,
-        exercises: [newEntry],
-      };
-      return { ...current, blocks: [...current.blocks, block] };
+      const blocks = [...current.blocks];
+      const [moved] = blocks.splice(fromIndex, 1);
+      if (!moved) return current;
+      blocks.splice(toIndex, 0, moved);
+      return { ...current, blocks };
     });
   };
 
@@ -227,18 +184,9 @@ export function SessionDetailScreen() {
     return <main className="session-detail-screen" aria-label="Session" />;
   }
 
-  // "Block N" position labels are computed from the ordinal among
-  // non-loose blocks, never the raw array index — a `loose` container
-  // renders with no label at all, so counting it would misnumber the
-  // first *visible* block (e.g. a loose exercise followed by the user's
-  // first "Add block" press would otherwise show that sole visible block
-  // as "Block 2").
-  const nonLooseBlocks = editable.blocks.filter((b) => b.loose !== true);
-
   return (
     <main className="session-detail-screen" aria-label="Session detail">
       <div className="session-detail-screen__header">
-        <h1>Session — {new Date(editable.dateTime).toLocaleString()}</h1>
         <button
           type="button"
           className="logging-button session-detail-screen__close"
@@ -280,29 +228,19 @@ export function SessionDetailScreen() {
         />
       )}
 
-      {editable.blocks.map((block) => {
-        const blockVm = toBlockViewModel(
-          block,
-          nonLooseBlocks.findIndex((b) => b.id === block.id),
-          catalogue,
-        );
-        const totalSets = block.exercises.reduce(
-          (sum, entry) => sum + entry.sets.length,
-          0,
-        );
-        // No `exercises.length > 0` guard: a `loose` block stays bare even
-        // once emptied by deleting its last exercise — it's still an
-        // implicit container the user never asked to see as a block.
-        const isBare = block.loose === true;
+      {editable.blocks.map((block, blockIndex) => {
+        const blockVm = toBlockViewModel(block, blockIndex, catalogue);
 
         return (
           <BlockCard
             key={block.id}
             displayName={blockVm.displayName}
             hasName={block.name !== undefined}
-            bare={isBare}
-            subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'} · ${totalSets} set${totalSets === 1 ? '' : 's'} logged`}
-            rounds={block.rounds}
+            subtitle={`${block.exercises.length} exercise${block.exercises.length === 1 ? '' : 's'}`}
+            canMoveUp={blockIndex > 0}
+            canMoveDown={blockIndex < editable.blocks.length - 1}
+            onMoveUp={() => moveBlock(blockIndex, blockIndex - 1)}
+            onMoveDown={() => moveBlock(blockIndex, blockIndex + 1)}
             onRename={(name) =>
               persist((editable) => ({
                 ...editable,
@@ -313,18 +251,6 @@ export function SessionDetailScreen() {
                 ),
               }))
             }
-            onSetRounds={(rounds) =>
-              persist((editable) => ({
-                ...editable,
-                blocks: editable.blocks.map((b) =>
-                  b.id !== block.id
-                    ? b
-                    : rounds !== undefined
-                      ? { ...b, rounds }
-                      : withoutRounds(b),
-                ),
-              }))
-            }
             onDelete={() =>
               persist((editable) => ({
                 ...editable,
@@ -332,25 +258,23 @@ export function SessionDetailScreen() {
               }))
             }
             footer={
-              isBare ? undefined : (
-                <AddExerciseControl
-                  buttonLabel={`Add exercise to ${blockVm.displayName}`}
-                  fieldLabel={`Add exercise to ${blockVm.displayName}`}
-                  search={(query) => searchExercises(query, catalogue)}
-                  onSelectExercise={(exercise) =>
-                    addExerciseToBlock(block.id, exercise.id)
-                  }
-                  onCreateExercise={(name) => {
-                    void (async () => {
-                      const exercise = await createExerciseInSession({
-                        canonicalName: name,
-                      });
-                      setCatalogue((current) => [...current, exercise]);
-                      addExerciseToBlock(block.id, exercise.id);
-                    })();
-                  }}
-                />
-              )
+              <AddExerciseControl
+                buttonLabel={`Add exercise to ${blockVm.displayName}`}
+                fieldLabel={`Add exercise to ${blockVm.displayName}`}
+                search={(query) => searchExercises(query, catalogue)}
+                onSelectExercise={(exercise) =>
+                  addExerciseToBlock(block.id, exercise.id)
+                }
+                onCreateExercise={(name) => {
+                  void (async () => {
+                    const exercise = await createExerciseInSession({
+                      canonicalName: name,
+                    });
+                    setCatalogue((current) => [...current, exercise]);
+                    addExerciseToBlock(block.id, exercise.id);
+                  })();
+                }}
+              />
             }
           >
             {block.exercises.map((entry, entryIndex) => {
@@ -358,12 +282,6 @@ export function SessionDetailScreen() {
               const exercise = catalogue.find((e) => e.id === entry.exerciseId);
               return (
                 <div key={entry.id}>
-                  <Link
-                    to={`/exercises/${entry.exerciseId}/progression`}
-                    className="session-detail-screen__progression-link"
-                  >
-                    View {entryVm.exerciseName} progression
-                  </Link>
                   <ExerciseEntryCard
                     exerciseName={entryVm.exerciseName}
                     canMoveUp={false}
@@ -393,55 +311,15 @@ export function SessionDetailScreen() {
                       }))
                     }
                   >
-                    <ul className="set-list">
-                      {entry.sets.map((set) => {
-                        const vm = toSetSummaryViewModel(set);
-                        return (
-                          <li key={vm.id} className="set-summary">
-                            <span>{vm.loadLabel}</span>
-                            <span>{vm.volumeLabel}</span>
-                            <button
-                              type="button"
-                              className="logging-button logging-button--icon-label"
-                              onClick={() =>
-                                persist((editable) => ({
-                                  ...editable,
-                                  blocks: editable.blocks.map((b) =>
-                                    b.id === block.id
-                                      ? {
-                                          ...b,
-                                          exercises: b.exercises.map((e) =>
-                                            e.id === entry.id
-                                              ? {
-                                                  ...e,
-                                                  sets: e.sets.filter(
-                                                    (s) => s.id !== vm.id,
-                                                  ),
-                                                }
-                                              : e,
-                                          ),
-                                        }
-                                      : b,
-                                  ),
-                                }))
-                              }
-                            >
-                              <Icon name="trash" />
-                              Delete set
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    <SetRow
-                      key={`${entry.id}-${entry.sets.length}-${exercise?.defaultLoadType ?? 'none'}-${exercise?.defaultVolumeKind ?? 'reps'}-${exercise?.trackEffort ?? false}`}
-                      prefill={undefined}
+                    <ExerciseSetList
+                      sets={entry.sets}
                       loadKind={exercise?.defaultLoadType ?? 'none'}
                       volumeKind={exercise?.defaultVolumeKind ?? 'reps'}
                       trackEffort={exercise?.trackEffort ?? false}
                       bandLabels={bandLabels}
                       freeTextSuggestions={[]}
-                      onConfirm={(input) =>
+                      prefill={undefined}
+                      onAddSet={(input) =>
                         persist((editable) => ({
                           ...editable,
                           blocks: editable.blocks.map((b) =>
@@ -475,6 +353,73 @@ export function SessionDetailScreen() {
                           ),
                         }))
                       }
+                      onUpdateSet={(setId, input) =>
+                        persist((editable) => ({
+                          ...editable,
+                          blocks: editable.blocks.map((b) =>
+                            b.id === block.id
+                              ? {
+                                  ...b,
+                                  exercises: b.exercises.map((e) =>
+                                    e.id === entry.id
+                                      ? {
+                                          ...e,
+                                          // FR-029's editable surface is
+                                          // load/volume/effort only —
+                                          // `setKind`/`completed` are kept
+                                          // from `s` itself, not taken
+                                          // from `input` (which always
+                                          // carries the add-form's fixed
+                                          // `setKind: 'working'`), so
+                                          // correcting e.g. a warm-up set's
+                                          // weight doesn't silently turn it
+                                          // into a completed working set.
+                                          sets: e.sets.map((s) =>
+                                            s.id === setId
+                                              ? {
+                                                  id: setId,
+                                                  ...(input.volume !== undefined
+                                                    ? { volume: input.volume }
+                                                    : {}),
+                                                  load: input.load,
+                                                  ...(input.effort !== undefined
+                                                    ? { effort: input.effort }
+                                                    : {}),
+                                                  setKind: s.setKind,
+                                                  completed: s.completed,
+                                                }
+                                              : s,
+                                          ),
+                                        }
+                                      : e,
+                                  ),
+                                }
+                              : b,
+                          ),
+                        }))
+                      }
+                      onDeleteSet={(setId) =>
+                        persist((editable) => ({
+                          ...editable,
+                          blocks: editable.blocks.map((b) =>
+                            b.id === block.id
+                              ? {
+                                  ...b,
+                                  exercises: b.exercises.map((e) =>
+                                    e.id === entry.id
+                                      ? {
+                                          ...e,
+                                          sets: e.sets.filter(
+                                            (s) => s.id !== setId,
+                                          ),
+                                        }
+                                      : e,
+                                  ),
+                                }
+                              : b,
+                          ),
+                        }))
+                      }
                       onSaveBandLabels={(labels) => setBandLabels(labels)}
                     />
                   </ExerciseEntryCard>
@@ -485,21 +430,6 @@ export function SessionDetailScreen() {
         );
       })}
 
-      <AddExerciseControl
-        buttonLabel="Add exercise"
-        fieldLabel="Exercise"
-        search={(query) => searchExercises(query, catalogue)}
-        onSelectExercise={(exercise) => addExerciseAtTopLevel(exercise.id)}
-        onCreateExercise={(name) => {
-          void (async () => {
-            const exercise = await createExerciseInSession({
-              canonicalName: name,
-            });
-            setCatalogue((current) => [...current, exercise]);
-            addExerciseAtTopLevel(exercise.id);
-          })();
-        }}
-      />
       <button
         type="button"
         className="logging-button logging-button--icon-label"

@@ -9,7 +9,6 @@ import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
 import type { SessionId, ExerciseId } from '../domain/ids';
 import { StorageError } from '../application/errors';
-import { toPersistableDraft } from '../application/logging/draft';
 import {
   migrateExerciseCatalogue,
   migrateExerciseTemplateDefaults as withTemplateDefaults,
@@ -400,8 +399,9 @@ export class FileSystemStorageAdapter implements StoragePort {
       // (Copilot review, PR #21).
       await this.#migrateExerciseTemplateDefaults();
     }
-    // v2 -> v3 (ADR-0008): see IndexedDbStorageAdapter's #checkSchema —
-    // nothing to backfill for this step.
+    // v2 -> v3 (ADR-0008) and v3 -> v4 (ADR-0013): see
+    // IndexedDbStorageAdapter's #checkSchema — nothing to backfill for
+    // either step.
     if (action === 'migrate' || stored === 0) {
       // See IndexedDbStorageAdapter's #checkSchema for the full rationale
       // — the never-initialized sentinel (stored === 0) needs the same
@@ -772,7 +772,7 @@ export class FileSystemStorageAdapter implements StoragePort {
 
   async saveDraft(draft: LoggingDraft): Promise<void> {
     await this.#ensureSchemaCheckedForWrite();
-    await this.#writeJson(DRAFT_FILE, toPersistableDraft(draft));
+    await this.#writeJson(DRAFT_FILE, draft);
   }
 
   async getDraft(): Promise<LoggingDraft | undefined> {
@@ -914,11 +914,7 @@ export class FileSystemStorageAdapter implements StoragePort {
       await this.#writeJsonToHandle(root, SETTINGS_FILE, input.settings);
     }
     if (input.loggingDraft !== undefined) {
-      await this.#writeJsonToHandle(
-        root,
-        DRAFT_FILE,
-        toPersistableDraft(input.loggingDraft),
-      );
+      await this.#writeJsonToHandle(root, DRAFT_FILE, input.loggingDraft);
     }
     await this.#writeJsonToHandle(root, META_FILE, {
       schemaVersion: input.schemaVersion,

@@ -25,12 +25,9 @@ describe('SettingsScreen (spec 006 FR-001-006)', () => {
     render(<SettingsScreen />);
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: 'Settings' }),
+        screen.getByRole('region', { name: 'Unit and increments' }),
       ).toBeInTheDocument(),
     );
-    expect(
-      screen.getByRole('region', { name: 'Unit and increments' }),
-    ).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Theme' })).toBeInTheDocument();
     expect(
       screen.getByRole('region', { name: 'First day of the week' }),

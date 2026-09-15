@@ -40,24 +40,31 @@ import type {
 export type { LoggingDraft, DraftBlock, DraftExerciseEntry, DraftSet };
 
 /**
- * FR-024/FR-027 (ADR-0009): whether the draft has anything worth keeping —
- * the same threshold that gates both the first `saveDraft` call (nothing
- * is persisted until this is true) and the "Log workout" control's own
- * availability, so "worth saving as a draft" and "worth registering as a
- * Session" never diverge. Editing only the session's date-time does not
- * add a block, so it alone never makes this true (FR-024's explicit
- * carve-out for that path).
+ * FR-024/FR-027 (ADR-0009, redefined by ADR-0011): whether the draft has
+ * anything worth keeping — the same threshold that gates both the first
+ * `saveDraft` call (nothing is persisted until this is true) and the "Log
+ * workout" control's own availability, so "worth saving as a draft" and
+ * "worth registering as a Session" never diverge. `createDraft` now always
+ * seeds one block (ADR-0011), so "has a block" alone is no longer a
+ * meaningful bar — this checks for at least one exercise entry instead.
+ * Editing only the session's date-time, or leaving the seeded block (or
+ * any other empty block) exactly as it started, never makes this true.
  */
 export function draftHasContent(draft: LoggingDraft): boolean {
-  return draft.blocks.length > 0;
+  return draft.blocks.some((block) => block.exercises.length > 0);
 }
 
-/** Creates a brand-new, empty draft dated `now` (ISO 8601). */
+/**
+ * Creates a brand-new draft dated `now` (ISO 8601), seeded with one
+ * unnamed, empty block (ADR-0011) — every exercise now always belongs to a
+ * real block, so the logging form always has one to add to immediately,
+ * with no separate "loose" concept to reach for first.
+ */
 export function createDraft(now: string): LoggingDraft {
   return {
     id: newId(),
     dateTime: now,
-    blocks: [],
+    blocks: [{ id: newId(), type: 'straightSets', exercises: [] }],
     notes: '',
     lastEditedAt: now,
   };
@@ -74,10 +81,7 @@ export function draftToSession(draft: LoggingDraft, id: SessionId): Session {
   const blocks = draft.blocks.map((block) =>
     createBlock({
       ...(block.name !== undefined ? { name: block.name } : {}),
-      // `block.loose` is deliberately dropped here — presentation-only,
-      // never part of the persisted `Block` (see `domain/block.ts`).
       type: block.type,
-      ...(block.rounds !== undefined ? { rounds: block.rounds } : {}),
       exercises: block.exercises.map((entry) => ({
         exerciseId: entry.exerciseId,
         notes: entry.notes,
@@ -106,29 +110,6 @@ export function draftToSession(draft: LoggingDraft, id: SessionId): Session {
       ? { durationSeconds: draft.durationSeconds }
       : {}),
   });
-}
-
-/**
- * Drops presentation-only fields before a draft is written to storage.
- * `DraftBlock.loose` is a rendering hint (docs/requirements.md §6: an
- * undocumented field reaching the actual persisted bytes is an implicit
- * schema change, the same reasoning `draftToSession` already applies when
- * promoting a draft to a `Session`). Both real adapters call this at their
- * write boundary so `loose` never reaches disk/IndexedDB; a block that was
- * loose simply shows its header again after a reload, matching what a
- * freshly-migrated v1 record (which never had the field) already renders.
- */
-export function toPersistableDraft(draft: LoggingDraft): LoggingDraft {
-  return {
-    ...draft,
-    blocks: draft.blocks.map((block) => ({
-      id: block.id,
-      ...(block.name !== undefined ? { name: block.name } : {}),
-      type: block.type,
-      ...(block.rounds !== undefined ? { rounds: block.rounds } : {}),
-      exercises: block.exercises,
-    })),
-  };
 }
 
 /**
@@ -180,25 +161,14 @@ export function pruneDraftExerciseId(
 }
 
 /**
- * Adds an exercise entry to the draft (FR-002). With no `blockId` (the
- * "loose exercise" path a user reaches without ever tapping "Add block"):
- * appends to the trailing block only if it's itself `loose` (an implicit
- * container this same path created earlier), or creates a fresh `loose`
- * block otherwise — this is what lets User Story 1 read as "a single
- * running list of sets" (spec.md User Story 2 context) when nothing has
- * been named yet, while never silently dropping a "loose" add into a
- * block the user *explicitly* created via "Add block" just because that
- * block also happens to have no name yet (FR-2 requires an unnamed block
- * to still show its position label and stay renameable/deletable — it
- * must not be mistaken for a `loose` one). The presentation layer renders
- * only `loose` blocks "bare" (no header/menu), so this is also what keeps
- * a loose exercise from ever looking like it's inside a block once a
- * real, explicitly created one exists alongside it.
- *
- * With an explicit `blockId` (a block's own "Add exercise" control, used
- * to group exercises on purpose): appends to that specific block instead.
- * An id that doesn't resolve is a no-op, matching `findEntry`'s defensive-
- * lookup convention elsewhere in this module.
+ * Adds an exercise entry to the draft (FR-002). Every exercise now always
+ * belongs to a real block (ADR-0011) — with an explicit `blockId` (a
+ * block's own "Add exercise" control, the only way the UI ever calls
+ * this), appends to that specific block; an id that doesn't resolve is a
+ * no-op, matching `findEntry`'s defensive-lookup convention elsewhere in
+ * this module. With no `blockId`, appends to the trailing block instead,
+ * creating one first if the draft somehow has none — `createDraft` always
+ * seeds one, so this only ever matters for a draft built without it.
  */
 export function addExerciseEntry(
   draft: LoggingDraft,
@@ -226,19 +196,13 @@ export function addExerciseEntry(
   }
 
   const lastIndex = draft.blocks.length - 1;
-  const lastBlock = draft.blocks[lastIndex];
-  // Only ever piggybacks on the trailing block if it's itself `loose` —
-  // an explicitly created block the user hasn't named yet (`loose` is
-  // unset) must stay its own block, never silently absorb a loose add
-  // just because it currently has no name (FR-2).
-  if (!lastBlock || lastBlock.loose !== true) {
+  if (lastIndex < 0) {
     const block: DraftBlock = {
       id: newId(),
-      loose: true,
       type: 'straightSets',
       exercises: [entry],
     };
-    return { ...draft, blocks: [...draft.blocks, block] };
+    return { ...draft, blocks: [block] };
   }
 
   return {
@@ -404,6 +368,62 @@ export function addSet(
   };
 }
 
+/**
+ * ADR-0010: edits an already-recorded set in place — spec 001 never had
+ * this capability (a confirmed set could only be added or deleted), added
+ * alongside restoring an explicit confirm step. Validates via domain
+ * `createSet`, the same as `addSet`; the caller/UI must not offer a
+ * confirm control until this would succeed (`SetRow`'s own `canConfirm`).
+ * A no-op (returns `draft` unchanged) if `entryId`/`setId` don't resolve.
+ */
+export function updateSet(
+  draft: LoggingDraft,
+  blockId: string,
+  entryId: string,
+  setId: string,
+  input: AddSetInput,
+): LoggingDraft {
+  const entry = findEntry(draft, blockId, entryId);
+  const existing = entry?.sets.find((s) => s.id === setId);
+  if (!entry || !existing) return draft;
+
+  // FR-029's editable surface is load/volume/effort only — `setKind`
+  // (warm-up/working/to-failure, which feeds progression computations,
+  // §5) and `completed` are not part of what this edits, so they're kept
+  // from the set actually being edited, not taken from `input` (`SetRow`
+  // always builds an `AddSetInput` with `setKind: 'working'`, since that's
+  // the only kind the *add* form ever offers — blindly applying it here
+  // would silently turn an edited warm-up or incomplete set into a
+  // completed working one).
+  const validated = createSet({
+    ...(input.volume !== undefined ? { volume: input.volume } : {}),
+    load: input.load,
+    ...(input.effort !== undefined ? { effort: input.effort } : {}),
+    setKind: existing.setKind,
+    completed: existing.completed,
+  });
+  const updatedSet: DraftSet = { id: setId, ...validated };
+
+  return {
+    ...draft,
+    blocks: draft.blocks.map((block) =>
+      block.id !== blockId
+        ? block
+        : {
+            ...block,
+            exercises: block.exercises.map((e) =>
+              e.id !== entryId
+                ? e
+                : {
+                    ...e,
+                    sets: e.sets.map((s) => (s.id === setId ? updatedSet : s)),
+                  },
+            ),
+          },
+    ),
+  };
+}
+
 /** FR-006: appends a new block, unnamed when `name` is omitted. */
 export function addBlock(
   draft: LoggingDraft,
@@ -427,7 +447,6 @@ function withoutName(block: DraftBlock): DraftBlock {
   const rest: DraftBlock = {
     id: block.id,
     type: block.type,
-    ...(block.rounds !== undefined ? { rounds: block.rounds } : {}),
     exercises: block.exercises,
   };
   return rest;
@@ -450,41 +469,18 @@ export function renameBlock(
   };
 }
 
-/**
- * ADR-0008: sets (or clears, with `undefined`) a block's target round
- * count. Unlike `addSet`'s `AddSetInput`, this never throws for an
- * out-of-range value — a draft may hold transient, not-yet-valid state
- * (this module's own doc comment) — `domain/block.ts`'s `createBlock`
- * rejects a non-positive-integer `rounds` at promotion time
- * (`draftToSession`), the same point every other draft-only laxness gets
- * caught.
- */
-export function setBlockRounds(
+/** Moves a block within the session, by list position (mirrors
+ * `reorderBlockExercise` below, one level up). */
+export function reorderBlock(
   draft: LoggingDraft,
-  blockId: string,
-  rounds: number | undefined,
+  fromIndex: number,
+  toIndex: number,
 ): LoggingDraft {
-  return {
-    ...draft,
-    blocks: draft.blocks.map((block) =>
-      block.id !== blockId
-        ? block
-        : rounds !== undefined
-          ? { ...block, rounds }
-          : withoutRounds(block),
-    ),
-  };
-}
-
-function withoutRounds(block: DraftBlock): DraftBlock {
-  const rest: DraftBlock = {
-    id: block.id,
-    ...(block.name !== undefined ? { name: block.name } : {}),
-    ...(block.loose !== undefined ? { loose: block.loose } : {}),
-    type: block.type,
-    exercises: block.exercises,
-  };
-  return rest;
+  const blocks = [...draft.blocks];
+  const [moved] = blocks.splice(fromIndex, 1);
+  if (!moved) return draft;
+  blocks.splice(toIndex, 0, moved);
+  return { ...draft, blocks };
 }
 
 /** FR-006: moves an exercise entry within one block, by list position. */
