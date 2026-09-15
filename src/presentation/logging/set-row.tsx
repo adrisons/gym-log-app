@@ -66,6 +66,13 @@ export interface SetRowProps {
   trackEffort: boolean;
   bandLabels: string[];
   freeTextSuggestions: string[];
+  /** Settings' `defaultUnit` (spec 006 FR-001/SC-003) — labels and tags a
+   * new Weight load; never rewrites an already-recorded one (`domain/
+   * load.ts`'s "stored exactly as entered" contract). */
+  unit: 'kg' | 'lb';
+  /** Settings' `quickIncrements` (spec 006 FR-001/SC-003) — the Duration/
+   * Distance +/- step sizes. */
+  quickIncrements: { durationSeconds: number; distanceMetres: number };
   onConfirm: (input: AddSetInput) => void;
   /** Shown as a Cancel button alongside Confirm when given.
    * `ExerciseSetList` passes this for both add and edit — closing the form
@@ -173,6 +180,8 @@ export function SetRow({
   trackEffort,
   bandLabels,
   freeTextSuggestions,
+  unit,
+  quickIncrements,
   onConfirm,
   onCancel,
   onSaveBandLabels,
@@ -185,6 +194,16 @@ export function SetRow({
   const effectiveVolumeKind: VolumeKind = editingSet?.volume
     ? editingSet.volume.kind
     : volumeKind;
+  // Same reasoning as `effectiveLoadKind`: an already-recorded Weight load
+  // keeps exactly the unit it was given — editing e.g. this set's reps
+  // must not silently retag its weight into whatever unit Settings
+  // currently defaults to, since the number itself is never converted
+  // (`domain/load.ts`). A fresh add (including a prefill) has no such
+  // history and always uses the current default.
+  const effectiveUnit: 'kg' | 'lb' =
+    editingSet && editingSet.load.kind === 'weight'
+      ? editingSet.load.unit
+      : unit;
 
   const initialLoad = editingSet?.load ?? prefill?.load;
   const loadMatchesEffectiveKind = initialLoad?.kind === effectiveLoadKind;
@@ -241,7 +260,7 @@ export function SetRow({
 
     const builtLoad: AddSetInput['load'] =
       effectiveLoadKind === 'weight' && fields.weightKg !== undefined
-        ? { kind: 'weight', value: fields.weightKg, unit: 'kg' }
+        ? { kind: 'weight', value: fields.weightKg, unit: effectiveUnit }
         : effectiveLoadKind === 'band' && fields.bandLabel
           ? { kind: 'band', label: fields.bandLabel }
           : effectiveLoadKind === 'bodyweight'
@@ -336,7 +355,11 @@ export function SetRow({
   return (
     <div className="set-row">
       {effectiveLoadKind === 'weight' && (
-        <WeightLoadInput valueKg={weightKg} onChange={setWeightKg} />
+        <WeightLoadInput
+          value={weightKg}
+          unit={effectiveUnit}
+          onChange={setWeightKg}
+        />
       )}
       {effectiveLoadKind === 'band' && (
         <BandLoadInput
@@ -362,6 +385,8 @@ export function SetRow({
       <VolumeInput
         kind={effectiveVolumeKind}
         value={volumeValue}
+        durationIncrement={quickIncrements.durationSeconds}
+        distanceIncrement={quickIncrements.distanceMetres}
         onValueChange={setVolumeValue}
       />
       {trackEffort && <EffortPicker value={effort} onChange={setEffort} />}

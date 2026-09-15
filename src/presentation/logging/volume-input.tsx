@@ -10,32 +10,18 @@
  * quick-increment mechanism. Duration/distance keep their numeric field
  * and quick-increment buttons unchanged (research.md §9); only reps was
  * asked to move to a wheel.
+ *
+ * `durationIncrement`/`distanceIncrement` (spec 006 FR-001/SC-003) are the
+ * caller's job to supply — Settings' own `quickIncrements`, not the fixed
+ * `application/logging/quick-increments.ts` constants this component used
+ * to import directly, which made changing either Settings field a no-op
+ * (Copilot review, PR #31).
  */
-import {
-  DURATION_INCREMENT_SECONDS,
-  DISTANCE_INCREMENT_METRES,
-} from '@/application/logging/quick-increments';
 import { WheelPicker } from './wheel-picker';
 import type { WheelPickerOption } from './wheel-picker';
 import './logging.css';
 
 export type VolumeKind = 'reps' | 'duration' | 'distance';
-
-const TIMED_KIND_META: Record<
-  'duration' | 'distance',
-  { label: string; increment: number; min: number }
-> = {
-  duration: {
-    label: 'Duration (s)',
-    increment: DURATION_INCREMENT_SECONDS,
-    min: 1,
-  },
-  distance: {
-    label: 'Distance (m)',
-    increment: DISTANCE_INCREMENT_METRES,
-    min: 1,
-  },
-};
 
 export const MAX_REPS = 100;
 const REPS_OPTIONS: WheelPickerOption<number | undefined>[] = [
@@ -49,10 +35,18 @@ const REPS_OPTIONS: WheelPickerOption<number | undefined>[] = [
 export interface VolumeInputProps {
   kind: VolumeKind;
   value: number | undefined;
+  durationIncrement: number;
+  distanceIncrement: number;
   onValueChange: (value: number | undefined) => void;
 }
 
-export function VolumeInput({ kind, value, onValueChange }: VolumeInputProps) {
+export function VolumeInput({
+  kind,
+  value,
+  durationIncrement,
+  distanceIncrement,
+  onValueChange,
+}: VolumeInputProps) {
   if (kind === 'reps') {
     return (
       <div className="set-row__field">
@@ -68,7 +62,10 @@ export function VolumeInput({ kind, value, onValueChange }: VolumeInputProps) {
     );
   }
 
-  const meta = TIMED_KIND_META[kind];
+  const meta =
+    kind === 'duration'
+      ? { label: 'Duration (s)', increment: durationIncrement, min: 1 }
+      : { label: 'Distance (m)', increment: distanceIncrement, min: 1 };
   const current = value ?? 0;
 
   return (

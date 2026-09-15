@@ -45,6 +45,7 @@ import {
   draftHasContent,
 } from '@/application/logging/logging-store';
 import { toBlockViewModel } from '@/application/logging/view-models';
+import { useSettingsStore } from '@/application/settings-store';
 import type { Exercise } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
 import { prefersReducedMotion } from '@/presentation/design/motion';
@@ -83,6 +84,7 @@ export function LoggingScreen() {
   const searchExercises = useLoggingSession((s) => s.searchExercises);
   const createExercise = useLoggingSession((s) => s.createExercise);
   const bandLabels = useLoggingSession((s) => s.bandLabels);
+  const settings = useSettingsStore((s) => s.settings);
   const updateExerciseTemplate = useLoggingSession(
     (s) => s.updateExerciseTemplate,
   );
@@ -326,6 +328,8 @@ export function LoggingScreen() {
                     bandLabels={bandLabels}
                     freeTextSuggestions={suggestFreeTextLoads(entry.exerciseId)}
                     prefill={prefillNextSet(block.id, entry.id)}
+                    unit={settings.defaultUnit}
+                    quickIncrements={settings.quickIncrements}
                     onAddSet={(input) => void addSet(entry.id, input)}
                     onUpdateSet={(setId, input) =>
                       void updateSet(entry.id, setId, input)

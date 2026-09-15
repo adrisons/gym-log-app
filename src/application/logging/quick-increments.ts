@@ -1,18 +1,16 @@
 /**
- * Named quick-increment amounts for numeric load/volume controls
- * (FR-010; research.md §9). Fixed defaults for this slice — "configurable"
- * is satisfied by being named constants in one place
- * (`docs/development-principles.md` §5), not by a user-facing settings UI,
- * which doesn't exist yet (Settings/FR-11 is out of scope, spec.md
- * Non-Goals).
+ * Named quick-increment amounts for numeric load controls (FR-010;
+ * research.md §9).
  *
- * Weight and reps no longer have dedicated quick-increment buttons — the
- * numeric keypad and the reps wheel picker replaced them (docs/requirements.md
- * FR-3's updated text) — so their constants were removed with the UI that
- * used them, rather than left as dead exports.
+ * Duration/distance's own increments moved to `Settings.quickIncrements`
+ * (spec 006 FR-001/SC-003, `application/ports/settings.ts`) now that
+ * they're genuinely user-configurable — `presentation/logging/
+ * volume-input.tsx` takes them as props instead of importing fixed
+ * constants from here, which had made the Settings fields it showed a
+ * no-op (Copilot review, PR #31). `DEFAULT_SETTINGS.quickIncrements`
+ * carries their old values (5s / 50m) forward as the fresh-install
+ * default, so this changes no existing behavior on its own.
  */
 
 export const WEIGHT_FINE_INCREMENT_KG = 0.5;
 export const BODYWEIGHT_COMPONENT_INCREMENT_KG = 2.5;
-export const DURATION_INCREMENT_SECONDS = 5;
-export const DISTANCE_INCREMENT_METRES = 50;

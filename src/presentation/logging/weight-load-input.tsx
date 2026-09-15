@@ -5,26 +5,37 @@
  * used to require; see docs/requirements.md FR-3's updated text). Value is
  * `undefined` when empty (treated as "no Weight load entered", not `0` —
  * `0` is itself a valid FR-026 value once the user actually enters it).
+ *
+ * `unit` (spec 006 FR-001/SC-003) only relabels the field and tags the
+ * stored `Load.unit` — the number itself is never converted, matching
+ * `domain/load.ts`'s "stored exactly as entered" contract for this load
+ * kind: switching the default unit in Settings changes what a typed "100"
+ * means for a *new* set, not any value already recorded.
  */
 import './logging.css';
 
 export interface WeightLoadInputProps {
-  valueKg: number | undefined;
-  onChange: (valueKg: number | undefined) => void;
+  value: number | undefined;
+  unit: 'kg' | 'lb';
+  onChange: (value: number | undefined) => void;
 }
 
-export function WeightLoadInput({ valueKg, onChange }: WeightLoadInputProps) {
+export function WeightLoadInput({
+  value,
+  unit,
+  onChange,
+}: WeightLoadInputProps) {
   return (
     <div className="set-row__field">
       <label>
-        <span>Weight (kg)</span>
+        <span>Weight ({unit})</span>
         <input
           type="number"
           inputMode="decimal"
           min={0}
           step={0.5}
           className="logging-field-input"
-          value={valueKg ?? ''}
+          value={value ?? ''}
           onChange={(event) => {
             const raw = event.target.value;
             if (raw === '') {

@@ -38,7 +38,15 @@ export interface Settings {
  */
 export const DEFAULT_SETTINGS: Settings = {
   defaultUnit: 'kg',
-  quickIncrements: { durationSeconds: 5, distanceMetres: 5 },
+  // Matches `application/logging/quick-increments.ts`'s pre-Settings
+  // hardcoded constants exactly (5s / 50m) — this field was previously
+  // `distanceMetres: 5`, which contradicted this doc comment's own claim
+  // and would have changed the default distance quick-increment for every
+  // existing install the moment logging started reading Settings instead
+  // of those constants (Copilot review, PR #31: "logging never reads
+  // these values" — fixed by wiring them through, which made this
+  // pre-existing mismatch reachable for the first time).
+  quickIncrements: { durationSeconds: 5, distanceMetres: 50 },
   theme: 'system',
   firstDayOfWeek: 'monday',
 };
