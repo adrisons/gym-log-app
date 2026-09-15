@@ -39,6 +39,7 @@
  * this exact set, not a guess forwarded from a different one.
  */
 import { useState } from 'react';
+import type { WheelEvent } from 'react';
 import { WeightLoadInput } from './weight-load-input';
 import { BandLoadInput } from './band-load-input';
 import { BodyweightLoadInput } from './bodyweight-load-input';
@@ -313,6 +314,18 @@ export function SetRow({
     !trackEffort;
 
   if (isCompactRow) {
+    // Hiding the native spinner (logging.css) doesn't stop a focused
+    // `type="number"` field from still responding to a mouse-wheel/
+    // trackpad scroll gesture over it — exactly the scroll-to-change
+    // interaction this compact row exists to avoid (Copilot review,
+    // PR #33). Blurring on wheel is the standard workaround: the browser
+    // only adjusts the value of the currently-focused number input, so an
+    // immediate blur (then refocus is still one tap away) makes a stray
+    // scroll over the field inert instead of silently changing it.
+    const blurOnWheel = (event: WheelEvent<HTMLInputElement>) => {
+      event.currentTarget.blur();
+    };
+
     return (
       <div className="set-row set-row--compact">
         <input
@@ -325,6 +338,7 @@ export function SetRow({
           placeholder="15"
           aria-label="Reps"
           value={volumeValue ?? ''}
+          onWheel={blurOnWheel}
           onChange={(event) => {
             const raw = event.target.value;
             if (raw === '') {
@@ -332,9 +346,14 @@ export function SetRow({
               return;
             }
             const parsed = Number(raw);
+            // Reps must be a positive integer (`domain/volume.ts`'s
+            // `createVolume`) — the old wheel only ever exposed 1..100, so
+            // this plain field must reject 0 and fractional entries the
+            // same way rather than letting `Add set` pass them through to
+            // a domain error (Copilot review, PR #33).
             setVolumeValue(
-              Number.isFinite(parsed) && parsed >= 0
-                ? Math.min(MAX_REPS, parsed)
+              Number.isInteger(parsed) && parsed >= 1 && parsed <= MAX_REPS
+                ? parsed
                 : undefined,
             );
           }}
@@ -348,6 +367,7 @@ export function SetRow({
           placeholder={effectiveUnit}
           aria-label={`Weight (${effectiveUnit})`}
           value={weightKg ?? ''}
+          onWheel={blurOnWheel}
           onChange={(event) => {
             const raw = event.target.value;
             if (raw === '') {

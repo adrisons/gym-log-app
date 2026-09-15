@@ -165,12 +165,17 @@ options.
 tap should never be ambiguous. Secondary actions (edit, delete, reorder)
 are present but visually quieter.
 
-**Destructive actions read the same at every level.** Deleting a block, an
-exercise entry, or a set is offered through the same affordance (a
-secondary, visually quiet menu next to the thing it acts on) at every
-level of that hierarchy — a user who has found it once at one level has
-found it everywhere, rather than a block getting a menu and a set getting
-a bare button.
+**Destructive actions read the same at every level.** Deleting a block or
+an exercise entry is offered through the same affordance (a secondary,
+visually quiet menu next to the thing it acts on) — a user who has found
+it once at one of those two levels has found it at the other.
+_(Amended, ADR-0015: a set is the one level that departs from this — its
+row shows a bare trailing "×" instead of a menu, matching the sets
+table's own one-icon-per-row footprint, with Edit reached by tapping the
+row's values instead of a menu item. A single, dense list of sets per
+exercise entry made the per-row menu read as one interaction too many
+compared to the block/exercise level, where a menu holds several actions
+(rename, move, delete) rather than one.)_
 
 **Structure can be collapsed without being lost.** A block long enough to
 push the next one off-screen can be collapsed to its header (name,

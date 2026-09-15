@@ -472,11 +472,16 @@
 .set-summary__edit {
   grid-column: 1 / 3;
   display: grid;
-  /* Mirrors the outer grid's own first two column widths (50px reps, 80px
-     load) — kept as literal widths rather than `subgrid` for wider browser
-     support, so this must stay in sync with `.sets-header-row`/`.set-summary`'s
-     own `grid-template-columns` if that ever changes. */
+  /* Mirrors the outer grid's own first two column widths AND gap (50px
+     reps, 80px load, var(--space-3) between) — kept as literal values
+     rather than `subgrid` for wider browser support, so this must stay in
+     sync with `.sets-header-row`/`.set-summary`'s own
+     `grid-template-columns`/`gap` if either ever changes. Missing the gap
+     here (Copilot review, PR #33) started the Load value 12px left of the
+     Load header/compact input above it — the two grids must share both
+     properties, not just the column widths. */
   grid-template-columns: 50px 80px;
+  gap: var(--space-3);
   align-items: center;
   font: inherit;
   color: inherit;
@@ -501,6 +506,16 @@
 .set-summary__load {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  /* The Load column is a fixed 80px (matching the header/input above it),
+     but a Free text load (up to 40 characters, free-text-load-input.tsx)
+     or a long Bodyweight label can exceed that — clip with an ellipsis
+     rather than overflow into the spacer/delete column (Copilot review,
+     PR #33). `min-width: 0` overrides the grid item's implicit `auto`
+     minimum, which would otherwise ignore this and grow the track anyway. */
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .set-summary__effort {

@@ -50,7 +50,13 @@ Each row drops the previous "⋮" `OverflowMenu` (Edit/Delete) in favor of a
 bare trailing "×" that only deletes; tapping the row's own value cells
 (a `<button>` wrapping them) opens the same in-place edit form Edit used
 to. This keeps editing reachable without a visible menu, matching the
-approved design's one-icon-per-row footprint.
+approved design's one-icon-per-row footprint, and departs from
+`docs/design.md`'s "destructive actions read the same at every level"
+rule for this one level only — a set row holds one action (delete) where
+a block/exercise's menu holds several (rename, move, delete), so the
+per-row menu read as one interaction too many at the density a sets list
+needs. `docs/design.md` is amended accordingly, scoped to sets only;
+block/exercise deletion is unchanged.
 
 ### 2. A compact single-line add-set row for Weight+Reps, no effort
 

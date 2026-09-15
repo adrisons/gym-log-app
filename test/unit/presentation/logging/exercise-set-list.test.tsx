@@ -164,6 +164,36 @@ describe('ExerciseSetList (ADR-0010)', () => {
     expect(screen.queryByText('—')).not.toBeInTheDocument();
   });
 
+  it('attaches the effort suffix to the volume cell, not an empty Load cell, for a none-kind load (Copilot review, PR #33)', () => {
+    const noneLoadWithEffort: DraftSet = {
+      id: 'set-none-effort',
+      volume: { kind: 'reps', count: 12 },
+      load: { kind: 'none' },
+      effort: 4,
+      setKind: 'working',
+      completed: true,
+    };
+    render(
+      <ExerciseSetList
+        {...baseProps}
+        loadKind="none"
+        sets={[noneLoadWithEffort]}
+        onAddSet={() => {}}
+        onUpdateSet={() => {}}
+        onDeleteSet={() => {}}
+      />,
+    );
+
+    // The effort word attaches to the reps cell (the only real value this
+    // set has) rather than being appended to an empty Load cell, which
+    // would otherwise read as a bare "— Hard" with nothing for the dash
+    // to follow.
+    expect(
+      screen.getByRole('button', { name: /edit 12 - hard/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^-\s*Hard$/)).toBeInTheDocument();
+  });
+
   it("shows only a trailing delete (×) on a logged set's row — no menu — with Edit reached by tapping the row itself", async () => {
     const onDeleteSet = vi.fn();
     render(

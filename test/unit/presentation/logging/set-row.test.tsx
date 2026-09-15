@@ -371,6 +371,35 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
       15,
     );
   });
+
+  it('the compact reps field rejects 0 and fractional entries — Confirm stays disabled (Copilot review, PR #33: reps must be a positive integer)', async () => {
+    render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
+
+    const repsField = screen.getByRole('spinbutton', { name: /^reps$/i });
+    await userEvent.type(repsField, '0');
+    expect(repsField).toHaveValue(null);
+    expect(confirmButton()).toBeDisabled();
+
+    await userEvent.clear(repsField);
+    await userEvent.type(repsField, '5.5');
+    expect(repsField).toHaveValue(null);
+    expect(confirmButton()).toBeDisabled();
+  });
+
+  it('the compact reps/weight fields blur on wheel so a scroll gesture cannot silently change the value (Copilot review, PR #33)', async () => {
+    render(<SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />);
+
+    const repsField = screen.getByRole('spinbutton', { name: /^reps$/i });
+    repsField.focus();
+    expect(repsField).toHaveFocus();
+
+    await userEvent.pointer({ target: repsField });
+    repsField.dispatchEvent(
+      new WheelEvent('wheel', { deltaY: -1, bubbles: true }),
+    );
+
+    expect(repsField).not.toHaveFocus();
+  });
 });
 
 describe('SetRow editing an existing set in place (ADR-0010)', () => {
