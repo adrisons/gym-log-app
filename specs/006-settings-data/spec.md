@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-12
 
-**Status**: Reviewed
+**Status**: Planned
 
 **Input**: User description: "Settings, export and import (FR-11, FR-12) —
 v1, Phase 6 per docs/agent-brief.md §3. Build the Settings screen (default
