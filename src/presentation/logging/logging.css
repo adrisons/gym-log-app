@@ -459,11 +459,12 @@
 
 .set-summary {
   position: relative;
+  /* Same padding as `.sets-header-row` (not a wider left value) — the
+     effort indicator bar (::before below) sits inside this existing
+     padding rather than adding to it, so the Reps/Load columns stay
+     aligned under their header regardless of whether this row has an
+     effort recorded (Copilot review, PR #34). */
   padding: var(--space-1) var(--space-3);
-  /* Reserves room for the effort indicator bar (::before below) plus the
-     same visual gap the old border-left left before the content, so a set
-     that later gets an effort edited in doesn't shift its neighbors. */
-  padding-left: calc(var(--space-3) + 5px);
   border-radius: var(--radius-sm);
   background: var(--color-surface-raised);
 }
