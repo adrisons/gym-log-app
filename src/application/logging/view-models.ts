@@ -118,8 +118,19 @@ export interface SetSummaryViewModel {
    * both are present, or whichever one alone is present (a none-kind load,
    * or FR-019's valid load-only set with no volume) — never an "x" with
    * only one real side. " - <effort word>" is appended when effort was
-   * recorded (ADR-0013). */
+   * recorded (ADR-0013). Kept for contexts that show a single compact line
+   * (e.g. a future dense view); the logging/session-detail screens render
+   * `volumeColumn`/`loadColumn` instead (design refinement pass). */
   summaryLine: string;
+  /** Bare volume value for the sets table's "Reps" column (e.g. "8"),
+   * `undefined` when this set has no volume (FR-019's load-only set). */
+  volumeColumn: string | undefined;
+  /** Bare load value for the sets table's "Load" column (e.g. "70kg"),
+   * `undefined` for a `none`-kind load. */
+  loadColumn: string | undefined;
+  /** " - <effort word>" suffix, appended to whichever column is present
+   * (load column preferred), or shown on its own when neither is. */
+  effortSuffix: string | undefined;
   effortTone?: 'success' | 'warning' | 'danger';
   setKind: 'warmUp' | 'working' | 'toFailure';
 }
@@ -131,11 +142,16 @@ export function toSetSummaryViewModel(set: DraftSet): SetSummaryViewModel {
     volumePart !== undefined && loadPart !== undefined
       ? `${volumePart} x ${loadPart}`
       : (volumePart ?? loadPart ?? '—');
+  const effortSuffix =
+    set.effort !== undefined ? EFFORT_LABELS[set.effort] : undefined;
   const summaryLine =
-    set.effort !== undefined ? `${line} - ${EFFORT_LABELS[set.effort]}` : line;
+    effortSuffix !== undefined ? `${line} - ${effortSuffix}` : line;
   return {
     id: set.id,
     summaryLine,
+    volumeColumn: volumePart,
+    loadColumn: loadPart,
+    effortSuffix,
     ...(set.effort !== undefined ? { effortTone: effortTone(set.effort) } : {}),
     setKind: set.setKind,
   };

@@ -81,7 +81,7 @@
      reserved for numbers that must align in a column (loads, reps, dates)
      so digits don't visually jitter as they change. No more than two type
      roles; loaded via Google Fonts in index.html. */
-  --font-ui: 'Space Grotesk', system-ui, sans-serif;
+  --font-ui: 'Geist', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 

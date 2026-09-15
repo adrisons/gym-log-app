@@ -17,6 +17,31 @@
      min-width, so it already reflows to a wider viewport (docs/design.md §6). */
 }
 
+/* Mirrors `.header-nav` (`nav/header-nav.css`) — the logging screen is the
+   one screen with no real `HeaderNav` (ADR-0009, it isn't one of the
+   destinations that bar surfaces), but its own header should still read
+   as the same chrome as every other screen's, not a visually distinct
+   one-off (design refinement request). Kept as a sibling class rather
+   than reusing `.header-nav` directly since this screen has no hamburger
+   menu to lay out — only the back arrow + title need to match. */
+.logging-screen__header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+}
+
+.logging-screen__title {
+  margin-right: auto;
+  font-size: 1.125rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .logging-screen__field-label {
   display: flex;
   flex-direction: column;
@@ -173,6 +198,33 @@
   opacity: 0.7;
 }
 
+/* Mirrors `.header-nav__back` exactly (design refinement) — a bare glyph,
+   not a `.logging-button`, so this screen's back control matches every
+   other screen's (`HeaderNav`'s own `backTo` arrow) rather than reading as
+   a one-off shape. */
+.logging-screen__back {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-left: calc(-1 * var(--space-2));
+  border-radius: var(--radius-sm);
+  color: var(--color-foreground);
+  text-decoration: none;
+  transition: background var(--duration-short) var(--easing-standard);
+}
+
+.logging-screen__back:hover {
+  background: var(--color-border);
+}
+
+.logging-screen__back:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
 /* FR-028 (ADR-0008): the pending-draft recovery banner, always at the top
    of the screen — a status region, never a modal (docs/design.md's own
    "no dialogs on the logging path"). */
@@ -204,6 +256,117 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
+}
+
+/* Compact "add set" row (design refinement — Claude Design canvas
+   exploration): the weight+reps, no-effort case laid out as one line,
+   sharing the sets table's own grid columns so its inputs line up with
+   the Reps/Load header and each already-logged row above (`SetRow`'s
+   `isCompactRow` gate — every other load/volume/effort combination keeps
+   the fuller stacked `.set-row` form above, which this selector does not
+   touch). No card chrome of its own — a plain top border stands in for
+   the table's row separator instead of nesting another bordered box
+   inside `.exercise-entry-card`. */
+.set-row--compact {
+  display: grid;
+  grid-template-columns: 50px 80px 1fr 44px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-top: 1px dashed var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+}
+
+.set-row__compact-input {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1rem;
+  color: var(--color-foreground);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  min-height: 44px;
+  width: 100%;
+  text-align: center;
+  /* A plain tap-to-type numeric field, not a stepper — the approved design
+     shows one bare cell per column, and the native up/down spinner reads
+     as an invitation to scroll/click-drag a value here the same way the
+     wheel picker this row replaced did (the exact interaction this compact
+     row exists to avoid). */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.set-row__compact-input::-webkit-outer-spin-button,
+.set-row__compact-input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.set-row__compact-input::placeholder {
+  color: var(--color-foreground-subtle);
+}
+
+.set-row__compact-input:hover {
+  border-color: var(--color-border-strong);
+}
+
+.set-row__compact-input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Confirm and (when offered) Cancel share the grid's trailing column as a
+   tight pair — matching the approved design's single "+" trailing action
+   while still surfacing Cancel (`ExerciseSetList` passes it for both add
+   and edit) rather than dropping the only way to back out of an in-place
+   edit without saving. */
+.set-row__compact-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.set-row__compact-confirm,
+.set-row__compact-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.set-row__compact-confirm {
+  color: var(--color-accent);
+}
+
+.set-row__compact-confirm:hover {
+  background: var(--color-border);
+}
+
+.set-row__compact-confirm:disabled {
+  color: var(--color-foreground-subtle);
+  cursor: not-allowed;
+}
+
+.set-row__compact-cancel {
+  color: var(--color-foreground-subtle);
+}
+
+.set-row__compact-cancel:hover {
+  background: var(--color-border);
+  color: var(--color-foreground);
 }
 
 .set-row__inputs {
@@ -241,12 +404,33 @@
   gap: var(--space-2);
 }
 
+/* Sets table: header row, each set row, and the add-set form's own inputs
+   (SetRow's .set-row__inputs) all share this same column layout — a
+   design-refinement request (Claude Design canvas exploration) so that
+   Reps/Load labels, values, and the trailing action control line up as
+   true columns rather than merely sitting near each other. */
+.sets-header-row,
 .set-summary {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 50px 80px 1fr 44px;
+  align-items: center;
   gap: var(--space-3);
-  align-items: baseline;
-  padding: var(--space-2) var(--space-3);
+}
+
+.sets-header-row {
+  padding: var(--space-1) var(--space-3);
+}
+
+.sets-header-cell {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-foreground-subtle);
+}
+
+.set-summary {
+  padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-sm);
   /* Reserved regardless of whether this set recorded an effort, so a set
      that later gets one edited in doesn't shift its neighbors — the tone
@@ -254,7 +438,79 @@
      it. */
   border-left: 3px solid transparent;
   background: var(--color-surface-raised);
+}
+
+/* Wraps the reps+load value cells as one tap target spanning the grid's
+   first two columns (design refinement: the approved design shows only a
+   trailing "×" for delete, with Edit reached by tapping the row's values
+   instead of a dropped ⋮ menu). A plain, unstyled-looking <button> — reset
+   to blend into the row rather than read as its own control. */
+.set-summary__edit {
+  grid-column: 1 / 3;
+  display: grid;
+  /* Mirrors the outer grid's own first two column widths (50px reps, 80px
+     load) — kept as literal widths rather than `subgrid` for wider browser
+     support, so this must stay in sync with `.sets-header-row`/`.set-summary`'s
+     own `grid-template-columns` if that ever changes. */
+  grid-template-columns: 50px 80px;
+  align-items: center;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.set-summary__edit:hover {
+  background: var(--color-border);
+}
+
+.set-summary__edit:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.set-summary__reps,
+.set-summary__load {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.set-summary__effort {
+  font-family: var(--font-ui);
+  color: var(--color-foreground-muted);
+}
+
+.set-summary__spacer {
+  min-width: 0;
+}
+
+.set-summary__delete {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-foreground-subtle);
+  cursor: pointer;
+}
+
+.set-summary__delete:hover {
+  background: var(--color-border);
+  color: var(--color-danger);
+}
+
+.set-summary__delete:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
 
 /* ADR-0013: a logged set's left edge reads its own effort at a glance —
@@ -271,12 +527,6 @@
 
 .set-summary--danger {
   border-left-color: var(--color-danger);
-}
-
-/* Pins the edit/delete menu to the row's end regardless of how many value
-   spans (load, volume, effort) wrap ahead of it. */
-.set-summary .overflow-menu {
-  margin-left: auto;
 }
 
 /* Plays once, only for the one row `LoggingScreen` marks as the set
@@ -351,33 +601,46 @@
   background: var(--color-surface);
 }
 
-/* Flatter, edge-to-edge treatment for the actual collapsible block (never
-   the shared `.block-card` shell above, which stays a normal floating
-   dialog card for `ExerciseTemplatePanel`/`ExerciseCataloguePanel`/
-   `CreateExercisePanel`/the rename popup): square corners, and negative
-   inline margins exactly cancelling `.logging-screen`'s own side padding
-   so the card's background spans the full viewport width instead of
-   sitting in a gutter — reclaiming that space was the point, so its own
-   `padding` (inherited from `.block-card`) keeps the content readably
-   inset regardless. */
+/* Borderless, canvas-level treatment for the actual collapsible block
+   (never the shared `.block-card` shell above, which stays a normal
+   floating dialog card for `ExerciseTemplatePanel`/
+   `ExerciseCataloguePanel`/`CreateExercisePanel`/the rename popup) — the
+   approved design (Claude Design canvas exploration, design-refinement
+   pass) has the block read as a plain section of the page, not a card:
+   no border, no surface fill, hierarchy carried by the header's own type
+   scale and a hairline rule under it instead. Exercises inside still
+   render as their own bordered cards (`.exercise-entry-card`) — only the
+   block-level wrapper lost its box. */
 .block-card--collapsible {
   gap: 0;
+  padding: 0;
+  border: none;
   border-radius: 0;
-  margin-inline: calc(-1 * var(--space-4));
+  background: transparent;
 }
 
 .block-card__header {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
 }
 
-/* Flatter treatment (design refinement): no border, unlike the generic
-   `.logging-button` it's still built from — its background against the
-   block's own is enough to read as tappable. */
+/* Flattest treatment (design refinement): no background, no border — a
+   bare glyph next to the title, matching the approved design's quiet
+   header chrome rather than reading as its own button. */
 .block-card__collapse-toggle {
   flex: none;
+  min-width: auto;
+  padding: var(--space-1);
+  background: transparent;
   border-color: transparent;
+  color: var(--color-foreground-subtle);
+}
+
+.block-card__collapse-toggle:hover {
+  background: var(--color-border);
 }
 
 /* The CSS-grid "animate to auto height" trick: `grid-template-rows`
@@ -503,7 +766,8 @@
 }
 
 /* Flatter treatment (design refinement) — same reasoning as
-   `.block-card__collapse-toggle` above: no visible border. */
+   `.block-card__collapse-toggle` above: no visible background or border,
+   a bare glyph. */
 .overflow-menu__trigger {
   display: inline-flex;
   align-items: center;
@@ -511,7 +775,13 @@
   min-height: 44px;
   min-width: 44px;
   padding: var(--space-2);
+  background: transparent;
   border-color: transparent;
+  color: var(--color-foreground-subtle);
+}
+
+.overflow-menu__trigger:hover {
+  background: var(--color-border);
 }
 
 .overflow-menu__list {

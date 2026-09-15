@@ -79,10 +79,14 @@ interface follows these:
 
 ### 1.2 Visual identity
 
-- **Type**: one legible, humanist typeface for everything read at length,
-  and one monospaced or tabular-figure treatment reserved for numbers that
-  need to align in a column (loads, reps, dates) so they don't visually
-  jitter as digits change. No more than two type roles.
+- **Type**: one legible, humanist typeface for everything read at length
+  (Geist), and one monospaced or tabular-figure treatment (JetBrains Mono)
+  reserved for numbers that need to align in a column (loads, reps, dates)
+  so they don't visually jitter as digits change. No more than two type
+  roles. Geist chosen over the earlier Space Grotesk pass in a Claude
+  Design canvas exploration, confirmed by the project owner — closer to
+  the "clean, modern, Notion-like" brief while still pairing naturally with
+  the mono numeral set.
 - **Icons**: line icons only, consistent stroke weight, on a fixed grid.
   Icons are never the only carrier of meaning — a state communicated by an
   icon is always also stated in a word (`docs/requirements.md` §7.4).
