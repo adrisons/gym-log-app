@@ -335,7 +335,12 @@ common use. **(ADR-0012)** That same header also carries the current
 screen's own title, to the left of the menu button — saving each screen
 the vertical space its own heading row used to take — so the hamburger
 button itself is the header's only fixed right-aligned element now, not
-the whole header.
+the whole header. A screen reached by drilling in from another (session
+detail from the diary, so far) instead registers a back arrow to the left
+of its title, replacing a floating close/back control of its own
+**(ADR-0014)** — one consistent place for "leave this screen," in the
+header every screen already has, rather than each screen inventing its
+own placement.
 
 Text wraps; it never scrolls sideways to be read.
 
