@@ -11,10 +11,11 @@
  * again. Filling in one field of a multi-field set (e.g. reps, before
  * weight is even touched) no longer saves anything on its own — every
  * field edit only updates this row's own local state; nothing reaches
- * `onConfirm` until the **Confirm** button is pressed. That button is
- * `disabled` (with a status line explaining why) until the row holds
- * every value the exercise's current template actually asks for — see
- * `buildRequirement` below.
+ * `onConfirm` until the **Confirm** button is pressed. That button stays
+ * `disabled` (`canConfirm` below) until the row holds every value the
+ * exercise's current template actually asks for — silently, with no
+ * status line naming what's missing (ADR-0014: the earlier explanatory
+ * text was removed as clutter).
  *
  * Add vs. edit mode: `editingSet`, when given, switches this row into
  * editing an already-recorded set in place — a capability sessions/
@@ -81,59 +82,16 @@ export interface SetRowProps {
   onSaveBandLabels: (labels: string[]) => void;
 }
 
-const VOLUME_KIND_WORDS: Record<VolumeKind, string> = {
-  reps: 'a rep count',
-  duration: 'a duration',
-  distance: 'a distance',
-};
-
 /** Only these load kinds require the user to actually type/pick a value —
  * Bodyweight is "present" on its own with nothing entered, and None has no
- * field to fill at all (`domain/load.ts`'s `createLoad`). */
+ * field to fill at all (`domain/load.ts`'s `createLoad`). Still needed for
+ * `canConfirm`'s own gating even though the status message that used to
+ * name these words for the user is gone (design-refinement request). */
 const LOAD_KIND_WORDS: Partial<Record<Load['kind'], string>> = {
   weight: 'a weight',
   band: 'a band',
   freeText: 'a value',
 };
-
-/**
- * Builds the edit-mode status message for a row that isn't yet
- * confirmable — the domain-minimum OR rule (FR-019), described in terms of
- * the set actually being edited: `effectiveVolumeKind` (which can be
- * Duration or Distance, not just Reps) and no "or a load" alternative at
- * all when `effectiveLoadKind` is `none` (there is no load control shown
- * to fill in that case).
- */
-function editRequirementMessage(
-  loadKind: Load['kind'],
-  volumeKind: VolumeKind,
-): string {
-  const loadWord = LOAD_KIND_WORDS[loadKind];
-  const volumeWord = VOLUME_KIND_WORDS[volumeKind];
-  return loadWord
-    ? `Enter ${loadWord} or ${volumeWord} to record this set.`
-    : `Enter ${volumeWord} to record this set.`;
-}
-
-/**
- * Builds the add-mode status message for a row that isn't yet confirmable,
- * naming exactly what the exercise's current template still needs (ADR-
- * 0010) — never the old blanket "a load or a rep count", which was untrue
- * the moment a template tracked both and the user had only filled one.
- */
-function missingFieldsMessage(
-  loadKind: Load['kind'],
-  volumeKind: VolumeKind,
-  loadPresent: boolean,
-  volumePresent: boolean,
-): string | undefined {
-  const missing: string[] = [];
-  const loadWord = LOAD_KIND_WORDS[loadKind];
-  if (loadWord && !loadPresent) missing.push(loadWord);
-  if (!volumePresent) missing.push(VOLUME_KIND_WORDS[volumeKind]);
-  if (missing.length === 0) return undefined;
-  return `Enter ${missing.join(' and ')} to record this set.`;
-}
 
 function initialVolumeValue(
   volume: Volume | undefined,
@@ -336,17 +294,6 @@ export function SetRow({
     : (LOAD_KIND_WORDS[effectiveLoadKind] === undefined || load.present) &&
       volumePresent;
 
-  const requirementMessage = canConfirm
-    ? undefined
-    : editingSet
-      ? editRequirementMessage(effectiveLoadKind, effectiveVolumeKind)
-      : missingFieldsMessage(
-          effectiveLoadKind,
-          effectiveVolumeKind,
-          load.present,
-          volumePresent,
-        );
-
   function handleConfirm() {
     const input = buildInput(currentFields);
     if (input) onConfirm(input);
@@ -412,11 +359,6 @@ export function SetRow({
           </button>
         )}
       </div>
-      {requirementMessage && (
-        <p className="logging-screen__field-label" role="status">
-          {requirementMessage}
-        </p>
-      )}
     </div>
   );
 }
