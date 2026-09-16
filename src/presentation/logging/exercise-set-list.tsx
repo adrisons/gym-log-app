@@ -21,7 +21,7 @@
  * Deleting an entry's last remaining set reopens the `'add'` form
  * automatically (there is once again "no data entered").
  */
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Icon } from '@/presentation/design/icons';
 import { SetRow } from './set-row';
 import type { VolumeKind } from './volume-input';
@@ -137,6 +137,53 @@ export function ExerciseSetList({
     form === 'edit' ? sets.find((s) => s.id === editingSetId) : undefined;
   const showForm = form === 'add' || (form === 'edit' && editingSet);
 
+  const setRow = showForm && (
+    <SetRow
+      // Add mode's key includes the template fields, not just `'add'`
+      // — otherwise editing the exercise's template (e.g. Reps →
+      // Duration) mid-session doesn't remount this row, and a value
+      // already typed under the old kind (e.g. "5" reps) gets silently
+      // reinterpreted as the new one (5 seconds) instead of being
+      // cleared (Copilot review, PR #27).
+      key={
+        form === 'edit'
+          ? `edit-${editingSetId}`
+          : `add-${loadKind}-${volumeKind}-${trackEffort}`
+      }
+      prefill={form === 'add' ? prefill : undefined}
+      editingSet={
+        editingSet
+          ? {
+              load: editingSet.load,
+              ...(editingSet.volume !== undefined
+                ? { volume: editingSet.volume }
+                : {}),
+              ...(editingSet.effort !== undefined
+                ? { effort: editingSet.effort }
+                : {}),
+            }
+          : undefined
+      }
+      loadKind={loadKind}
+      volumeKind={volumeKind}
+      trackEffort={trackEffort}
+      bandLabels={bandLabels}
+      freeTextSuggestions={freeTextSuggestions}
+      unit={unit}
+      quickIncrements={quickIncrements}
+      onConfirm={(input) => {
+        if (form === 'edit' && editingSetId) {
+          onUpdateSet(editingSetId, input);
+        } else {
+          onAddSet(input);
+        }
+        closeForm();
+      }}
+      onCancel={closeForm}
+      onSaveBandLabels={onSaveBandLabels}
+    />
+  );
+
   return (
     <>
       {sets.length > 0 && (
@@ -144,7 +191,9 @@ export function ExerciseSetList({
           <span className="sets-header-cell">
             {VOLUME_COLUMN_LABEL[volumeKind]}
           </span>
-          <span className="sets-header-cell">Load</span>
+          <span className="sets-header-cell">
+            {loadKind !== 'none' ? 'Load' : ''}
+          </span>
           <span className="sets-header-cell" />
         </div>
       )}
@@ -160,14 +209,14 @@ export function ExerciseSetList({
             .filter(Boolean)
             .join(' ');
           return (
-            <li
-              key={vm.id}
-              className={className}
-              {...(isNewest && onNewestSetAnimationEnd
-                ? { onAnimationEnd: () => onNewestSetAnimationEnd(vm.id) }
-                : {})}
-            >
-              {/* Tapping the row opens in-place edit (ExerciseSetList's
+            <Fragment key={vm.id}>
+              <li
+                className={className}
+                {...(isNewest && onNewestSetAnimationEnd
+                  ? { onAnimationEnd: () => onNewestSetAnimationEnd(vm.id) }
+                  : {})}
+              >
+                {/* Tapping the row opens in-place edit (ExerciseSetList's
                   existing 'edit' form state) — the approved design shows
                   only a trailing "×" for delete, with no visible menu, so
                   Edit is reached from the row itself instead of a dropped
@@ -175,16 +224,16 @@ export function ExerciseSetList({
                   whole <li>, which also hosts the delete control) keeps
                   this keyboard-operable without nesting an interactive
                   element inside another. */}
-              <button
-                type="button"
-                className="set-summary__edit"
-                aria-label={`Edit ${vm.summaryLine}`}
-                onClick={() => {
-                  setEditingSetId(set.id);
-                  setForm('edit');
-                }}
-              >
-                {/* Empty, not a "—" placeholder, when this column's value
+                <button
+                  type="button"
+                  className="set-summary__edit"
+                  aria-label={`Edit ${vm.summaryLine}`}
+                  onClick={() => {
+                    setEditingSetId(set.id);
+                    setForm('edit');
+                  }}
+                >
+                  {/* Empty, not a "—" placeholder, when this column's value
                     is absent (a load-only set with no volume, or a
                     none-kind load) — only entered data shows, a
                     pre-existing product rule this table must not regress
@@ -194,18 +243,22 @@ export function ExerciseSetList({
                     reflects it, and `vm.summaryLine`'s effort wording still
                     reaches screen readers via the Edit/Delete aria-labels
                     below. */}
-                <span className="set-summary__reps">{vm.volumeColumn}</span>
-                <span className="set-summary__load">{vm.loadColumn}</span>
-              </button>
-              <button
-                type="button"
-                className="set-summary__delete"
-                aria-label={`Delete ${vm.summaryLine}`}
-                onClick={() => onDeleteSet(set.id)}
-              >
-                <Icon name="close" />
-              </button>
-            </li>
+                  <span className="set-summary__reps">{vm.volumeColumn}</span>
+                  <span className="set-summary__load">{vm.loadColumn}</span>
+                </button>
+                <button
+                  type="button"
+                  className="set-summary__delete"
+                  aria-label={`Delete ${vm.summaryLine}`}
+                  onClick={() => onDeleteSet(set.id)}
+                >
+                  <Icon name="close" />
+                </button>
+              </li>
+              {form === 'edit' && vm.id === editingSetId && (
+                <li className="set-row-wrapper">{setRow}</li>
+              )}
+            </Fragment>
           );
         })}
       </ul>
@@ -221,52 +274,7 @@ export function ExerciseSetList({
         </button>
       )}
 
-      {showForm && (
-        <SetRow
-          // Add mode's key includes the template fields, not just `'add'`
-          // — otherwise editing the exercise's template (e.g. Reps →
-          // Duration) mid-session doesn't remount this row, and a value
-          // already typed under the old kind (e.g. "5" reps) gets silently
-          // reinterpreted as the new one (5 seconds) instead of being
-          // cleared (Copilot review, PR #27).
-          key={
-            form === 'edit'
-              ? `edit-${editingSetId}`
-              : `add-${loadKind}-${volumeKind}-${trackEffort}`
-          }
-          prefill={form === 'add' ? prefill : undefined}
-          editingSet={
-            editingSet
-              ? {
-                  load: editingSet.load,
-                  ...(editingSet.volume !== undefined
-                    ? { volume: editingSet.volume }
-                    : {}),
-                  ...(editingSet.effort !== undefined
-                    ? { effort: editingSet.effort }
-                    : {}),
-                }
-              : undefined
-          }
-          loadKind={loadKind}
-          volumeKind={volumeKind}
-          trackEffort={trackEffort}
-          bandLabels={bandLabels}
-          freeTextSuggestions={freeTextSuggestions}
-          unit={unit}
-          quickIncrements={quickIncrements}
-          onConfirm={(input) => {
-            if (form === 'edit' && editingSetId) {
-              onUpdateSet(editingSetId, input);
-            } else {
-              onAddSet(input);
-            }
-            closeForm();
-          }}
-          onCancel={closeForm}
-          onSaveBandLabels={onSaveBandLabels}
-        />
-      )}
+      {form === 'add' && setRow}
     </>
   );
 }

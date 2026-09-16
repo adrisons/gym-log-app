@@ -153,3 +153,21 @@
   display: flex;
   gap: var(--space-2);
 }
+
+/* Data section (Export/Import/Delete) — each sub-flow's root wraps its own
+   button(s) plus any confirmation/preview state, so the gap here spaces
+   those whole groups apart, not just the buttons themselves. */
+.settings-data-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Export controls' two buttons (data vs. spreadsheet) — stacked with the
+   same rhythm as the group gap above, replacing the old inline-text-space
+   layout that left them touching when they wrapped to separate lines. */
+.settings-button-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
