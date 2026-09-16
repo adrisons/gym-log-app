@@ -30,7 +30,7 @@ const COLUMNS = [
  * Neutralizes a leading `=`, `+`, `-`, or `@` — spreadsheet applications
  * (Excel, Sheets, LibreOffice) interpret a cell starting with any of these
  * as a formula, so user-authored free text (session notes, exercise/block
- * names, band/free-text load labels) could otherwise execute arbitrary
+ * names, free-text load labels) could otherwise execute arbitrary
  * formulas when this file is opened — a classic CSV-injection vector, and
  * one that also applies to a file this app later re-imports as data
  * (untrusted input). Prefixing with a single quote is the standard
@@ -55,11 +55,10 @@ function volumeValue(volume: Volume | undefined): string {
   return String(volume.metres);
 }
 
-/** User-authored text only for `band`/`freeText` — the other variants are
+/** User-authored text only for `freeText` — the other variants are
  * numeric or empty, never subject to formula-injection sanitizing. */
 function loadValue(load: Load): string {
   if (load.kind === 'weight') return String(load.value);
-  if (load.kind === 'band') return neutralizeFormulaLeader(load.label);
   if (load.kind === 'bodyweight') {
     return load.addedOrAssistedKg !== undefined
       ? String(load.addedOrAssistedKg)

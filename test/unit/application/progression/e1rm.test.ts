@@ -32,15 +32,15 @@ describe('isE1rmEligible', () => {
     ).toBe(true);
   });
 
-  it('is false for Band or FreeText loads', () => {
-    expect(
-      isE1rmEligible(set({ load: createLoad({ kind: 'band', label: 'red' }) })),
-    ).toBe(false);
+  it('is false for FreeText or None loads', () => {
     expect(
       isE1rmEligible(
         set({ load: createLoad({ kind: 'freeText', text: 'heavy' }) }),
       ),
     ).toBe(false);
+    expect(isE1rmEligible(set({ load: createLoad({ kind: 'none' }) }))).toBe(
+      false,
+    );
   });
 
   it('is false for a zero-added-load Bodyweight set', () => {

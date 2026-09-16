@@ -82,7 +82,6 @@ describe('data-transfer performance (spec 006 FR-020, SC-007)', () => {
     const file = buildExportFile({
       sessions,
       exercises: allExercises,
-      bandLabels: ['Red', 'Blue'],
       settings: undefined,
       loggingDraft: undefined,
     });
@@ -103,7 +102,6 @@ describe('data-transfer performance (spec 006 FR-020, SC-007)', () => {
     const file = buildExportFile({
       sessions,
       exercises: allExercises,
-      bandLabels: [],
       settings: undefined,
       loggingDraft: undefined,
     });
@@ -112,7 +110,6 @@ describe('data-transfer performance (spec 006 FR-020, SC-007)', () => {
       {
         sessions,
         exercises: allExercises,
-        bandLabels: [],
         settings: undefined,
         loggingDraft: undefined,
       },

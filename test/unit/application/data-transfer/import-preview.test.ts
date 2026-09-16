@@ -39,7 +39,6 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 const emptyLocal: LocalImportSnapshot = {
   sessions: [],
   exercises: [],
-  bandLabels: [],
   settings: undefined,
   loggingDraft: undefined,
 };
@@ -49,7 +48,6 @@ describe('computeImportPreview (spec 006 FR-010)', () => {
     const file = buildExportFile({
       sessions: [makeSession()],
       exercises: [makeExercise()],
-      bandLabels: [],
       settings: undefined,
       loggingDraft: undefined,
     });
@@ -69,7 +67,6 @@ describe('computeImportPreview (spec 006 FR-010)', () => {
     const file = buildExportFile({
       sessions: [session],
       exercises: [exercise],
-      bandLabels: [],
       settings: undefined,
       loggingDraft: undefined,
     });
@@ -84,7 +81,6 @@ describe('computeImportPreview (spec 006 FR-010)', () => {
     const local: LocalImportSnapshot = {
       sessions: [session],
       exercises: [exercise],
-      bandLabels: ['Red'],
       settings: {
         defaultUnit: 'kg',
         quickIncrements: { durationSeconds: 5, distanceMetres: 5 },
@@ -97,28 +93,17 @@ describe('computeImportPreview (spec 006 FR-010)', () => {
     const preview = computeImportPreview(local, file);
     expect(preview.sessions).toEqual({ toAdd: 0, toReplace: 1 });
     expect(preview.exercises).toEqual({ toAdd: 0, toReplace: 1 });
-    expect(preview.bandLabels).toEqual({ present: true, willReplace: true });
     expect(preview.settings).toEqual({ present: true, willReplace: true });
   });
 
-  it('reports bandLabels/settings/loggingDraft presence and replacement per singleton semantics', () => {
+  it('reports settings/loggingDraft presence and replacement per singleton semantics', () => {
     const fileWithNone: ExportFile = buildExportFile(emptyLocal);
     const preview = computeImportPreview(emptyLocal, fileWithNone);
-    expect(preview.bandLabels).toEqual({ present: false, willReplace: false });
     expect(preview.settings).toEqual({ present: false, willReplace: false });
     expect(preview.loggingDraft).toEqual({
       present: false,
       willReplace: false,
     });
-  });
-
-  it('present-but-no-local-match reports willReplace: false (it will be added, not replaced)', () => {
-    const file = buildExportFile({
-      ...emptyLocal,
-      bandLabels: ['Red'],
-    });
-    const preview = computeImportPreview(emptyLocal, file);
-    expect(preview.bandLabels).toEqual({ present: true, willReplace: false });
   });
 
   it('reports the original (pre-migration) file version and willMigrate correctly', () => {

@@ -33,8 +33,6 @@ export function formatLoad(load: Load): string {
   switch (load.kind) {
     case 'weight':
       return `${load.value} ${load.unit}`;
-    case 'band':
-      return `Band: ${load.label}`;
     case 'bodyweight':
       if (load.addedOrAssistedKg === undefined) return 'Bodyweight';
       return `Bodyweight ${load.addedOrAssistedKg > 0 ? '+' : ''}${load.addedOrAssistedKg} kg`;

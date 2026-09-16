@@ -30,7 +30,7 @@ describe('sessionTonnage', () => {
     const sets = [
       createSet({
         volume: createVolume({ kind: 'reps', count: 12 }),
-        load: createLoad({ kind: 'band', label: 'red' }),
+        load: createLoad({ kind: 'freeText', text: 'red band' }),
         setKind: 'working',
         completed: true,
       }),

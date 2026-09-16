@@ -53,7 +53,7 @@ function weightSession(
   });
 }
 
-function bandSession(
+function freeTextSession(
   id: string,
   dateTime: string,
   exerciseId: ExerciseId,
@@ -64,7 +64,7 @@ function bandSession(
     sets: [
       createSet({
         volume: createVolume({ kind: 'reps', count: 10 }),
-        load: createLoad({ kind: 'band', label: 'red' }),
+        load: createLoad({ kind: 'freeText', text: 'red band' }),
         setKind: 'working',
         completed: true,
       }),
@@ -117,17 +117,21 @@ describe('buildPerExerciseProgressCards', () => {
     expect(buildPerExerciseProgressCards(sessions, [squat])).toHaveLength(0);
   });
 
-  it('produces no card for a Band-only exercise (no e1RM-eligible sets)', () => {
-    const bandExercise = exercise('ex-band', 'Band pull-apart', 'band');
+  it('produces no card for a FreeText-only exercise (no e1RM-eligible sets)', () => {
+    const freeTextExercise = exercise(
+      'ex-freetext',
+      'Band pull-apart',
+      'freeText',
+    );
     const sessions = Array.from({ length: 6 }, (_, i) =>
-      bandSession(
+      freeTextSession(
         `s${i}`,
         `2026-0${1 + Math.floor(i / 4)}-${String((i % 28) + 1).padStart(2, '0')}T10:00:00.000Z`,
-        bandExercise.id,
+        freeTextExercise.id,
       ),
     );
     expect(
-      buildPerExerciseProgressCards(sessions, [bandExercise]),
+      buildPerExerciseProgressCards(sessions, [freeTextExercise]),
     ).toHaveLength(0);
   });
 });

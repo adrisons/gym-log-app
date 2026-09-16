@@ -8,7 +8,6 @@ import type { SessionId } from '../../domain/ids';
 export const SESSIONS_DIR = 'sessions';
 export const EXERCISES_FILE = 'exercises.json';
 export const DRAFT_FILE = 'draft.json';
-export const BAND_LABELS_FILE = 'band-labels.json';
 export const SETTINGS_FILE = 'settings.json';
 export const META_FILE = '_meta.json';
 /** Write-ahead journal for `importBulk`/`resetToFreshInstall`'s atomic

@@ -15,7 +15,6 @@ import type { ExerciseId } from '@/domain/ids';
 describe('view-models formatters (data-model.md "View models")', () => {
   it('formatLoad renders every load kind', () => {
     expect(formatLoad({ kind: 'weight', value: 60, unit: 'kg' })).toBe('60 kg');
-    expect(formatLoad({ kind: 'band', label: 'Red' })).toBe('Band: Red');
     expect(formatLoad({ kind: 'bodyweight' })).toBe('Bodyweight');
     expect(formatLoad({ kind: 'bodyweight', addedOrAssistedKg: 10 })).toBe(
       'Bodyweight +10 kg',
@@ -144,12 +143,12 @@ describe('view-models formatters (data-model.md "View models")', () => {
     expect(
       toSetSummaryViewModel({
         id: 'set-6',
-        load: { kind: 'band', label: 'Red' },
+        load: { kind: 'freeText', text: 'Red band' },
         volume: { kind: 'reps', count: 12 },
         setKind: 'working',
         completed: true,
       }).summaryLine,
-    ).toBe('12 x Band: Red');
+    ).toBe('12 x Red band');
   });
 
   it('toSetSummaryViewModel abbreviates Bodyweight to "BW" (ADR-0014, avoids row wrap)', () => {

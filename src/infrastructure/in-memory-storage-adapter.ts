@@ -41,7 +41,6 @@ export class InMemoryStorageAdapter implements StoragePort {
   #sessions = new Map<SessionId, Session>();
   #exercises = new Map<ExerciseId, Exercise>();
   #draft: LoggingDraft | undefined;
-  #bandLabels: string[] = [];
   #settings: Settings | undefined;
   #schemaVersion = 0;
 
@@ -164,14 +163,6 @@ export class InMemoryStorageAdapter implements StoragePort {
     this.#draft = undefined;
   }
 
-  async listBandLabels(): Promise<string[]> {
-    return [...this.#bandLabels];
-  }
-
-  async saveBandLabels(labels: string[]): Promise<void> {
-    this.#bandLabels = [...labels];
-  }
-
   async getSchemaVersion(): Promise<number> {
     return this.#schemaVersion;
   }
@@ -212,9 +203,6 @@ export class InMemoryStorageAdapter implements StoragePort {
     for (const session of input.sessions) {
       this.#sessions.set(session.id, session);
     }
-    if (input.bandLabels !== undefined) {
-      this.#bandLabels = [...input.bandLabels];
-    }
     if (input.settings !== undefined) {
       this.#settings = input.settings;
     }
@@ -231,7 +219,6 @@ export class InMemoryStorageAdapter implements StoragePort {
       this.#exercises.set(exercise.id, exercise);
     }
     this.#draft = undefined;
-    this.#bandLabels = [];
     this.#settings = undefined;
     this.#schemaVersion = CURRENT_SCHEMA_VERSION;
   }
@@ -241,7 +228,6 @@ export class InMemoryStorageAdapter implements StoragePort {
     this.#sessions.clear();
     this.#exercises.clear();
     this.#draft = undefined;
-    this.#bandLabels = [];
     this.#settings = undefined;
     this.#schemaVersion = 0;
   }

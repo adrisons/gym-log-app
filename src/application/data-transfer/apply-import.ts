@@ -23,6 +23,7 @@ import {
 } from './import-preview';
 import {
   migrateExerciseCatalogue,
+  migrateSessionsBandLoad,
   CURRENT_SCHEMA_VERSION,
 } from '@/application/schema-migration';
 import type { ExportFile, ExportedSession } from './export-file';
@@ -38,8 +39,11 @@ export type PrepareImportResult =
 /** Strips the export's denormalized `exerciseName` (FR-008/022, readability
  * only) back off before writing — the domain `ExerciseEntry` shape has no
  * such field. */
-function toPersistableSessions(sessions: ExportedSession[]): Session[] {
-  return sessions.map((session) => ({
+function toPersistableSessions(
+  sessions: ExportedSession[],
+  fileVersion: number,
+): Session[] {
+  const stripped: Session[] = sessions.map((session) => ({
     ...session,
     blocks: session.blocks.map((block) => ({
       ...block,
@@ -52,6 +56,12 @@ function toPersistableSessions(sessions: ExportedSession[]): Session[] {
       ),
     })),
   }));
+  // A pre-v5 export (ADR-0016) may still carry `Set.load` values with
+  // `kind: 'band'` — rewritten to `freeText` here, the same migration
+  // (and the same reasoning) `StoragePort`'s own adapters apply to
+  // already-stored data, so an imported file's band loads land exactly
+  // where a locally-migrated one would.
+  return migrateSessionsBandLoad(stripped, fileVersion);
 }
 
 export async function prepareImport(
@@ -72,18 +82,15 @@ export async function prepareImport(
     schemaVersion: CURRENT_SCHEMA_VERSION,
   };
 
-  const [sessions, exercises, bandLabels, settings, loggingDraft] =
-    await Promise.all([
-      storage.listSessions(allStoredDataRange()),
-      storage.listExercises(),
-      storage.listBandLabels(),
-      storage.getSettings(),
-      storage.getDraft(),
-    ]);
+  const [sessions, exercises, settings, loggingDraft] = await Promise.all([
+    storage.listSessions(allStoredDataRange()),
+    storage.listExercises(),
+    storage.getSettings(),
+    storage.getDraft(),
+  ]);
   const local: LocalImportSnapshot = {
     sessions,
     exercises,
-    bandLabels,
     settings,
     loggingDraft,
   };
@@ -95,12 +102,9 @@ export async function prepareImport(
   );
 
   const input: BulkImportInput = {
-    sessions: toPersistableSessions(migratedFile.sessions),
+    sessions: toPersistableSessions(migratedFile.sessions, originalFileVersion),
     exercises: migratedFile.exerciseCatalogue,
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    ...(migratedFile.bandLabels !== undefined && {
-      bandLabels: migratedFile.bandLabels,
-    }),
     ...(migratedFile.settings !== undefined && {
       settings: migratedFile.settings,
     }),

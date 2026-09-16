@@ -48,7 +48,7 @@ function sessionWithBandSet(
     sets: [
       createSet({
         volume: createVolume({ kind: 'reps', count: reps }),
-        load: createLoad({ kind: 'band', label: 'red' }),
+        load: createLoad({ kind: 'freeText', text: 'red band' }),
         setKind: 'working',
         completed: true,
       }),

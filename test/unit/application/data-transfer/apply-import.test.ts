@@ -38,7 +38,6 @@ describe('prepareImport (spec 006 FR-011/012)', () => {
     const file = buildExportFile({
       sessions: [],
       exercises: [exercise],
-      bandLabels: [],
       settings: undefined,
       loggingDraft: undefined,
     });
@@ -59,7 +58,6 @@ describe('prepareImport (spec 006 FR-011/012)', () => {
     const file = buildExportFile({
       sessions: [],
       exercises: [makeExercise()],
-      bandLabels: [],
       settings: undefined,
       loggingDraft: undefined,
     });
@@ -103,6 +101,51 @@ describe('prepareImport (spec 006 FR-011/012)', () => {
     expect(await storage.getSchemaVersion()).toBe(CURRENT_SCHEMA_VERSION);
   });
 
+  it('migrates a pre-v5 imported session Set.load of kind band to freeText (ADR-0016)', async () => {
+    const exercise = makeExercise();
+    const file = {
+      format: 'gym-log-export' as const,
+      schemaVersion: 4,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      sessions: [
+        {
+          id: 'sess-band' as SessionId,
+          dateTime: '2026-09-10T18:00:00.000Z',
+          notes: '',
+          blocks: [
+            {
+              type: 'straightSets',
+              exercises: [
+                {
+                  exerciseId: exercise.id,
+                  notes: '',
+                  sets: [
+                    {
+                      load: { kind: 'band', label: 'Red' },
+                      setKind: 'working',
+                      completed: true,
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      exerciseCatalogue: [exercise],
+    };
+
+    const result = await prepareImport(storage, JSON.stringify(file));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    await result.prepared.commit();
+    const saved = await storage.getSession('sess-band' as SessionId);
+    expect(saved?.blocks[0]?.exercises[0]?.sets[0]?.load).toEqual({
+      kind: 'freeText',
+      text: 'Band: Red',
+    });
+  });
+
   it('strips the denormalized exerciseName before writing sessions', async () => {
     const exercise = makeExercise();
     const file = buildExportFile({
@@ -120,7 +163,6 @@ describe('prepareImport (spec 006 FR-011/012)', () => {
         },
       ],
       exercises: [exercise],
-      bandLabels: [],
       settings: undefined,
       loggingDraft: undefined,
     });

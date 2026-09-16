@@ -153,10 +153,11 @@ One vocabulary, used identically in code, UI and documentation.
 
 - **Load** — a sum type; exactly one variant per set:
   - `Weight` — numeric value + unit (kg/lb).
-  - `Band` — band label (colour or name) + optional estimated resistance.
   - `Bodyweight` — with optional added or assisted load (`+10 kg`, `−20 kg`).
-  - `FreeText` — short string ("machine level 4", "stack 3").
+  - `FreeText` — short string ("machine level 4", "stack 3", "red band").
   - `None` — for work where load does not apply.
+  - _(A `Band` variant existed through schema v4 and was removed by
+    ADR-0016 — a band exercise is now tracked with `FreeText` or `None`.)_
 - **Volume** — a sum type: `Reps` | `Duration` (seconds) | `Distance` (metres).
   A 45-second plank and an 8-rep press are both valid sets.
 - **Effort** — an integer level from 1 to 5, stored as the single canonical
@@ -427,8 +428,9 @@ discipline (§1.4) in v1 — its metrics (e1RM, tonnage) are defined in §5 for
   session tonnage, and reps at a fixed load.
 - Selectable range: 3 months, 6 months, 1 year, all.
 - Personal records are marked visually in both representations.
-- For band or free-text loads the app shows no estimated 1RM: it offers the
-  metrics that do apply and explains in one sentence why (degrade honestly).
+- For free-text or no-load work the app shows no estimated 1RM: it offers
+  the metrics that do apply and explains in one sentence why (degrade
+  honestly).
 
 ### FR-9 — Insights `[v1]`
 
@@ -454,8 +456,10 @@ cross-references elsewhere in the codebase are not renumbered.
 
 - Default unit (kg/lb), quick increments, theme (light / dark / system),
   first day of the week.
-- Band catalogue management.
 - Data section: export, import, delete everything (double confirmation).
+- _(Band catalogue management was removed by ADR-0016 — its label editor
+  blocked the "add set" flow; band exercises are now tracked with the
+  `FreeText`/`None` load kind instead.)_
 
 ### FR-12 — Export and import `[v1]`
 

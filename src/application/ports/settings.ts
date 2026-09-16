@@ -2,8 +2,7 @@
  * `Settings` — the user's own per-device preferences (`docs/requirements.md`
  * FR-11; `specs/006-settings-data` data-model.md). Not a canonical entity
  * (`docs/requirements.md` §3.1) — additive, non-canonical state on the same
- * footing as the band-label list and the logging draft (D14), so it needs
- * no schema-version bump.
+ * footing as the logging draft (D14), so it needs no schema-version bump.
  *
  * Lives under `application/ports/`, not `application/`, purely so
  * `storage-port.ts` can reference it without an `application-ports` →

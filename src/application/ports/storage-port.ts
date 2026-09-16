@@ -91,17 +91,6 @@ export interface StoragePort {
   getDraft(): Promise<LoggingDraft | undefined>;
   discardDraft(): Promise<void>;
 
-  /**
-   * The user's own reorderable list of Band load labels (spec 001
-   * FR-011). Not a canonical entity (`docs/requirements.md` §3) — see
-   * `specs/001-log-a-session/research.md` §7 for why this does not
-   * trigger the constitution's schema-version bump rule (Principle III).
-   * Order is significant and is exactly the order the caller passed to
-   * the last `saveBandLabels` call; there is no separate sort step.
-   */
-  listBandLabels(): Promise<string[]>;
-  saveBandLabels(labels: string[]): Promise<void>;
-
   /** The schema version that travels with the data (`docs/requirements.md` §6). */
   getSchemaVersion(): Promise<number>;
   setSchemaVersion(version: number): Promise<void>;
@@ -123,8 +112,8 @@ export interface StoragePort {
    * Atomically applies a multi-record import (spec 006 FR-011): either
    * every one of `input`'s writes lands, or — if interrupted — none of
    * them is left half-applied. `sessions`/`exercises` are upserted by id
-   * (added if new, replaced if an existing id matches); `bandLabels`/
-   * `settings`/`loggingDraft` each replace the device's own singleton
+   * (added if new, replaced if an existing id matches); `settings`/
+   * `loggingDraft` each replace the device's own singleton
    * record when present in `input` and are left completely untouched when
    * absent. `schemaVersion` becomes the new stored schema version (the
    * caller has already migrated `input`'s data to it, spec 006 FR-012 —
@@ -135,8 +124,8 @@ export interface StoragePort {
   /**
    * Atomically resets the device to a fresh-install state (spec 006
    * FR-015/016): every Session gone, the Exercise catalogue replaced with
-   * exactly `seedExercises`, the draft discarded, band labels cleared to
-   * `[]`, Settings cleared (a later `getSettings()` returns `undefined`,
+   * exactly `seedExercises`, the draft discarded,
+   * Settings cleared (a later `getSettings()` returns `undefined`,
    * same as a genuine fresh install), and the stored schema version set to
    * `CURRENT_SCHEMA_VERSION` (`src/infrastructure/schema-version.ts` — the
    * caller passes the concrete number, this port has no notion of that
@@ -173,7 +162,6 @@ export interface StoragePort {
 export interface BulkImportInput {
   sessions: Session[];
   exercises: Exercise[];
-  bandLabels?: string[];
   settings?: Settings;
   loggingDraft?: LoggingDraft;
   schemaVersion: number;

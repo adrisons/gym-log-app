@@ -8,8 +8,6 @@ import {
   createExercise,
   updateExerciseTemplate,
   suggestFreeTextLoads,
-  listBandLabels,
-  saveBandLabels,
   renameExerciseWithCollisionCheck,
   mergeExercises,
   deleteExerciseCascade,
@@ -401,14 +399,6 @@ describe('suggestFreeTextLoads (FR-012)', () => {
       'Setting 6',
       'Setting 4',
     ]);
-  });
-});
-
-describe('listBandLabels/saveBandLabels (FR-011)', () => {
-  it('round-trip through the port, preserving order', async () => {
-    const storage = new InMemoryStorage();
-    await saveBandLabels(storage, ['Red', 'Blue']);
-    expect(await listBandLabels(storage)).toEqual(['Red', 'Blue']);
   });
 });
 

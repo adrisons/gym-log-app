@@ -13,12 +13,12 @@ import { StorageError } from '../application/errors';
 import {
   migrateExerciseCatalogue,
   migrateExerciseTemplateDefaults as withTemplateDefaults,
+  migrateSessionBandLoads,
 } from '../application/schema-migration';
 import {
   SESSIONS_DIR,
   EXERCISES_FILE,
   DRAFT_FILE,
-  BAND_LABELS_FILE,
   SETTINGS_FILE,
   META_FILE,
   PENDING_BULK_WRITE_FILE,
@@ -309,6 +309,12 @@ export class FileSystemStorageAdapter implements StoragePort {
         );
       }
     }
+    if (action === 'migrate' && stored < 5) {
+      // v4 -> v5 (ADR-0016): see IndexedDbStorageAdapter's own comment —
+      // rewrites every stored Session's Set.load with kind 'band' to
+      // freeText.
+      await this.#migrateSessionBandLoadsOnHandle(handle);
+    }
     if (action === 'migrate' || stored === 0) {
       await this.#writeJsonToHandle(handle, META_FILE, {
         schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -403,6 +409,11 @@ export class FileSystemStorageAdapter implements StoragePort {
     // v2 -> v3 (ADR-0008) and v3 -> v4 (ADR-0013): see
     // IndexedDbStorageAdapter's #checkSchema — nothing to backfill for
     // either step.
+    if (action === 'migrate' && stored < 5) {
+      // v4 -> v5 (ADR-0016): see #reconcileSchemaOnAcquire's own comment.
+      const root = await this.#resolveHandle(true);
+      if (root) await this.#migrateSessionBandLoadsOnHandle(root);
+    }
     if (action === 'migrate' || stored === 0) {
       // See IndexedDbStorageAdapter's #checkSchema for the full rationale
       // — the never-initialized sentinel (stored === 0) needs the same
@@ -424,6 +435,37 @@ export class FileSystemStorageAdapter implements StoragePort {
       EXERCISES_FILE,
       migrateExerciseCatalogue(exercises, 1),
     );
+  }
+
+  /** ADR-0016's v4->v5 migration: rewrites every stored Session file's
+   * `Set.load` values with `kind: 'band'` to `freeText`, preserving the
+   * label. Idempotent — `migrateSessionBandLoads` only rewrites a `Load`
+   * that is still `kind: 'band'`. */
+  async #migrateSessionBandLoadsOnHandle(
+    root: FileSystemDirectoryHandle,
+  ): Promise<void> {
+    let dir: FileSystemDirectoryHandle;
+    try {
+      dir = await root.getDirectoryHandle(SESSIONS_DIR, { create: false });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'NotFoundError') {
+        return;
+      }
+      throw error;
+    }
+    for await (const [name, entryHandle] of dir.entries()) {
+      if (entryHandle.kind !== 'file' || !name.endsWith('.json')) continue;
+      const fileHandle = entryHandle as FileSystemFileHandle;
+      const file = await fileHandle.getFile();
+      const session = JSON.parse(await file.text()) as Session;
+      const migrated = migrateSessionBandLoads(session);
+      if (JSON.stringify(migrated) === JSON.stringify(session)) continue;
+      await this.#run(async () => {
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(migrated));
+        await writable.close();
+      });
+    }
   }
 
   async #readSchemaVersionRaw(forceHandle: boolean): Promise<number> {
@@ -790,18 +832,6 @@ export class FileSystemStorageAdapter implements StoragePort {
     await this.#deleteFile(DRAFT_FILE);
   }
 
-  // Band labels
-
-  async listBandLabels(): Promise<string[]> {
-    await this.#replayPendingBulkWriteIfHandleAlreadyAvailable();
-    return (await this.#readJson<string[]>(BAND_LABELS_FILE)) ?? [];
-  }
-
-  async saveBandLabels(labels: string[]): Promise<void> {
-    await this.#ensureSchemaCheckedForWrite();
-    await this.#writeJson(BAND_LABELS_FILE, [...labels]);
-  }
-
   // Schema version
 
   async getSchemaVersion(): Promise<number> {
@@ -993,11 +1023,6 @@ export class FileSystemStorageAdapter implements StoragePort {
         });
       }
     }
-    if (input.bandLabels !== undefined) {
-      await this.#writeJsonToHandle(root, BAND_LABELS_FILE, [
-        ...input.bandLabels,
-      ]);
-    }
     if (input.settings !== undefined) {
       await this.#writeJsonToHandle(root, SETTINGS_FILE, input.settings);
     }
@@ -1028,7 +1053,6 @@ export class FileSystemStorageAdapter implements StoragePort {
     }
     await this.#writeJsonToHandle(root, EXERCISES_FILE, payload.seedExercises);
     await this.#removeEntryIfPresent(root, DRAFT_FILE);
-    await this.#writeJsonToHandle(root, BAND_LABELS_FILE, []);
     await this.#removeEntryIfPresent(root, SETTINGS_FILE);
     await this.#writeJsonToHandle(root, META_FILE, {
       schemaVersion: payload.schemaVersion,

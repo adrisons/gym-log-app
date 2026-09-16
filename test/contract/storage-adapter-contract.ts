@@ -292,24 +292,6 @@ const draftScenarios: Scenario[] = [
   },
 ];
 
-// Cross-adapter parity / band labels (contracts/storage-adapters.md scenario 7, US3)
-
-const crossAdapterScenarios: Scenario[] = [
-  {
-    name: 'US3-1: Band labels round-trip in order across a restart',
-    async run(makeAdapter) {
-      const writer = await makeAdapter();
-      await writer.saveBandLabels(['Red', 'Blue', 'Green']);
-
-      const reader = await makeAdapter();
-      assert(
-        deepEqual(await reader.listBandLabels(), ['Red', 'Blue', 'Green']),
-        'listBandLabels preserves order after restart',
-      );
-    },
-  },
-];
-
 // Settings (spec 006 contracts/storage-port-additions.md, cases 1-2)
 
 const settingsScenarios: Scenario[] = [
@@ -377,10 +359,9 @@ const storageStatusScenarios: Scenario[] = [
 
 const bulkWriteScenarios: Scenario[] = [
   {
-    name: 'bulk-1: importBulk with no singleton fields adds sessions/exercises and leaves band labels/settings/draft untouched',
+    name: 'bulk-1: importBulk with no singleton fields adds sessions/exercises and leaves settings/draft untouched',
     async run(makeAdapter) {
       const writer = await makeAdapter();
-      await writer.saveBandLabels(['Red']);
       await writer.saveSettings(makeSettings());
       await writer.saveDraft(makeDraft());
 
@@ -401,10 +382,6 @@ const bulkWriteScenarios: Scenario[] = [
       assert(
         deepEqual(await reader.getExercise(newExercise.id), newExercise),
         'the new exercise is added',
-      );
-      assert(
-        deepEqual(await reader.listBandLabels(), ['Red']),
-        'band labels are untouched when absent from the import input',
       );
       assert(
         deepEqual(await reader.getSettings(), makeSettings()),
@@ -455,10 +432,9 @@ const bulkWriteScenarios: Scenario[] = [
     },
   },
   {
-    name: 'bulk-3: importBulk including bandLabels/settings/loggingDraft replaces each; sets the stored schema version',
+    name: 'bulk-3: importBulk including settings/loggingDraft replaces each; sets the stored schema version',
     async run(makeAdapter) {
       const writer = await makeAdapter();
-      await writer.saveBandLabels(['Old']);
       await writer.saveSettings(makeSettings({ theme: 'light' }));
 
       const importedSettings = makeSettings({ theme: 'dark' });
@@ -466,17 +442,12 @@ const bulkWriteScenarios: Scenario[] = [
       await writer.importBulk({
         sessions: [],
         exercises: [],
-        bandLabels: ['New', 'Labels'],
         settings: importedSettings,
         loggingDraft: importedDraft,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       });
 
       const reader = await makeAdapter();
-      assert(
-        deepEqual(await reader.listBandLabels(), ['New', 'Labels']),
-        'band labels are replaced when present in the import input',
-      );
       assert(
         deepEqual(await reader.getSettings(), importedSettings),
         'settings are replaced when present in the import input',
@@ -492,7 +463,7 @@ const bulkWriteScenarios: Scenario[] = [
     },
   },
   {
-    name: 'reset-1: resetToFreshInstall wipes sessions/draft/bandLabels/settings and replaces the catalogue with exactly the seed set',
+    name: 'reset-1: resetToFreshInstall wipes sessions/draft/settings and replaces the catalogue with exactly the seed set',
     async run(makeAdapter) {
       const writer = await makeAdapter();
       await writer.saveSession(makeSession({ id: 'to-be-wiped' as SessionId }));
@@ -500,7 +471,6 @@ const bulkWriteScenarios: Scenario[] = [
         makeExercise({ id: 'user-added' as ExerciseId }),
       );
       await writer.saveDraft(makeDraft());
-      await writer.saveBandLabels(['Red']);
       await writer.saveSettings(makeSettings());
 
       const seed = [makeExercise({ id: 'seed-1' as ExerciseId })];
@@ -518,10 +488,6 @@ const bulkWriteScenarios: Scenario[] = [
       assert(
         (await reader.getDraft()) === undefined,
         'the draft is discarded after reset',
-      );
-      assert(
-        deepEqual(await reader.listBandLabels(), []),
-        'band labels are cleared to [] after reset',
       );
       assert(
         (await reader.getSettings()) === undefined,
@@ -546,7 +512,7 @@ const schemaVersionScenarios: Scenario[] = [
         (await adapter.getSchemaVersion()) === 0,
         'getSchemaVersion is 0 (never-initialized sentinel) before any write',
       );
-      await adapter.saveBandLabels(['first-write']);
+      await adapter.saveSettings(makeSettings());
       assert(
         (await adapter.getSchemaVersion()) >= 1,
         'getSchemaVersion is at least 1 after the first real write',
@@ -557,7 +523,8 @@ const schemaVersionScenarios: Scenario[] = [
     name: 'US4-2: a device at the current schema version opens normally with no data change',
     async run(makeAdapter) {
       const writer = await makeAdapter();
-      await writer.saveBandLabels(['unchanged']);
+      const settings = makeSettings();
+      await writer.saveSettings(settings);
       const versionBefore = await writer.getSchemaVersion();
 
       const reader = await makeAdapter();
@@ -566,7 +533,7 @@ const schemaVersionScenarios: Scenario[] = [
         'getSchemaVersion is unchanged on a same-version open',
       );
       assert(
-        deepEqual(await reader.listBandLabels(), ['unchanged']),
+        deepEqual(await reader.getSettings(), settings),
         'data is unchanged on a same-version open',
       );
     },
@@ -580,7 +547,7 @@ const schemaVersionScenarios: Scenario[] = [
       const adapter = await makeAdapter();
       let threw: unknown;
       try {
-        await adapter.saveBandLabels(['should-not-be-written']);
+        await adapter.saveSettings(makeSettings());
       } catch (error) {
         threw = error;
       }
@@ -785,7 +752,6 @@ const cascadeScenarios: Scenario[] = [
 export const CONTRACT_SCENARIOS: Scenario[] = [
   ...sessionScenarios,
   ...draftScenarios,
-  ...crossAdapterScenarios,
   ...settingsScenarios,
   ...storageStatusScenarios,
   ...bulkWriteScenarios,

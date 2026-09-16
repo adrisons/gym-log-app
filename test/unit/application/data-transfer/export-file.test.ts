@@ -40,7 +40,6 @@ describe('buildExportFile (spec 006 FR-007/008/021/022/023)', () => {
     const file = buildExportFile({
       sessions: [],
       exercises: [],
-      bandLabels: [],
       settings: undefined,
       loggingDraft: undefined,
       now: new Date('2026-09-15T00:00:00.000Z'),
@@ -52,28 +51,15 @@ describe('buildExportFile (spec 006 FR-007/008/021/022/023)', () => {
     expect(file.exerciseCatalogue).toEqual([]);
   });
 
-  it('omits bandLabels/settings/loggingDraft entirely when absent locally (presence semantics, data-model.md)', () => {
+  it('omits settings/loggingDraft entirely when absent locally (presence semantics, data-model.md)', () => {
     const file = buildExportFile({
       sessions: [],
       exercises: [],
-      bandLabels: [],
       settings: undefined,
       loggingDraft: undefined,
     });
-    expect(file).not.toHaveProperty('bandLabels');
     expect(file).not.toHaveProperty('settings');
     expect(file).not.toHaveProperty('loggingDraft');
-  });
-
-  it('includes bandLabels only when non-empty', () => {
-    const file = buildExportFile({
-      sessions: [],
-      exercises: [],
-      bandLabels: ['Red'],
-      settings: undefined,
-      loggingDraft: undefined,
-    });
-    expect(file.bandLabels).toEqual(['Red']);
   });
 
   it('denormalizes each ExerciseEntry with a readable exerciseName, keeping exerciseId as the identity field (FR-008/022)', () => {
@@ -102,7 +88,6 @@ describe('buildExportFile (spec 006 FR-007/008/021/022/023)', () => {
     const file = buildExportFile({
       sessions: [session],
       exercises: [exercise],
-      bandLabels: [],
       settings: undefined,
       loggingDraft: undefined,
     });
@@ -115,7 +100,6 @@ describe('buildExportFile (spec 006 FR-007/008/021/022/023)', () => {
     const file = buildExportFile({
       sessions: [],
       exercises: [makeExercise()],
-      bandLabels: ['Red'],
       settings: {
         defaultUnit: 'kg',
         quickIncrements: { durationSeconds: 5, distanceMetres: 5 },

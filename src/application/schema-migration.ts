@@ -17,6 +17,8 @@
  * drift apart.
  */
 import type { Exercise } from '@/domain/exercise';
+import type { Session } from '@/domain/session';
+import type { Load } from '@/domain/load';
 
 /**
  * The schema version this build of the app understands
@@ -25,7 +27,7 @@ import type { Exercise } from '@/domain/exercise';
  * 006), read it from here so they can never disagree about what "current"
  * means.
  */
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 5;
 
 export type SchemaAction = 'migrate' | 'open' | 'refuse';
 
@@ -80,4 +82,55 @@ export function migrateExerciseCatalogue(
 ): Exercise[] {
   if (storedVersion >= 2) return exercises;
   return exercises.map(migrateExerciseTemplateDefaults);
+}
+
+/**
+ * ADR-0016's v4->v5 backfill: the `band` `Load` kind was removed (its
+ * label editor blocked the "add set" flow, and band exercises are better
+ * served by `freeText`/`none`). Every stored `Set.load` with `kind ===
+ * 'band'` is rewritten to `{ kind: 'freeText', text: 'Band: ' + label }`,
+ * preserving the original label as text so no data is silently lost.
+ * Idempotent — a `Load` that is already some other kind (including
+ * `freeText`) passes through unchanged, and a legacy `band` value found
+ * more than once (e.g. re-running the migration) is only ever rewritten
+ * once because its `kind` is no longer `'band'` afterward.
+ */
+export function migrateBandLoad(load: Load): Load {
+  // `band` was removed from the `Load` union in schema v5, so a
+  // still-persisted v4 record's `kind: 'band'` value no longer type-checks
+  // against `Load` — this function is exactly the boundary where such
+  // legacy data is normalized, hence the cast.
+  const legacy = load as Load | { kind: 'band'; label: string };
+  if (legacy.kind !== 'band') return load;
+  return { kind: 'freeText', text: `Band: ${legacy.label}` };
+}
+
+/** Applies `migrateBandLoad` to every `Set.load` in a whole `Session`. */
+export function migrateSessionBandLoads(session: Session): Session {
+  return {
+    ...session,
+    blocks: session.blocks.map((block) => ({
+      ...block,
+      exercises: block.exercises.map((entry) => ({
+        ...entry,
+        sets: entry.sets.map((set) => ({
+          ...set,
+          load: migrateBandLoad(set.load),
+        })),
+      })),
+    })),
+  };
+}
+
+/**
+ * Migrates a whole session list from `storedVersion` up to whatever this
+ * build understands. `storedVersion < 5` runs the v4->v5 band-load
+ * backfill (ADR-0016).
+ */
+export function migrateSessionsBandLoad(
+  sessions: Session[],
+  storedVersion: number,
+): Session[] {
+  if (storedVersion >= 5) return sessions;
+  return sessions.map(migrateSessionBandLoads);
 }
