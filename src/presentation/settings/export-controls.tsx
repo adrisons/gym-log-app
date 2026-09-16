@@ -22,18 +22,15 @@ export function ExportControls() {
     try {
       const storage = requireStorage();
       const now = new Date();
-      const [sessions, exercises, bandLabels, settings, loggingDraft] =
-        await Promise.all([
-          storage.listSessions(allStoredDataRange()),
-          storage.listExercises(),
-          storage.listBandLabels(),
-          storage.getSettings(),
-          storage.getDraft(),
-        ]);
+      const [sessions, exercises, settings, loggingDraft] = await Promise.all([
+        storage.listSessions(allStoredDataRange()),
+        storage.listExercises(),
+        storage.getSettings(),
+        storage.getDraft(),
+      ]);
       const file = buildExportFile({
         sessions,
         exercises,
-        bandLabels,
         settings,
         loggingDraft,
         now,

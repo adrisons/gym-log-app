@@ -8,9 +8,7 @@ const baseProps = {
   loadKind: 'weight' as const,
   volumeKind: 'reps' as const,
   trackEffort: false,
-  bandLabels: ['Red', 'Blue'],
   freeTextSuggestions: [],
-  onSaveBandLabels: () => {},
   unit: 'kg' as const,
   quickIncrements: { durationSeconds: 5, distanceMetres: 50 },
 };
@@ -216,7 +214,7 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     render(
       <SetRow
         {...baseProps}
-        loadKind="band"
+        loadKind="freeText"
         prefill={{
           volume: { kind: 'reps', count: 5 },
           load: { kind: 'weight', value: 100, unit: 'kg' },
@@ -228,7 +226,7 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     expect(
       screen.queryByRole('spinbutton', { name: /weight/i }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Red' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox')).toHaveValue('');
   });
 
   it('the weight field has no dedicated quick-increment buttons (numeric keypad only)', () => {
@@ -240,30 +238,6 @@ describe('SetRow (US1 minimal + US3 full load/effort/volume surface, ADR-0006, A
     expect(
       screen.queryByRole('button', { name: /decrease weight/i }),
     ).not.toBeInTheDocument();
-  });
-
-  it('selecting a band and pressing Confirm records it as a Band load, no expand step', async () => {
-    const onConfirm = vi.fn();
-    render(
-      <SetRow
-        {...baseProps}
-        loadKind="band"
-        volumeKind="reps"
-        prefill={undefined}
-        onConfirm={onConfirm}
-      />,
-    );
-
-    await userEvent.click(screen.getByRole('radio', { name: 'Red' }));
-    await userEvent.click(screen.getByRole('listbox', { name: /^reps$/i }));
-    await userEvent.keyboard('{ArrowDown}'.repeat(5));
-    await userEvent.click(confirmButton());
-
-    expect(onConfirm).toHaveBeenCalledWith({
-      volume: { kind: 'reps', count: 5 },
-      load: { kind: 'band', label: 'Red' },
-      setKind: 'working',
-    });
   });
 
   it('Bodyweight with an added component is confirmable once the volume is filled too (US3, Acceptance Scenario 3.5)', async () => {

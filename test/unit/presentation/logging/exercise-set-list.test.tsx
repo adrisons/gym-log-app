@@ -9,10 +9,8 @@ const baseProps = {
   loadKind: 'weight' as const,
   volumeKind: 'reps' as const,
   trackEffort: false,
-  bandLabels: [],
   freeTextSuggestions: [],
   prefill: undefined,
-  onSaveBandLabels: () => {},
   unit: 'kg' as const,
   quickIncrements: { durationSeconds: 5, distanceMetres: 50 },
 };

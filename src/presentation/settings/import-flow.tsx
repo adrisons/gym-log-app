@@ -18,7 +18,7 @@ type FlowState =
 
 export interface ImportFlowProps {
   /** Called once `commit()` has landed — the caller refreshes whatever
-   * in-memory state (Settings store, band labels, theme) still holds the
+   * in-memory state (Settings store, theme) still holds the
    * pre-import snapshot (Copilot review, PR #31). */
   onImported: () => void | Promise<void>;
 }
@@ -105,17 +105,6 @@ export function ImportFlow({ onImported }: ImportFlowProps) {
             Exercises: {state.prepared.preview.exercises.toAdd} to add,{' '}
             {state.prepared.preview.exercises.toReplace} to replace.
           </p>
-          {describeSingleton(
-            'Band labels',
-            state.prepared.preview.bandLabels,
-          ) && (
-            <p>
-              {describeSingleton(
-                'Band labels',
-                state.prepared.preview.bandLabels,
-              )}
-            </p>
-          )}
           {describeSingleton('Settings', state.prepared.preview.settings) && (
             <p>
               {describeSingleton('Settings', state.prepared.preview.settings)}

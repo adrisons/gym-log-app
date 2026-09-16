@@ -39,7 +39,6 @@ export interface ExerciseSetListProps {
   loadKind: Load['kind'];
   volumeKind: VolumeKind;
   trackEffort: boolean;
-  bandLabels: string[];
   freeTextSuggestions: string[];
   /** Add-mode prefill (FR-008) — the previous set's load/volume, or
    * `undefined` when there's none or the caller doesn't offer one. */
@@ -51,7 +50,6 @@ export interface ExerciseSetListProps {
   onAddSet: (input: AddSetInput) => void;
   onUpdateSet: (setId: string, input: AddSetInput) => void;
   onDeleteSet: (setId: string) => void;
-  onSaveBandLabels: (labels: string[]) => void;
   /** The id of the set to mark for the entrance animation (`LoggingScreen`
    * only — `SessionDetailScreen` has no such marker). */
   newestSetId?: string | undefined;
@@ -75,7 +73,6 @@ export function ExerciseSetList({
   loadKind,
   volumeKind,
   trackEffort,
-  bandLabels,
   freeTextSuggestions,
   prefill,
   unit,
@@ -83,7 +80,6 @@ export function ExerciseSetList({
   onAddSet,
   onUpdateSet,
   onDeleteSet,
-  onSaveBandLabels,
   newestSetId,
   onNewestSetAnimationEnd,
 }: ExerciseSetListProps) {
@@ -119,6 +115,10 @@ export function ExerciseSetList({
   const [prevSetsLength, setPrevSetsLength] = useState(sets.length);
   const lengthChanged = sets.length !== prevSetsLength;
   if (lengthChanged) setPrevSetsLength(sets.length);
+
+  const [openHeaderTooltip, setOpenHeaderTooltip] = useState<
+    'volume' | 'load' | undefined
+  >(undefined);
 
   if (lengthChanged && sets.length === 0) {
     setForm('add');
@@ -167,7 +167,6 @@ export function ExerciseSetList({
       loadKind={loadKind}
       volumeKind={volumeKind}
       trackEffort={trackEffort}
-      bandLabels={bandLabels}
       freeTextSuggestions={freeTextSuggestions}
       unit={unit}
       quickIncrements={quickIncrements}
@@ -180,21 +179,54 @@ export function ExerciseSetList({
         closeForm();
       }}
       onCancel={closeForm}
-      onSaveBandLabels={onSaveBandLabels}
     />
   );
 
   return (
     <>
       {sets.length > 0 && (
-        <div className="sets-header-row" aria-hidden="true">
+        <div className="sets-header-row">
           <span className="sets-header-cell">
-            {VOLUME_COLUMN_LABEL[volumeKind]}
+            <button
+              type="button"
+              className="sets-header-cell__button"
+              aria-expanded={openHeaderTooltip === 'volume'}
+              onClick={() =>
+                setOpenHeaderTooltip((current) =>
+                  current === 'volume' ? undefined : 'volume',
+                )
+              }
+            >
+              {VOLUME_COLUMN_LABEL[volumeKind]}
+            </button>
+            {openHeaderTooltip === 'volume' && (
+              <span className="sets-header-cell__tooltip" role="tooltip">
+                {VOLUME_COLUMN_LABEL[volumeKind]}
+              </span>
+            )}
           </span>
           <span className="sets-header-cell">
-            {loadKind !== 'none' ? 'Load' : ''}
+            {loadKind !== 'none' && (
+              <button
+                type="button"
+                className="sets-header-cell__button"
+                aria-expanded={openHeaderTooltip === 'load'}
+                onClick={() =>
+                  setOpenHeaderTooltip((current) =>
+                    current === 'load' ? undefined : 'load',
+                  )
+                }
+              >
+                Load
+              </button>
+            )}
+            {openHeaderTooltip === 'load' && (
+              <span className="sets-header-cell__tooltip" role="tooltip">
+                Load
+              </span>
+            )}
           </span>
-          <span className="sets-header-cell" />
+          <span className="sets-header-cell" aria-hidden="true" />
         </div>
       )}
       <ul className="set-list">

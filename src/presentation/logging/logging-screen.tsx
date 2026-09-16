@@ -83,13 +83,11 @@ export function LoggingScreen() {
   const prefillNextSet = useLoggingSession((s) => s.prefillNextSet);
   const searchExercises = useLoggingSession((s) => s.searchExercises);
   const createExercise = useLoggingSession((s) => s.createExercise);
-  const bandLabels = useLoggingSession((s) => s.bandLabels);
   const settings = useSettingsStore((s) => s.settings);
   const updateExerciseTemplate = useLoggingSession(
     (s) => s.updateExerciseTemplate,
   );
   const suggestFreeTextLoads = useLoggingSession((s) => s.suggestFreeTextLoads);
-  const saveBandLabels = useLoggingSession((s) => s.saveBandLabels);
   const addBlock = useLoggingSession((s) => s.addBlock);
   const renameBlock = useLoggingSession((s) => s.renameBlock);
   const reorderBlock = useLoggingSession((s) => s.reorderBlock);
@@ -352,7 +350,6 @@ export function LoggingScreen() {
                       loadKind={exercise?.defaultLoadType ?? 'none'}
                       volumeKind={exercise?.defaultVolumeKind ?? 'reps'}
                       trackEffort={exercise?.trackEffort ?? false}
-                      bandLabels={bandLabels}
                       freeTextSuggestions={suggestFreeTextLoads(
                         entry.exerciseId,
                       )}
@@ -366,7 +363,6 @@ export function LoggingScreen() {
                       onDeleteSet={(setId) =>
                         void deleteSet(block.id, entry.id, setId)
                       }
-                      onSaveBandLabels={(labels) => void saveBandLabels(labels)}
                       newestSetId={lastAddedSetId}
                       onNewestSetAnimationEnd={(setId) => {
                         // Guards against a stale closure: if a second set
