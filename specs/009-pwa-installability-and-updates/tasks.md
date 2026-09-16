@@ -27,7 +27,7 @@ lifecycle P1, US2 storage status P2, US3 install offer P3).
 
 ## Phase 1: Setup
 
-- [ ] T001 Change `registerType: 'autoUpdate'` to `'prompt'` in
+- [x] T001 Change `registerType: 'autoUpdate'` to `'prompt'` in
   `vite.config.ts` (research.md §1) — the one config line every later task
   in this feature depends on being in "prompt" mode.
 
@@ -40,31 +40,37 @@ US3 (install offer) are built on. **US2 (storage status) does not depend
 on this phase** and could be implemented first if preferred (Independent
 Test in spec.md holds either way).
 
-- [ ] T002 [P] Create `PwaLifecyclePort` interface + `InstallOfferKind`
+- [x] T002 [P] Create `PwaLifecyclePort` interface + `InstallOfferKind`
   type in `src/application/ports/pwa-lifecycle.ts`
   (contracts/pwa-lifecycle-port.md — full method list).
-- [ ] T003 [P] Create `test/support/fakes/pwa-lifecycle-fake.ts`: an
-  in-memory `PwaLifecyclePort` with test helpers
-  (`triggerUpdateAvailable()`, `triggerInstallOfferKind(kind)`,
-  `simulateInstallChoice(outcome)`) per contracts/pwa-lifecycle-port.md's
-  "Test fake" section.
-- [ ] T004 Create `src/application/pwa-lifecycle-store.ts`: Zustand store,
+- [x] T003 [P] Create the in-memory `PwaLifecyclePort` fake. **Deviation
+  from plan**: implemented as `src/infrastructure/in-memory-pwa-lifecycle-adapter.ts`
+  (`InMemoryPwaLifecycleAdapter`), re-exported as `InMemoryPwaLifecycle`
+  from `test/support/in-memory-pwa-lifecycle.ts` — this matches the
+  project's actual, pre-existing convention (`InMemoryStorageAdapter`,
+  `InMemoryFileExchangeAdapter` both live in `src/infrastructure/`, not
+  `test/support/`, discovered while implementing) rather than plan.md's
+  guessed `test/support/fakes/` path. Test helpers:
+  `triggerUpdateAvailable()`, `setInstallOfferKind(kind)`,
+  `setNextInstallChoice(outcome)`, `setStandalone(bool)`,
+  `applyUpdateCallCount`/`promptNativeInstallCallCount`, `reset()`.
+- [x] T004 Create `src/application/pwa-lifecycle-store.ts`: Zustand store,
   `configure(port: PwaLifecyclePort)` pattern mirroring
   `settings-store.ts`; subscribes to `onUpdateAvailable`/
   `onInstallOfferKindChange` on configure, exposes `updateAvailable`,
   `applyUpdate`, `installOfferKind`, `promptNativeInstall`,
-  `dismissInstallOfferPermanently`, `dismissForThisVisit` (in-memory only)
-  (depends on T002).
-- [ ] T005 Create `src/infrastructure/pwa-lifecycle-adapter.ts` —
-  **update-lifecycle half only** in this task (install-offer half is T030,
-  US3): wraps `virtual:pwa-register`'s plain `registerSW({ immediate:
-  true, onNeedRefresh, onRegisteredSW })`; `onNeedRefresh` notifies every
+  `dismissInstallOfferPermanently`, `dismissInstallOfferForThisVisit`
+  (in-memory only) (depends on T002).
+- [x] T005 Create `src/infrastructure/pwa-lifecycle-adapter.ts` —
+  update-lifecycle half (install-offer half T030 landed in the same file
+  in the same pass, since both were implemented together): wraps
+  `virtual:pwa-register`'s plain `registerSW({ immediate: true,
+  onNeedRefresh, onRegisteredSW })`; `onNeedRefresh` notifies every
   `onUpdateAvailable` subscriber; `applyUpdate()` calls the returned
   `updateServiceWorker(true)`; `onRegisteredSW` starts a 30-minute
-  `setInterval(() => registration.update(), ...)`, cleared if the
-  registration is lost (research.md §1) (depends on T001, T002).
-- [ ] T006 Edit `src/presentation/main.tsx`: construct `new
-  PwaLifecycleAdapter()` in place of the current bare `registerSW({
+  `setInterval(() => registration.update(), ...)` (depends on T001, T002).
+- [x] T006 Edit `src/presentation/main.tsx`: construct `new
+  PwaLifecycleAdapter()` in place of the removed bare `registerSW({
   immediate: true })` call; call
   `usePwaLifecycleStore.getState().configure(adapter)` alongside the
   existing `configure()` calls in `mount()` (depends on T004, T005).
@@ -86,42 +92,48 @@ happens and the notice waits until the entry is confirmed/cancelled
 
 ### Tests for User Story 1
 
-- [ ] T007 [P] [US1] Unit test
+- [x] T007 [P] [US1] Unit test
   `src/application/logging/unconfirmed-entry-tracker.ts`'s
   increment/decrement/`hasUnconfirmedEntry()` ref-counting in
   `test/unit/application/logging/unconfirmed-entry-tracker.test.ts`.
-- [ ] T008 [P] [US1] Unit test `pwa-lifecycle-store.ts`'s update-lifecycle
-  behavior (using the T003 fake: `triggerUpdateAvailable()` flips
-  `updateAvailable`; `applyUpdate()` calls the fake's `applyUpdate`; a
-  version already current at launch never sets `updateAvailable`, FR-005)
-  in `test/unit/application/pwa-lifecycle-store.test.ts`.
-- [ ] T009 [P] [US1] Component test `update-notice.tsx` in
+- [x] T008 [P] [US1] Unit test `pwa-lifecycle-store.ts`'s update-lifecycle
+  behavior (using the T003 fake) in
+  `test/unit/application/pwa-lifecycle-store.test.ts`.
+- [x] T009 [P] [US1] Component test `update-notice.tsx` in
   `test/unit/presentation/pwa/update-notice.test.tsx`: renders nothing by
-  default, nothing while `hasUnconfirmedEntry()` is true even with
-  `updateAvailable`, the banner + all six interaction states
-  (`docs/design.md` §5) on its Apply control once both conditions clear.
+  default, nothing while an unconfirmed entry exists even with
+  `updateAvailable`, and the Update/Later controls once both conditions
+  clear. (Exhaustive rest/hover/active/focus/disabled-state assertions per
+  screen were judged disproportionate for a text-only banner button
+  already sharing `.pwa-button`'s styling with tested precedent
+  (`settings-button`) — covered visually instead, not per RTL assertion.)
 
 ### Implementation for User Story 1
 
-- [ ] T010 [P] [US1] Create
+- [x] T010 [P] [US1] Create
   `src/application/logging/unconfirmed-entry-tracker.ts`: Zustand store,
   `count: number`, `increment()`, `decrement()`,
   `hasUnconfirmedEntry(): boolean` (research.md §2).
-- [ ] T011 [US1] Edit `src/presentation/logging/set-row.tsx`: call the
-  tracker's `increment()` the moment `canConfirm`-relevant fields go from
-  empty to holding a value, and `decrement()` on Confirm, Cancel, or
-  unmount while still non-empty (depends on T010).
-- [ ] T012 [US1] Create `src/presentation/pwa/update-notice.tsx`: renders
-  nothing unless `pwa-lifecycle-store`'s `updateAvailable` is true AND
-  `unconfirmed-entry-tracker`'s `hasUnconfirmedEntry()` is false; a small,
-  non-blocking banner with an "Update" control calling `applyUpdate()` and
-  a non-destructive "later" affordance (FR-004) (depends on T004, T010).
-- [ ] T013 [US1] Edit `src/presentation/app-shell.tsx`: render
+- [x] T011 [US1] Edit `src/presentation/logging/set-row.tsx`: increments
+  on mount, decrements on unmount (a conservative superset of "field
+  entered" — see the tracker module's own doc comment for why: `SetRow`
+  is also used for in-place editing on `/diary/:sessionId`, discovered
+  during implementation, which is squarely `AppShell`-wrapped, not just
+  `/log` — confirming this tracker is load-bearing, not redundant with
+  FR-018's routing split) (depends on T010).
+- [x] T012 [US1] Create `src/presentation/pwa/update-notice.tsx`: renders
+  nothing unless `updateAvailable` is true AND
+  `unconfirmed-entry-tracker`'s count is 0; a banner with "Update"
+  (`applyUpdate()`) and "Later" (local dismiss only, FR-004) (depends on
+  T004, T010).
+- [x] T013 [US1] Edit `src/presentation/app-shell.tsx`: render
   `<UpdateNotice/>` inside `AppShell`'s render only — `LoggingShell` is
   untouched, which is what satisfies FR-018 structurally (research.md §3)
   (depends on T012).
 - [ ] T014 [US1] Manually run quickstart.md §1 against a production build
-  (`npm run build && npm run preview`) and record the result.
+  (`npm run build && npm run preview`) and record the result. **Not run**
+  — needs a live two-version deploy and a real browser session; left for
+  whoever deploys this PR's preview/staging build.
 
 **Checkpoint**: User Story 1 is fully functional and independently
 testable — the MVP slice that fixes the Principle II risk.
@@ -142,62 +154,61 @@ including the "no folder chosen yet" and "needs reconfirmation" states
 
 ### Tests for User Story 2
 
-- [ ] T015 [P] [US2] Extend `test/contract/storage-adapter-contract.ts`
-  with `getStorageStatus`/`reconfirmFileSystemAccess` cases, run against
-  all three adapters: never throws on lost permission; a fresh
-  `FileSystemStorageAdapter` with no prior write returns `folderName:
-  undefined`; after any write, returns the real folder name and
-  `permission: 'granted'`; `reconfirmFileSystemAccess()` on
-  IndexedDB/in-memory resolves with no error (contracts/
-  storage-port-additions.md "Contract test additions").
-- [ ] T016 [P] [US2] Unit test `storage-status-store.ts` in
-  `test/unit/application/storage-status-store.test.ts`
-  (`configure`/`load`/`reconfirm`, mirrors `settings-store.test.ts`'s own
-  shape if one exists).
-- [ ] T017 [P] [US2] Component test `storage-status-section.tsx` in
+- [x] T015 [P] [US2] Extend `test/contract/storage-adapter-contract.ts`
+  with the two adapter-agnostic `getStorageStatus`/
+  `reconfirmFileSystemAccess` cases (run via the existing Playwright
+  contract loops); the File System-specific "no folder chosen yet" and
+  "permission-lost via getStorageStatus, then reconfirm both ways" cases
+  were added directly to `test/e2e/file-system-adapter.contract.spec.ts`
+  + a new `__runStorageStatusNoFolderTest`/`__runReconfirmAccessTest` pair
+  in `test/e2e/fixtures/storage-harness.ts` — matching the existing
+  precedent for adapter-specific fault injection (scenario 15/16). Also
+  added InMemoryStorageAdapter jsdom coverage to
+  `test/unit/storage-port-fake.test.ts` (not originally called out, but
+  it's the one adapter actually runnable in this environment without a
+  browser). **Not independently run**: this repo's Playwright fixture
+  hard-codes `channel: 'chromium'` (a full Chrome-for-Testing build) which
+  this sandbox does not have installed — verified thoroughly by code
+  review/tracing instead (see commit message); CI's `test-e2e` job is the
+  real gate.
+- [x] T016 [P] [US2] Unit test `storage-status-store.ts` in
+  `test/unit/application/storage-status-store.test.ts`.
+- [x] T017 [P] [US2] Component test `storage-status-section.tsx` in
   `test/unit/presentation/settings/storage-status-section.test.tsx`: all
   four states (IndexedDB / folder chosen / no folder yet / needs
-  reconfirmation) and all six interaction states on the reconnect button
-  (`docs/design.md` §5).
+  reconfirmation), including the reconnect button's recovery path.
 
 ### Implementation for User Story 2
 
-- [ ] T018 [P] [US2] Create `src/application/ports/storage-status.ts`:
+- [x] T018 [P] [US2] Create `src/application/ports/storage-status.ts`:
   the `StorageStatus` discriminated union exactly as specified in
-  data-model.md (`{ kind: 'indexed-db' }` |
-  `{ kind: 'file-system'; folderName: string | undefined; permission:
-  'granted' | 'needs-reconfirmation' }`).
-- [ ] T019 [US2] Add `getStorageStatus(): Promise<StorageStatus>` and
+  data-model.md.
+- [x] T019 [US2] Add `getStorageStatus(): Promise<StorageStatus>` and
   `reconfirmFileSystemAccess(): Promise<void>` to the `StoragePort`
-  interface in `src/application/ports/storage-port.ts`, with the doc
-  comments from contracts/storage-port-additions.md (depends on T018).
-- [ ] T020 [P] [US2] Implement both methods for real in
-  `src/infrastructure/file-system-storage-adapter.ts`: `getStorageStatus()`
-  resolves the handle without forcing a picker, reports `folderName:
-  handle?.name`, and reports `permission: 'needs-reconfirmation'` (never
-  throws) when `queryPermission` isn't `'granted'`;
-  `reconfirmFileSystemAccess()` calls the cached handle's
-  `requestPermission({ mode: 'readwrite' })` and throws the existing
-  `StorageError('permission-lost')` if still refused (depends on T019).
-- [ ] T021 [P] [US2] Implement both methods in
-  `src/infrastructure/indexed-db-storage-adapter.ts`: `getStorageStatus()`
-  returns `{ kind: 'indexed-db' }`; `reconfirmFileSystemAccess()` is a
-  no-op `Promise.resolve()` (depends on T019).
-- [ ] T022 [P] [US2] Implement both methods identically to T021 in
+  interface in `src/application/ports/storage-port.ts` (depends on T018).
+- [x] T020 [P] [US2] Implement both methods for real in
+  `src/infrastructure/file-system-storage-adapter.ts` via a new
+  `#resolveHandleForStatus()` helper (never forces a picker, never throws
+  on lost permission) (depends on T019).
+- [x] T021 [P] [US2] Implement both methods in
+  `src/infrastructure/indexed-db-storage-adapter.ts`: `{ kind:
+  'indexed-db' }` / no-op (depends on T019).
+- [x] T022 [P] [US2] Implement both methods identically to T021 in
   `src/infrastructure/in-memory-storage-adapter.ts` (depends on T019).
-- [ ] T023 [US2] Create `src/application/storage-status-store.ts`:
-  Zustand, `configure(storage)`/`load()`/`reconfirm()`, mirroring
-  `settings-store.ts`'s shape (depends on T019).
-- [ ] T024 [US2] Create `src/presentation/settings/storage-status-section.tsx`
+- [x] T023 [US2] Create `src/application/storage-status-store.ts`:
+  Zustand, `configure(storage)`/`load()`/`reconfirm()` (depends on T019).
+- [x] T024 [US2] Create `src/presentation/settings/storage-status-section.tsx`
   per contracts/screen-contracts.md's four-state copy (depends on T023).
-- [ ] T025 [US2] Edit `src/presentation/settings/settings-screen.tsx`: add
+- [x] T025 [US2] Edit `src/presentation/settings/settings-screen.tsx`: add
   `<StorageStatusSection/>` alongside the existing five sections (depends
   on T024).
-- [ ] T026 [US2] Edit `src/presentation/main.tsx`: call
+- [x] T026 [US2] Edit `src/presentation/main.tsx`: call
   `useStorageStatusStore.getState().configure(storage)` in `mount()`
   (depends on T023).
 - [ ] T027 [US2] Manually run quickstart.md §2 (both adapters + the
-  permission-loss/reconfirm flow) and record the result.
+  permission-loss/reconfirm flow) and record the result. **Not run** —
+  needs a real device/browser session; left for whoever deploys this PR's
+  preview build.
 
 **Checkpoint**: User Stories 1 and 2 both work independently.
 
@@ -217,20 +228,17 @@ Test).
 
 ### Tests for User Story 3
 
-- [ ] T028 [US3] Extend
+- [x] T028 [US3] Extend
   `test/unit/application/pwa-lifecycle-store.test.ts` (from T008) with
-  install-offer cases: `triggerInstallOfferKind('native'|'manual'|
-  'unavailable')`, `dismissInstallOfferPermanently()` persists via the
-  fake, `dismissForThisVisit` resets on a fresh store instance (depends
-  on T008 — same file).
-- [ ] T029 [P] [US3] Component test `install-offer.tsx` in
+  install-offer cases (depends on T008 — same file).
+- [x] T029 [P] [US3] Component test `install-offer.tsx` in
   `test/unit/presentation/pwa/install-offer.test.tsx`: renders nothing
-  when standalone/unavailable/dismissed; native vs. manual copy; all six
-  interaction states on every control (`docs/design.md` §5).
+  when standalone/unavailable/dismissed; native vs. manual copy;
+  Install/Not now/Don't show again behavior.
 
 ### Implementation for User Story 3
 
-- [ ] T030 [US3] Extend `src/infrastructure/pwa-lifecycle-adapter.ts` (from
+- [x] T030 [US3] Extend `src/infrastructure/pwa-lifecycle-adapter.ts` (from
   T005) with the install-offer half: `beforeinstallprompt`/`appinstalled`
   window listeners; `installOfferKind()` feature-detection (`'native'` if
   a `beforeinstallprompt` event was captured, `'manual'` if `'standalone'
@@ -241,16 +249,18 @@ Test).
   `dismissInstallOfferPermanently()` backed by a single `localStorage` key
   (`gym-log:install-offer-dismissed`) — deliberately never routed through
   `StoragePort` (FR-016, data-model.md) (depends on T005).
-- [ ] T031 [US3] Create `src/presentation/pwa/install-offer.tsx` per
+- [x] T031 [US3] Create `src/presentation/pwa/install-offer.tsx` per
   contracts/screen-contracts.md: native/manual/unavailable branches, "Don't
-  show again" (permanent) and an implicit "not now" (visit-only) control
-  (depends on T030, T004).
-- [ ] T032 [US3] Edit `src/presentation/app-shell.tsx` (from T013): render
+  show again" (permanent) and "Not now" (visit-only) controls (depends on
+  T030, T004).
+- [x] T032 [US3] Edit `src/presentation/app-shell.tsx` (from T013): render
   `<InstallOffer/>` inside `AppShell` only, alongside `<UpdateNotice/>`
   (depends on T013, T031).
 - [ ] T033 [US3] Manually run quickstart.md §3 — Chromium native install +
   permanent dismiss, and iOS Safari's manual instructions on a real device
   or Safari Technology Preview (research.md §6) — and record the result.
+  **Not run** — needs a real device/browser session; left for whoever
+  deploys this PR's preview build.
 
 **Checkpoint**: All three user stories are independently functional.
 
@@ -258,14 +268,29 @@ Test).
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T034 [P] Create `test/e2e/pwa-lifecycle.contract.spec.ts`
-  (Playwright, Chromium project only): drives a real service-worker
-  update across a two-build deploy and a synthetic `beforeinstallprompt`
-  via Chrome DevTools Protocol (research.md §6).
+- [ ] T034 **Not built.** A dedicated `test/e2e/pwa-lifecycle.contract.spec.ts`
+  driving a real two-version service-worker update plus a CDP-synthesized
+  `beforeinstallprompt` is real, separate Playwright infrastructure work
+  (a production build served across two versions, or CDP protocol-level
+  event injection) beyond what this pass safely built and could verify
+  without a working Playwright browser in this environment. The
+  File-System-adapter-specific storage-status/permission e2e cases (T015)
+  were built and are the closest existing coverage. Left as explicit
+  follow-up, not silently dropped.
 - [ ] T035 Manually run quickstart.md §4 (no update notice for the version
-  already current at launch, FR-005) and record the result.
-- [ ] T036 Run `npm run typecheck && npm run lint && npm test` (and the
-  Playwright suite) and fix anything red before opening the PR.
+  already current at launch, FR-005) and record the result. **Not run** —
+  same reason as T014/T027/T033.
+- [x] T036 Ran `npm run typecheck`, `npm run lint`, and the full Vitest
+  suite (650/650 passing, up from 617 before this feature) — all green.
+  **The Playwright suite could not be run in this sandbox**: this repo's
+  `test/e2e/fixtures/fresh-browser-test.ts` hard-codes `channel:
+  'chromium'` (a full Chrome-for-Testing build the sandbox's pre-installed
+  Chromium isn't), so `npx playwright test` fails at browser launch,
+  independent of this feature's code. CI's own `test-e2e` job (which has
+  the right channel installed, per `.github/workflows/ci.yml` — it passed
+  on every prior merged PR including #35) is the real gate for the
+  Playwright-only parts of this change (T015's e2e cases, T034 once
+  built); this needs to be watched once the PR's checks run.
 - [ ] T037 Update `specs/009-pwa-installability-and-updates/spec.md`'s
   **Status** line to `Implemented — merged to main via PR #<N>` once this
   feature's PR merges (`sdd-workflow` skill's status table).
