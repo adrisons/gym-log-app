@@ -95,6 +95,29 @@
   outline-offset: 2px;
 }
 
+/* AddExerciseControl's popup (design refinement) — same modal shell as
+   `.block-card__rename-backdrop`/`.block-card__rename-dialog`, kept as its
+   own pair of classes since the dialog here isn't a `.block-card`. */
+.add-exercise-control__backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: color-mix(in oklab, var(--color-foreground) 40%, transparent);
+  z-index: 100;
+}
+
+.add-exercise-control__dialog {
+  width: 100%;
+  max-width: 360px;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
 .exercise-search-field {
   display: flex;
   flex-direction: column;

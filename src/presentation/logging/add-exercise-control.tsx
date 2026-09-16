@@ -1,8 +1,10 @@
 /**
- * A button that expands into `ExerciseSearchField`, so this reads as one
- * control instead of an always-visible search field sitting in view
- * before the user has asked for it (docs/design.md §2). Collapses back to
- * a button after a selection/creation, or on blur.
+ * A button that opens `ExerciseSearchField` inside a modal popup (design
+ * request: search shouldn't sit in view, nor share scroll space with the
+ * rest of the block, before the user has asked for it — docs/design.md
+ * §2), matching `BlockCard`'s own rename-dialog pattern (backdrop +
+ * `role="dialog"`). Closes back to the button on a selection/creation,
+ * Escape, or a tap on the backdrop.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { Exercise } from '@/application/logging/use-cases';
@@ -28,30 +30,22 @@ export function AddExerciseControl({
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
-  // Set only by a selection/creation closing this control (never by
-  // blur) — see the effect below.
-  const restoreFocusRef = useRef(false);
 
-  // The trigger button unmounts while expanded, so a selection/creation
-  // closing this control would otherwise leave keyboard focus nowhere —
-  // hand it back once the button exists again. A blur-driven close (e.g.
-  // Tab moving on to the next control) must NOT do this: the focus the
-  // browser just moved to is exactly where the user meant it to go, and
-  // yanking it back to this button would send a keyboard user backwards
-  // and trap them here. `restoreFocusRef` is what tells the two apart.
-  // Skipped on first mount: `wasOpenRef` only turns true once this
-  // component has actually been open, so a page that renders this
-  // collapsed and untouched never steals focus on its own.
+  // The trigger button stays mounted underneath the popup (unlike the old
+  // inline-expand version), so closing can always hand focus back to it —
+  // whether that close came from a selection/creation, Escape, or a
+  // backdrop tap. Skipped on first mount: `wasOpenRef` only turns true
+  // once this control has actually been opened, so a page that renders it
+  // untouched never steals focus on its own.
   useEffect(() => {
-    if (wasOpenRef.current && !open && restoreFocusRef.current) {
+    if (wasOpenRef.current && !open) {
       buttonRef.current?.focus();
-      restoreFocusRef.current = false;
     }
     wasOpenRef.current = open;
   }, [open]);
 
-  if (!open) {
-    return (
+  return (
+    <>
       <button
         ref={buttonRef}
         type="button"
@@ -61,32 +55,41 @@ export function AddExerciseControl({
         <Icon name="plus" />
         {buttonLabel}
       </button>
-    );
-  }
-
-  return (
-    <div
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          setOpen(false);
-        }
-      }}
-    >
-      <ExerciseSearchField
-        label={fieldLabel}
-        search={search}
-        autoFocus
-        onSelectExercise={(exercise) => {
-          onSelectExercise(exercise);
-          restoreFocusRef.current = true;
-          setOpen(false);
-        }}
-        onCreateExercise={(name) => {
-          onCreateExercise(name);
-          restoreFocusRef.current = true;
-          setOpen(false);
-        }}
-      />
-    </div>
+      {open && (
+        <div
+          className="add-exercise-control__backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setOpen(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              setOpen(false);
+            }
+          }}
+        >
+          <div
+            className="add-exercise-control__dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={fieldLabel}
+          >
+            <ExerciseSearchField
+              label={fieldLabel}
+              search={search}
+              autoFocus
+              onSelectExercise={(exercise) => {
+                onSelectExercise(exercise);
+                setOpen(false);
+              }}
+              onCreateExercise={(name) => {
+                onCreateExercise(name);
+                setOpen(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }

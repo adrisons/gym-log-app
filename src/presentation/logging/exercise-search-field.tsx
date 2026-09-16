@@ -66,7 +66,12 @@ export function ExerciseSearchField({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const trimmed = query.trim();
-  const results = search(query);
+  // Capped here, at the display boundary, rather than inside each `search`
+  // implementation: whichever catalogue/ranking a caller plugs in, the
+  // popup only ever surfaces its top 3 matches (or, with an empty query,
+  // top 3 suggestions) — enough to glance at, not another full list to
+  // scroll (the very thing this component replaced).
+  const results = search(query).slice(0, 3);
   const normalizedQuery = normalize(trimmed);
   const hasExactMatch = results.some((exercise) =>
     [exercise.canonicalName, ...exercise.aliases].some(
