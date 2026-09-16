@@ -263,12 +263,13 @@ Create a session and add blocks, exercises and sets.
   set-entry template (ADR-0006), not re-offered as a picker on every set: the
   set-entry form shows exactly the load input and volume control the
   template says, and nothing else, by default — for a fresh exercise, that's
-  Weight + Reps. Changing the template (including switching to Band/
-  Bodyweight/Free text/None, or to Duration/Distance, or turning effort
-  tracking on) happens through the exercise's own menu, with a warning that
-  it changes what a *new* set defaults to going forward; it never touches an
+  Weight + Reps. Changing the template (including switching to Bodyweight/
+  Free text/None, or to Duration/Distance, or turning effort tracking on)
+  happens through the exercise's own menu, with a warning that it changes
+  what a *new* set defaults to going forward; it never touches an
   already-recorded set (ADR-0006 — supersedes this FR's earlier per-set
-  override wording).
+  override wording). _(A `Band` load kind was also switchable to here
+  through schema v4; removed by ADR-0016 — see §3.2's own note.)_
 - Weight uses the numeric keypad by default (`inputMode="decimal"`) with no
   dedicated quick-increment buttons — entering a value directly is the whole
   interaction. Reps are chosen with a scrollable wheel (1 to 100, plus an
@@ -287,7 +288,9 @@ Create a session and add blocks, exercises and sets.
   wording below). A row that is merely pre-filled and still untouched does
   nothing on its own — see the next bullet for how an identical repeat
   still works in one tap.
-- Bands are picked from a user-owned, reorderable list with free labels.
+- _(Bands were picked from a user-owned, reorderable list with free labels
+  through schema v4; superseded by ADR-0016 — see §3.2's own note. A band
+  exercise is now tracked with `FreeText` or `None` instead.)_
 - Free text accepts up to 40 characters and autocompletes from what has already
   been used for that exercise.
 - An exercise entry holds any number of sets in the same session (e.g. three
