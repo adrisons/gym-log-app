@@ -8,5 +8,6 @@ export {
   InMemoryFileExchange,
   type SavedFile,
 } from './in-memory-file-exchange';
+export { InMemoryPwaLifecycle } from './in-memory-pwa-lifecycle';
 export { createHarness } from './integration-harness';
 export type { Harness } from './integration-harness';

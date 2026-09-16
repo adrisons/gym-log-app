@@ -339,6 +339,39 @@ const settingsScenarios: Scenario[] = [
   },
 ];
 
+// Storage status (spec 009 contracts/storage-port-additions.md) — the two
+// adapter-agnostic cases. The File System Access-specific ones (no folder
+// chosen yet; a lost permission surfaced via `getStorageStatus` and
+// resolved via `reconfirmFileSystemAccess`) need real fault injection the
+// same way scenario 16 does — see
+// test/e2e/file-system-adapter.contract.spec.ts.
+
+const storageStatusScenarios: Scenario[] = [
+  {
+    name: 'storage-status-1: getStorageStatus never throws and reports a valid kind on a never-written device',
+    async run(makeAdapter) {
+      const adapter = await makeAdapter();
+      const status = await adapter.getStorageStatus();
+      assert(
+        status.kind === 'indexed-db' || status.kind === 'file-system',
+        "getStorageStatus reports one of ADR-0002's two adapter kinds",
+      );
+    },
+  },
+  {
+    name: 'storage-status-2: reconfirmFileSystemAccess never throws on an adapter with no permission concept',
+    async run(makeAdapter) {
+      const adapter = await makeAdapter();
+      const status = await adapter.getStorageStatus();
+      // Only meaningful on the IndexedDB/in-memory adapters — the File
+      // System adapter's own e2e suite exercises the real
+      // permission-lost/reconfirm path with fault injection instead.
+      if (status.kind !== 'indexed-db') return;
+      await adapter.reconfirmFileSystemAccess();
+    },
+  },
+];
+
 // Bulk atomic write: importBulk / resetToFreshInstall (spec 006
 // contracts/storage-port-additions.md, cases 3-7)
 
@@ -754,6 +787,7 @@ export const CONTRACT_SCENARIOS: Scenario[] = [
   ...draftScenarios,
   ...crossAdapterScenarios,
   ...settingsScenarios,
+  ...storageStatusScenarios,
   ...bulkWriteScenarios,
   ...schemaVersionScenarios,
   ...cascadeScenarios,

@@ -8,13 +8,23 @@
 import { Outlet } from 'react-router-dom';
 import { HeaderNav } from './nav/header-nav';
 import { ScreenTitleProvider } from './nav/screen-title';
+import { UpdateNotice } from './pwa/update-notice';
+import { InstallOffer } from './pwa/install-offer';
 import './app-shell.css';
 
+/**
+ * `UpdateNotice`/`InstallOffer` render only here, never in `LoggingShell`
+ * below — this is what satisfies spec 009 FR-018 (never on `/log`)
+ * structurally rather than with a runtime route check
+ * (`specs/009-pwa-installability-and-updates/research.md` §3).
+ */
 export function AppShell() {
   return (
     <ScreenTitleProvider>
       <div className="app-shell">
         <HeaderNav />
+        <UpdateNotice />
+        <InstallOffer />
         <div className="app-shell__content">
           <Outlet />
         </div>

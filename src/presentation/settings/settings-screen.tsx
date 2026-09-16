@@ -10,6 +10,7 @@ import { UnitAndIncrementsSection } from './unit-and-increments-section';
 import { ThemeSection } from './theme-section';
 import { FirstDayOfWeekSection } from './first-day-of-week-section';
 import { BandLabelsSection } from './band-labels-section';
+import { StorageStatusSection } from './storage-status-section';
 import { DataSection } from './data-section';
 import './settings.css';
 
@@ -46,6 +47,7 @@ export function SettingsScreen() {
       <ThemeSection />
       <FirstDayOfWeekSection />
       <BandLabelsSection key={dataVersion} />
+      <StorageStatusSection />
       <DataSection onDataChanged={handleDataChanged} />
     </main>
   );

@@ -5,6 +5,7 @@ import type {
   BulkImportInput,
 } from '../application/ports/storage-port';
 import type { Settings } from '../application/ports/settings';
+import type { StorageStatus } from '../application/ports/storage-status';
 import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
 import type { SessionId, ExerciseId } from '../domain/ids';
@@ -320,6 +321,17 @@ export class IndexedDbStorageAdapter implements StoragePort {
     await this.#run(() =>
       this.#db.settings.put({ key: SETTINGS_ROW_KEY, value: settings }),
     );
+  }
+
+  // Storage status (spec 009 FR-006-009/FR-017) — this adapter is always
+  // IndexedDB (ADR-0002); there is no folder or permission to report.
+
+  async getStorageStatus(): Promise<StorageStatus> {
+    return { kind: 'indexed-db' };
+  }
+
+  async reconfirmFileSystemAccess(): Promise<void> {
+    // No-op — nothing to reconfirm on this adapter.
   }
 
   // Bulk atomic write (spec 006 FR-011/FR-015-016)

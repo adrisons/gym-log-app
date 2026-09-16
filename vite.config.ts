@@ -46,7 +46,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // Spec 009: 'prompt', not 'autoUpdate' — a new version is downloaded
+      // and held until PwaLifecycleAdapter's onNeedRefresh callback lets
+      // the app decide when to apply it (never silently, never mid-set,
+      // Principle II). See src/infrastructure/pwa-lifecycle-adapter.ts.
+      registerType: 'prompt',
       // Phase 0: precache the app shell so it is usable offline after first
       // load (ADR-0002). No runtime caching rules yet — there are no data
       // requests to cache.

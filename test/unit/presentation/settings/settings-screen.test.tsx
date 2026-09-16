@@ -5,6 +5,7 @@ import { SettingsScreen } from '@/presentation/settings/settings-screen';
 import { useStorageAccess } from '@/application/storage-access';
 import { useFileExchangeAccess } from '@/application/file-exchange-access';
 import { useSettingsStore } from '@/application/settings-store';
+import { useStorageStatusStore } from '@/application/storage-status-store';
 import { InMemoryStorage, InMemoryFileExchange } from '../../../support';
 
 describe('SettingsScreen (spec 006 FR-001-006)', () => {
@@ -19,6 +20,8 @@ describe('SettingsScreen (spec 006 FR-001-006)', () => {
       settings: useSettingsStore.getState().settings,
       loaded: false,
     });
+    useStorageStatusStore.getState().configure(storage);
+    useStorageStatusStore.setState({ status: undefined, loaded: false });
   });
 
   it('renders every section once loaded', async () => {
@@ -35,6 +38,7 @@ describe('SettingsScreen (spec 006 FR-001-006)', () => {
     expect(
       screen.getByRole('region', { name: 'Band labels' }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Storage' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Data' })).toBeInTheDocument();
   });
 

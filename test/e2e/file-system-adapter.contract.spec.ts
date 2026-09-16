@@ -160,6 +160,47 @@ test('a queued merge of two exercises does not resurrect the merged-away loser f
   expect(outcome.exerciseIds).toEqual(['legacy-a']);
 });
 
+test('getStorageStatus reports no folder chosen yet, without forcing acquisition (spec 009 User Story 2, Acceptance Scenario 4)', async ({
+  page,
+  browserName,
+}) => {
+  test.setTimeout(90_000);
+  test.skip(browserName !== 'chromium', 'File System Access is chromium-only.');
+
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const status = await page.evaluate(() =>
+    window.__runStorageStatusNoFolderTest(),
+  );
+
+  expect(status).toEqual({
+    kind: 'file-system',
+    folderName: undefined,
+    permission: 'granted',
+  });
+});
+
+test('a lost permission surfaces via getStorageStatus, and reconfirmFileSystemAccess both recovers it and reports StorageError when declined (spec 009 FR-009/FR-017)', async ({
+  page,
+  browserName,
+}) => {
+  test.setTimeout(90_000);
+  test.skip(browserName !== 'chromium', 'File System Access is chromium-only.');
+
+  await page.goto('/test/e2e/fixtures/storage-harness.html');
+  const outcome = await page.evaluate(() => window.__runReconfirmAccessTest());
+
+  expect(outcome.lostStatus.kind).toBe('file-system');
+  if (outcome.lostStatus.kind === 'file-system') {
+    expect(outcome.lostStatus.permission).toBe('needs-reconfirmation');
+  }
+  expect(outcome.declinedThrew).toBe(true);
+  expect(outcome.declinedKind).toBe('permission-lost');
+  expect(outcome.restoredStatus.kind).toBe('file-system');
+  if (outcome.restoredStatus.kind === 'file-system') {
+    expect(outcome.restoredStatus.permission).toBe('granted');
+  }
+});
+
 test('a lost File System Access permission surfaces StorageError with kind "permission-lost", distinguishable from "no data yet"', async ({
   page,
   browserName,
