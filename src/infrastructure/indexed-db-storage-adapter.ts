@@ -12,7 +12,9 @@ import type { SessionId, ExerciseId } from '../domain/ids';
 import { StorageError } from '../application/errors';
 import {
   migrateExerciseCatalogue,
+  migrateExerciseCatalogueLoadType,
   migrateSessionsBandLoad,
+  migrateDraftBandLoad,
 } from '../application/schema-migration';
 import {
   GymLogDatabase,
@@ -86,6 +88,12 @@ export class IndexedDbStorageAdapter implements StoragePort {
       // table is simply never read/written again — no explicit table drop
       // needed (Copilot review, PR #21's same "gate on stored < N" pattern).
       await this.#migrateSessionBandLoads();
+      // Same v4 -> v5 step, for the two other places a `band` Load kind
+      // could still be sitting in storage: an Exercise catalogue
+      // template's own `defaultLoadType`, and the one in-progress
+      // LoggingDraft (Copilot review, PR #39).
+      await this.#migrateExerciseDefaultLoadTypes();
+      await this.#migrateDraftBandLoad();
     }
     // v2 -> v3 (ADR-0008): Block.rounds was optional, and its absence in
     // every already-stored Session was itself valid v3 data — no stored
@@ -132,6 +140,30 @@ export class IndexedDbStorageAdapter implements StoragePort {
     const sessions = await this.#db.sessions.toArray();
     await this.#run(() =>
       this.#db.sessions.bulkPut(migrateSessionsBandLoad(sessions, 4)),
+    );
+  }
+
+  /** ADR-0016's v4->v5 migration, `Exercise.defaultLoadType`'s own
+   * `band` -> `freeText` backfill: see the call site's comment. */
+  async #migrateExerciseDefaultLoadTypes(): Promise<void> {
+    const exercises = await this.#db.exercises.toArray();
+    await this.#run(() =>
+      this.#db.exercises.bulkPut(
+        migrateExerciseCatalogueLoadType(exercises, 4),
+      ),
+    );
+  }
+
+  /** ADR-0016's v4->v5 migration, the in-progress LoggingDraft's own
+   * `band` -> `freeText` backfill: see the call site's comment. */
+  async #migrateDraftBandLoad(): Promise<void> {
+    const row = await this.#db.draft.get(DRAFT_ROW_KEY);
+    if (!row) return;
+    await this.#run(() =>
+      this.#db.draft.put({
+        key: DRAFT_ROW_KEY,
+        value: migrateDraftBandLoad(row.value),
+      }),
     );
   }
 

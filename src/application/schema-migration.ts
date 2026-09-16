@@ -19,6 +19,7 @@
 import type { Exercise } from '@/domain/exercise';
 import type { Session } from '@/domain/session';
 import type { Load } from '@/domain/load';
+import type { LoggingDraft } from '@/application/ports/logging-draft';
 
 /**
  * The schema version this build of the app understands
@@ -85,24 +86,62 @@ export function migrateExerciseCatalogue(
 }
 
 /**
+ * ADR-0016's v4->v5 backfill for the Exercise catalogue: a template's
+ * `defaultLoadType` could be `'band'` (the removed `Load` kind), the same
+ * exposure `migrateBandLoad` fixes for a `Set`'s own load — rewritten to
+ * `'freeText'` here for the same reason (band exercises are better served
+ * by free text than by the removed band editor). Idempotent — a
+ * `defaultLoadType` that is already something else passes through
+ * unchanged.
+ */
+export function migrateExerciseDefaultLoadType(exercise: Exercise): Exercise {
+  // See `migrateBandLoad`'s own comment on the cast: `'band'` no longer
+  // type-checks against `Load['kind']` in schema v5.
+  if ((exercise.defaultLoadType as string) !== 'band') return exercise;
+  return { ...exercise, defaultLoadType: 'freeText' };
+}
+
+/**
+ * Migrates a whole Exercise catalogue's `defaultLoadType` from
+ * `storedVersion` up to whatever this build understands. `storedVersion <
+ * 5` runs the v4->v5 `defaultLoadType` backfill (ADR-0016) — kept as its
+ * own function/gate, parallel to `migrateSessionsBandLoad`, rather than
+ * folded into `migrateExerciseCatalogue`'s v1->v2 gate, since a catalogue
+ * already at v2-v4 must still run this step while skipping the v1->v2 one.
+ */
+export function migrateExerciseCatalogueLoadType(
+  exercises: Exercise[],
+  storedVersion: number,
+): Exercise[] {
+  if (storedVersion >= 5) return exercises;
+  return exercises.map(migrateExerciseDefaultLoadType);
+}
+
+/**
  * ADR-0016's v4->v5 backfill: the `band` `Load` kind was removed (its
  * label editor blocked the "add set" flow, and band exercises are better
  * served by `freeText`/`none`). Every stored `Set.load` with `kind ===
  * 'band'` is rewritten to `{ kind: 'freeText', text: 'Band: ' + label }`,
- * preserving the original label as text so no data is silently lost.
- * Idempotent — a `Load` that is already some other kind (including
- * `freeText`) passes through unchanged, and a legacy `band` value found
- * more than once (e.g. re-running the migration) is only ever rewritten
- * once because its `kind` is no longer `'band'` afterward.
+ * preserving the original label — and, when present, the legacy
+ * `estimatedResistanceKg` — as text so no data is silently lost. Idempotent
+ * — a `Load` that is already some other kind (including `freeText`) passes
+ * through unchanged, and a legacy `band` value found more than once (e.g.
+ * re-running the migration) is only ever rewritten once because its `kind`
+ * is no longer `'band'` afterward.
  */
 export function migrateBandLoad(load: Load): Load {
   // `band` was removed from the `Load` union in schema v5, so a
   // still-persisted v4 record's `kind: 'band'` value no longer type-checks
   // against `Load` — this function is exactly the boundary where such
   // legacy data is normalized, hence the cast.
-  const legacy = load as Load | { kind: 'band'; label: string };
+  const legacy = load as
+    Load | { kind: 'band'; label: string; estimatedResistanceKg?: number };
   if (legacy.kind !== 'band') return load;
-  return { kind: 'freeText', text: `Band: ${legacy.label}` };
+  const resistance =
+    legacy.estimatedResistanceKg !== undefined
+      ? ` (~${legacy.estimatedResistanceKg}kg)`
+      : '';
+  return { kind: 'freeText', text: `Band: ${legacy.label}${resistance}` };
 }
 
 /** Applies `migrateBandLoad` to every `Set.load` in a whole `Session`. */
@@ -133,4 +172,27 @@ export function migrateSessionsBandLoad(
 ): Session[] {
   if (storedVersion >= 5) return sessions;
   return sessions.map(migrateSessionBandLoads);
+}
+
+/**
+ * `LoggingDraft.blocks[].exercises[].sets[].load` (`DraftSet.load`,
+ * `application/ports/logging-draft.ts`) is structurally identical to
+ * `Session.blocks[].exercises[].sets[].load` — the same `band` exposure
+ * `migrateSessionBandLoads` walks a `Session` for, walked here for the
+ * one, currently-in-progress `LoggingDraft` instead.
+ */
+export function migrateDraftBandLoad(draft: LoggingDraft): LoggingDraft {
+  return {
+    ...draft,
+    blocks: draft.blocks.map((block) => ({
+      ...block,
+      exercises: block.exercises.map((entry) => ({
+        ...entry,
+        sets: entry.sets.map((set) => ({
+          ...set,
+          load: migrateBandLoad(set.load),
+        })),
+      })),
+    })),
+  };
 }

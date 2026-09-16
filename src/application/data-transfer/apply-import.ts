@@ -23,7 +23,9 @@ import {
 } from './import-preview';
 import {
   migrateExerciseCatalogue,
+  migrateExerciseCatalogueLoadType,
   migrateSessionsBandLoad,
+  migrateDraftBandLoad,
   CURRENT_SCHEMA_VERSION,
 } from '@/application/schema-migration';
 import type { ExportFile, ExportedSession } from './export-file';
@@ -75,10 +77,21 @@ export async function prepareImport(
   const originalFileVersion = validation.file.schemaVersion;
   const migratedFile: ExportFile = {
     ...validation.file,
-    exerciseCatalogue: migrateExerciseCatalogue(
-      validation.file.exerciseCatalogue,
+    exerciseCatalogue: migrateExerciseCatalogueLoadType(
+      migrateExerciseCatalogue(
+        validation.file.exerciseCatalogue,
+        originalFileVersion,
+      ),
       originalFileVersion,
     ),
+    // A pre-v5 export (ADR-0016) may still carry a `loggingDraft` whose
+    // sets have `Load` values with `kind: 'band'` — the same exposure
+    // `toPersistableSessions` already fixes for `sessions` below, applied
+    // here so a valid pre-v5 export can never reintroduce a `band` load
+    // into `BulkImportInput.loggingDraft` (Copilot review, PR #39).
+    ...(validation.file.loggingDraft !== undefined && {
+      loggingDraft: migrateDraftBandLoad(validation.file.loggingDraft),
+    }),
     schemaVersion: CURRENT_SCHEMA_VERSION,
   };
 
