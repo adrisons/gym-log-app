@@ -455,11 +455,12 @@
      own `50px`/`1fr` track size and lets long text (e.g. "Duration")
      overflow past its cell into the next one instead of truncating —
      `min-width: 0` opts back into normal shrink-to-fit-then-ellipsis
-     behavior. */
+     behavior. The ellipsis/truncation styles themselves live only on
+     `.sets-header-cell__button` below — this outer element stays
+     `overflow: visible` so `.sets-header-cell__tooltip`, positioned
+     `top: 100%` of it, isn't clipped by the same rule that truncates the
+     label (Copilot review, PR #39). */
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -496,7 +497,7 @@
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   background: var(--color-surface-raised);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px var(--color-border-strong);
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: none;
