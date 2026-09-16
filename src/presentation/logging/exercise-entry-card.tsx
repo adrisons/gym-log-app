@@ -62,28 +62,23 @@ export function ExerciseEntryCard({
             Move down
           </button>
           {otherBlocks.length > 0 && (
-            <label className="logging-screen__field-label">
-              <span className="logging-screen__field-label--icon">
-                <Icon name="move-to" />
-                Move to
-              </span>
-              <select
-                className="logging-field-input"
-                value=""
-                onChange={(event) => {
-                  if (event.target.value) onMoveToBlock(event.target.value);
-                }}
-              >
-                <option value="" disabled>
-                  Move to…
+            <select
+              className="logging-field-input"
+              aria-label="Move to"
+              value=""
+              onChange={(event) => {
+                if (event.target.value) onMoveToBlock(event.target.value);
+              }}
+            >
+              <option value="" disabled>
+                Move to…
+              </option>
+              {otherBlocks.map((block) => (
+                <option key={block.id} value={block.id}>
+                  {block.displayName}
                 </option>
-                {otherBlocks.map((block) => (
-                  <option key={block.id} value={block.id}>
-                    {block.displayName}
-                  </option>
-                ))}
-              </select>
-            </label>
+              ))}
+            </select>
           )}
           {onEditTemplate && (
             <button
