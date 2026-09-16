@@ -4,9 +4,12 @@
 
 **Created**: 2026-09-16
 
-**Status**: Planned — `plan.md`/`research.md`/`data-model.md`/`contracts/`/
-`quickstart.md`/`tasks.md` all exist (Constitution Check: PASS, no
-violations); implementation not yet merged.
+**Status**: Implemented — merged to `main` via PR #36 (implementation)
+and a follow-up CI lint fix (unrelated to feature behavior). See
+`tasks.md` for which tasks landed vs. remain manual/CI-only follow-up
+(quickstart.md's live-device verification steps, and a dedicated
+two-version service-worker + synthetic `beforeinstallprompt` Playwright
+spec).
 
 **Input**: User description: "Review whether the specs already cover showing
 the user, from Settings, where their data is being stored — on iPhone no

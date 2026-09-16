@@ -291,9 +291,23 @@ Test).
   on every prior merged PR including #35) is the real gate for the
   Playwright-only parts of this change (T015's e2e cases, T034 once
   built); this needs to be watched once the PR's checks run.
-- [ ] T037 Update `specs/009-pwa-installability-and-updates/spec.md`'s
-  **Status** line to `Implemented — merged to main via PR #<N>` once this
-  feature's PR merges (`sdd-workflow` skill's status table).
+- [x] T037 Updated `specs/009-pwa-installability-and-updates/spec.md`'s
+  **Status** line to `Implemented` (merged via PR #36, plus this CI-fix
+  follow-up), per `sdd-workflow`'s status table.
+
+## Post-merge note (2026-09-16)
+
+CI on `main` went red right after PR #36 merged: `scripts/check-no-color-literals.sh`'s
+own regex (`#[0-9a-fA-F]{3,8}`) matched `pwa-lifecycle-adapter.ts`'s
+private field `#deferredPrompt` as a false-positive hex color (its first
+four letters, "defe", are all valid hex digits) — nothing to do with an
+actual literal color. Fixed by renaming to `#pendingInstallPrompt` in a
+same-day follow-up commit on a fresh branch (the merged PR #36 branch was
+already gone) — no behavior change, `typecheck`/`lint`/
+`check:no-color-literals`/the full Vitest suite (650/650) all re-verified
+green locally. Also confirmed from PR #36's own CI run: `test-e2e`
+**passed**, meaning the Playwright-only harness additions (T015) — which
+this sandbox couldn't run locally — are validated for real.
 
 ---
 
