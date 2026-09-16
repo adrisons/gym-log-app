@@ -4,9 +4,9 @@
 
 **Created**: 2026-09-16
 
-**Status**: Reviewed — passed `spec-reviewer` (findings resolved by direct
-edit) and `schema-guardian` (no schema-version impact); `plan.md`/`tasks.md`
-not yet written.
+**Status**: Planned — `plan.md`/`research.md`/`data-model.md`/`contracts/`/
+`quickstart.md` exist (Constitution Check: PASS, no violations);
+`tasks.md` not yet written; implementation not yet merged.
 
 **Input**: User description: "Review whether the specs already cover showing
 the user, from Settings, where their data is being stored — on iPhone no
