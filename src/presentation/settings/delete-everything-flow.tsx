@@ -17,7 +17,7 @@ type FlowState =
 
 export interface DeleteEverythingFlowProps {
   /** Called once `resetToFreshInstall` has landed — the caller refreshes
-   * whatever in-memory state (Settings store, band labels, theme) still
+   * whatever in-memory state (Settings store, theme) still
    * holds the pre-reset snapshot (Copilot review, PR #31). */
   onDeleted: () => void | Promise<void>;
 }
@@ -71,8 +71,8 @@ export function DeleteEverythingFlow({ onDeleted }: DeleteEverythingFlowProps) {
           aria-label="Confirm deletion"
         >
           <p>
-            This deletes every session, custom exercise, band label, and
-            setting. Are you sure?
+            This deletes every session, custom exercise, and setting. Are you
+            sure?
           </p>
           <div className="settings-confirm-actions">
             <button

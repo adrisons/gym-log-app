@@ -35,9 +35,6 @@ describe('SettingsScreen (spec 006 FR-001-006)', () => {
     expect(
       screen.getByRole('region', { name: 'First day of the week' }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('region', { name: 'Band labels' }),
-    ).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Storage' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Data' })).toBeInTheDocument();
   });

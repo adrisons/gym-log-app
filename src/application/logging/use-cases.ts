@@ -255,18 +255,6 @@ export function suggestFreeTextLoads(
   return result;
 }
 
-/** FR-011: thin wrappers over the port's band-labels surface. */
-export async function listBandLabels(storage: StoragePort): Promise<string[]> {
-  return storage.listBandLabels();
-}
-
-export async function saveBandLabels(
-  storage: StoragePort,
-  labels: string[],
-): Promise<void> {
-  await storage.saveBandLabels(labels);
-}
-
 export type RenameExerciseResult =
   | { status: 'renamed'; exercise: Exercise }
   | { status: 'collision'; collidesWith: Exercise };

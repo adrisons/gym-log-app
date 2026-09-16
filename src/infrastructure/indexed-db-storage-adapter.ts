@@ -10,11 +10,15 @@ import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
 import type { SessionId, ExerciseId } from '../domain/ids';
 import { StorageError } from '../application/errors';
-import { migrateExerciseCatalogue } from '../application/schema-migration';
+import {
+  migrateExerciseCatalogue,
+  migrateExerciseCatalogueLoadType,
+  migrateSessionsBandLoad,
+  migrateDraftBandLoad,
+} from '../application/schema-migration';
 import {
   GymLogDatabase,
   DRAFT_ROW_KEY,
-  BAND_LABELS_ROW_KEY,
   SETTINGS_ROW_KEY,
   SCHEMA_VERSION_ROW_KEY,
 } from './indexed-db/schema';
@@ -77,6 +81,20 @@ export class IndexedDbStorageAdapter implements StoragePort {
       // for a backfill it no longer needs (Copilot review, PR #21).
       await this.#migrateExerciseTemplateDefaults();
     }
+    if (action === 'migrate' && stored < 5) {
+      // v4 -> v5 (ADR-0016): removes the `band` Load kind and its label
+      // catalogue. Every stored Session's Set.load with kind 'band' is
+      // rewritten to freeText (preserving the label), and the bandLabels
+      // table is simply never read/written again — no explicit table drop
+      // needed (Copilot review, PR #21's same "gate on stored < N" pattern).
+      await this.#migrateSessionBandLoads();
+      // Same v4 -> v5 step, for the two other places a `band` Load kind
+      // could still be sitting in storage: an Exercise catalogue
+      // template's own `defaultLoadType`, and the one in-progress
+      // LoggingDraft (Copilot review, PR #39).
+      await this.#migrateExerciseDefaultLoadTypes();
+      await this.#migrateDraftBandLoad();
+    }
     // v2 -> v3 (ADR-0008): Block.rounds was optional, and its absence in
     // every already-stored Session was itself valid v3 data — no stored
     // shape changes, so this step never had a backfill of its own to run.
@@ -114,6 +132,38 @@ export class IndexedDbStorageAdapter implements StoragePort {
     const exercises = await this.#db.exercises.toArray();
     await this.#run(() =>
       this.#db.exercises.bulkPut(migrateExerciseCatalogue(exercises, 1)),
+    );
+  }
+
+  /** ADR-0016's v4->v5 migration: see the call site's comment. */
+  async #migrateSessionBandLoads(): Promise<void> {
+    const sessions = await this.#db.sessions.toArray();
+    await this.#run(() =>
+      this.#db.sessions.bulkPut(migrateSessionsBandLoad(sessions, 4)),
+    );
+  }
+
+  /** ADR-0016's v4->v5 migration, `Exercise.defaultLoadType`'s own
+   * `band` -> `freeText` backfill: see the call site's comment. */
+  async #migrateExerciseDefaultLoadTypes(): Promise<void> {
+    const exercises = await this.#db.exercises.toArray();
+    await this.#run(() =>
+      this.#db.exercises.bulkPut(
+        migrateExerciseCatalogueLoadType(exercises, 4),
+      ),
+    );
+  }
+
+  /** ADR-0016's v4->v5 migration, the in-progress LoggingDraft's own
+   * `band` -> `freeText` backfill: see the call site's comment. */
+  async #migrateDraftBandLoad(): Promise<void> {
+    const row = await this.#db.draft.get(DRAFT_ROW_KEY);
+    if (!row) return;
+    await this.#run(() =>
+      this.#db.draft.put({
+        key: DRAFT_ROW_KEY,
+        value: migrateDraftBandLoad(row.value),
+      }),
     );
   }
 
@@ -281,21 +331,6 @@ export class IndexedDbStorageAdapter implements StoragePort {
     await this.#run(() => this.#db.draft.delete(DRAFT_ROW_KEY));
   }
 
-  // Band labels
-
-  async listBandLabels(): Promise<string[]> {
-    await this.#ensureSchemaChecked();
-    const row = await this.#db.bandLabels.get(BAND_LABELS_ROW_KEY);
-    return row ? [...row.value] : [];
-  }
-
-  async saveBandLabels(labels: string[]): Promise<void> {
-    await this.#ensureSchemaChecked();
-    await this.#run(() =>
-      this.#db.bandLabels.put({ key: BAND_LABELS_ROW_KEY, value: [...labels] }),
-    );
-  }
-
   // Schema version
 
   async getSchemaVersion(): Promise<number> {
@@ -345,7 +380,6 @@ export class IndexedDbStorageAdapter implements StoragePort {
           this.#db.sessions,
           this.#db.exercises,
           this.#db.draft,
-          this.#db.bandLabels,
           this.#db.settings,
           this.#db.meta,
         ],
@@ -355,12 +389,6 @@ export class IndexedDbStorageAdapter implements StoragePort {
           }
           if (input.sessions.length > 0) {
             await this.#db.sessions.bulkPut(input.sessions);
-          }
-          if (input.bandLabels !== undefined) {
-            await this.#db.bandLabels.put({
-              key: BAND_LABELS_ROW_KEY,
-              value: [...input.bandLabels],
-            });
           }
           if (input.settings !== undefined) {
             await this.#db.settings.put({
@@ -392,7 +420,6 @@ export class IndexedDbStorageAdapter implements StoragePort {
           this.#db.sessions,
           this.#db.exercises,
           this.#db.draft,
-          this.#db.bandLabels,
           this.#db.settings,
           this.#db.meta,
         ],
@@ -401,10 +428,6 @@ export class IndexedDbStorageAdapter implements StoragePort {
           await this.#db.exercises.clear();
           await this.#db.exercises.bulkPut(seedExercises);
           await this.#db.draft.delete(DRAFT_ROW_KEY);
-          await this.#db.bandLabels.put({
-            key: BAND_LABELS_ROW_KEY,
-            value: [],
-          });
           await this.#db.settings.delete(SETTINGS_ROW_KEY);
           await this.#db.meta.put({
             key: SCHEMA_VERSION_ROW_KEY,

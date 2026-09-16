@@ -33,11 +33,6 @@ describe('Session > Block > Exercise entry > Set construction (US1)', () => {
           completed: true,
         }),
         createSet({
-          load: createLoad({ kind: 'band', label: 'red' }),
-          setKind: 'working',
-          completed: true,
-        }),
-        createSet({
           load: createLoad({ kind: 'freeText', text: 'heavy dumbbell' }),
           setKind: 'working',
           completed: true,
@@ -54,7 +49,7 @@ describe('Session > Block > Exercise entry > Set construction (US1)', () => {
       blocks: [block],
       notes: '',
     });
-    expect(session.blocks[0]?.exercises[0]?.sets).toHaveLength(5);
+    expect(session.blocks[0]?.exercises[0]?.sets).toHaveLength(4);
   });
 });
 

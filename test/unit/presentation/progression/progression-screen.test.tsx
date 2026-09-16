@@ -92,14 +92,14 @@ describe('ProgressionScreen (FR-013..023)', () => {
     expect(screen.getByText('80 kg')).toBeInTheDocument();
   });
 
-  it('shows the FR-021 explanation and no e1RM option for a Band/FreeText-only exercise', async () => {
+  it('shows the FR-021 explanation and no e1RM option for a FreeText-only exercise', async () => {
     const storage = new InMemoryStorage();
     const exerciseId = 'ex-2' as ExerciseId;
     await storage.saveExercise({
       id: exerciseId,
       canonicalName: 'Band pull-apart',
       aliases: [],
-      defaultLoadType: 'band',
+      defaultLoadType: 'freeText',
       defaultVolumeKind: 'reps',
       trackEffort: false,
       unilateral: false,
@@ -120,7 +120,7 @@ describe('ProgressionScreen (FR-013..023)', () => {
                 sets: [
                   createSet({
                     volume: createVolume({ kind: 'reps', count: 15 }),
-                    load: createLoad({ kind: 'band', label: 'red' }),
+                    load: createLoad({ kind: 'freeText', text: 'red band' }),
                     setKind: 'working',
                     completed: true,
                   }),

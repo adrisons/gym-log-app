@@ -31,6 +31,10 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === 'string');
 }
 
+// 'band' is no longer a live `Load` kind (ADR-0016) but stays accepted here
+// so a pre-v5 export still passes structural validation — `apply-import.ts`
+// migrates any such value to `freeText` the same way already-stored data is
+// migrated, rather than this layer hard-rejecting an otherwise-valid file.
 const LOAD_KINDS = new Set([
   'weight',
   'band',
@@ -174,12 +178,6 @@ function validateStructure(
     !candidate.exerciseCatalogue.every(isValidExercise)
   ) {
     return 'This file’s exercise catalogue is missing or malformed and cannot be imported.';
-  }
-  if (
-    candidate.bandLabels !== undefined &&
-    !isStringArray(candidate.bandLabels)
-  ) {
-    return 'This file’s band labels are malformed and cannot be imported.';
   }
   if (
     candidate.settings !== undefined &&

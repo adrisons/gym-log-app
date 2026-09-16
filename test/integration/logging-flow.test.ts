@@ -75,11 +75,6 @@ describe('Logging flow (US3 Independent Test)', () => {
         setKind: 'working',
       },
       {
-        volume: { kind: 'reps', count: 10 },
-        load: { kind: 'band', label: 'Red' },
-        setKind: 'working',
-      },
-      {
         volume: { kind: 'reps', count: 12 },
         load: { kind: 'bodyweight', addedOrAssistedKg: 10 },
         setKind: 'working',
@@ -111,7 +106,7 @@ describe('Logging flow (US3 Independent Test)', () => {
 
     const reloaded = await storage.getDraft();
     const sets = reloaded?.blocks[0]?.exercises[0]?.sets ?? [];
-    expect(sets).toHaveLength(5);
+    expect(sets).toHaveLength(4);
     expect(sets.map((s) => s.load)).toEqual(inputs.map((i) => i.load));
   });
 });
@@ -197,7 +192,7 @@ describe('Logging flow (US4 Independent Test)', () => {
     const { draft } = await openLoggingForm(storage);
     const survivor = await createExercise(storage, {
       canonicalName: 'Hip thrust',
-      defaultLoadType: 'band',
+      defaultLoadType: 'freeText',
     });
     const loser = await createExercise(storage, {
       canonicalName: 'Glute bridge',
@@ -246,7 +241,7 @@ describe('Logging flow (US4 Independent Test)', () => {
     await storage.mergeExercises(result.collidesWith.id, loser.id);
 
     const survivorReloaded = await storage.getExercise(survivor.id);
-    expect(survivorReloaded?.defaultLoadType).toBe('band'); // kept its own defaults
+    expect(survivorReloaded?.defaultLoadType).toBe('freeText'); // kept its own defaults
     expect(survivorReloaded?.aliases).toContain('Glute bridge');
     expect(await storage.getExercise(loser.id)).toBeUndefined();
 

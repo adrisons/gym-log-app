@@ -31,7 +31,6 @@ export interface ExportFile {
   exportedAt: string;
   sessions: ExportedSession[];
   exerciseCatalogue: Exercise[];
-  bandLabels?: string[];
   settings?: Settings;
   loggingDraft?: LoggingDraft;
 }
@@ -39,7 +38,6 @@ export interface ExportFile {
 export interface LocalExportSource {
   sessions: Session[];
   exercises: Exercise[];
-  bandLabels: string[];
   settings: Settings | undefined;
   loggingDraft: LoggingDraft | undefined;
   now?: Date;
@@ -66,12 +64,11 @@ function denormalizeSession(
 }
 
 /**
- * Builds the export file. `bandLabels`/`settings`/`loggingDraft` are
- * included only when present locally (data-model.md's presence
- * semantics): an empty band-label list and an absent Settings/draft are
- * both omitted from the file entirely, not written as an empty/default
- * placeholder — FR-010's import preview relies on this to report true
- * presence.
+ * Builds the export file. `settings`/`loggingDraft` are included only
+ * when present locally (data-model.md's presence semantics): an absent
+ * Settings/draft is omitted from the file entirely, not written as a
+ * default placeholder — FR-010's import preview relies on this to report
+ * true presence.
  */
 export function buildExportFile(source: LocalExportSource): ExportFile {
   const nameById = exerciseNameById(source.exercises);
@@ -82,7 +79,6 @@ export function buildExportFile(source: LocalExportSource): ExportFile {
     sessions: source.sessions.map((s) => denormalizeSession(s, nameById)),
     exerciseCatalogue: source.exercises,
   };
-  if (source.bandLabels.length > 0) file.bandLabels = source.bandLabels;
   if (source.settings !== undefined) file.settings = source.settings;
   if (source.loggingDraft !== undefined)
     file.loggingDraft = source.loggingDraft;

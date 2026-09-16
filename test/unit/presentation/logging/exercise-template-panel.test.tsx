@@ -43,7 +43,7 @@ describe('ExerciseTemplatePanel (ADR-0006)', () => {
       />,
     );
 
-    await userEvent.click(screen.getByRole('radio', { name: 'Band' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Free text' }));
     await userEvent.click(screen.getByRole('radio', { name: 'Duration' }));
     await userEvent.click(
       screen.getByRole('checkbox', { name: /track effort/i }),
@@ -53,7 +53,7 @@ describe('ExerciseTemplatePanel (ADR-0006)', () => {
     );
 
     expect(onSave).toHaveBeenCalledWith({
-      defaultLoadType: 'band',
+      defaultLoadType: 'freeText',
       defaultVolumeKind: 'duration',
       trackEffort: true,
     });

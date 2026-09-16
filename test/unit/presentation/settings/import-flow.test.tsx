@@ -51,7 +51,6 @@ describe('ImportFlow (spec 006 FR-010/011)', () => {
     const file = buildExportFile({
       sessions: [],
       exercises: [exercise],
-      bandLabels: [],
       settings: undefined,
       loggingDraft: undefined,
     });
@@ -83,7 +82,6 @@ describe('ImportFlow (spec 006 FR-010/011)', () => {
     const file = buildExportFile({
       sessions: [],
       exercises: [makeExercise()],
-      bandLabels: [],
       settings: undefined,
       loggingDraft: undefined,
     });
@@ -141,7 +139,6 @@ describe('ImportFlow (spec 006 FR-010/011)', () => {
     const file = buildExportFile({
       sessions: [],
       exercises: [makeExercise()],
-      bandLabels: [],
       settings: undefined,
       loggingDraft: undefined,
     });

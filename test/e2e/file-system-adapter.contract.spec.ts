@@ -59,12 +59,12 @@ test('ADR-0006 v1->v2 migration backfills a legacy Exercise and bumps the stored
   expect(outcome.defaultLoadTypePreserved).toBe(true);
   expect(outcome.defaultVolumeKind).toBe('reps');
   expect(outcome.trackEffort).toBe(false);
-  // CURRENT_SCHEMA_VERSION has since advanced to 4 (ADR-0008, ADR-0013); a
+  // CURRENT_SCHEMA_VERSION has since advanced to 5 (ADR-0008, ADR-0013, ADR-0016); a
   // legacy v1 record still runs this same v1->v2 backfill on its way up
   // and lands at whatever the current version now is — there is no
   // v2->v3 or v3->v4 data rewrite to add (neither `Block.rounds`'s
   // addition nor its later removal needed one).
-  expect(outcome.storedSchemaVersion).toBe(4);
+  expect(outcome.storedSchemaVersion).toBe(5);
   // The port's own read-time normalization would report a correctly
   // shaped record either way — this is the field that actually tells a
   // real physical migration apart from that safety net alone.
@@ -85,7 +85,7 @@ test('ADR-0008 v2->v3: a Block with no `rounds` upgrades cleanly, with rounds le
 
   expect(outcome.blockNamePreserved).toBe(true);
   expect(outcome.roundsStillAbsent).toBe(true);
-  expect(outcome.storedSchemaVersion).toBe(4);
+  expect(outcome.storedSchemaVersion).toBe(5);
 });
 
 test('ADR-0013 v3->v4: a Block with `rounds` set upgrades cleanly, with rounds left unchanged on disk', async ({
@@ -102,7 +102,7 @@ test('ADR-0013 v3->v4: a Block with `rounds` set upgrades cleanly, with rounds l
 
   expect(outcome.blockNamePreserved).toBe(true);
   expect(outcome.roundsLeftUnchangedOnDisk).toBe(true);
-  expect(outcome.storedSchemaVersion).toBe(4);
+  expect(outcome.storedSchemaVersion).toBe(5);
 });
 
 test('ADR-0006 migration survives a gesture-less first write followed by a real handle acquisition against a pre-existing v1 directory', async ({
@@ -121,9 +121,9 @@ test('ADR-0006 migration survives a gesture-less first write followed by a real 
   expect(outcome.defaultLoadTypePreserved).toBe(true);
   expect(outcome.defaultVolumeKind).toBe('reps');
   expect(outcome.trackEffort).toBe(false);
-  // CURRENT_SCHEMA_VERSION has since advanced to 4 (ADR-0008, ADR-0013);
+  // CURRENT_SCHEMA_VERSION has since advanced to 5 (ADR-0008, ADR-0013, ADR-0016);
   // see the sibling test above for why this lands at 4, not 2.
-  expect(outcome.storedSchemaVersion).toBe(4);
+  expect(outcome.storedSchemaVersion).toBe(5);
   // The port's own read-time normalization would report a correctly
   // shaped record either way — this is the field that actually tells a
   // real physical migration apart from that safety net alone.

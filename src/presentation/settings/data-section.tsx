@@ -8,7 +8,7 @@ import { DeleteEverythingFlow } from './delete-everything-flow';
 export interface DataSectionProps {
   /** Called after a successful import or delete-everything, once the
    * atomic storage write has landed — the caller's job is refreshing
-   * whatever in-memory state (Settings store, band labels, theme) still
+   * whatever in-memory state (Settings store, theme) still
    * holds the pre-change snapshot. */
   onDataChanged: () => void | Promise<void>;
 }

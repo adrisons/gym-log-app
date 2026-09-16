@@ -58,7 +58,6 @@ export function SessionDetailScreen() {
     undefined,
   );
   const [catalogue, setCatalogue] = useState<Exercise[]>([]);
-  const [bandLabels, setBandLabels] = useState<string[]>([]);
   const settings = useSettingsStore((s) => s.settings);
   const [editingTemplateFor, setEditingTemplateFor] = useState<
     Exercise | undefined
@@ -81,10 +80,9 @@ export function SessionDetailScreen() {
     if (!sessionId) return;
     void (async () => {
       const storage = requireStorage();
-      const [session, exercises, labels] = await Promise.all([
+      const [session, exercises] = await Promise.all([
         storage.getSession(sessionId as SessionId),
         storage.listExercises(),
-        storage.listBandLabels(),
       ]);
       if (session) {
         skipNextSaveRef.current = true;
@@ -92,7 +90,6 @@ export function SessionDetailScreen() {
         setEditable(sessionToEditable(session));
       }
       setCatalogue(exercises);
-      setBandLabels(labels);
     })();
   }, [sessionId]);
 
@@ -376,7 +373,6 @@ export function SessionDetailScreen() {
                       loadKind={exercise?.defaultLoadType ?? 'none'}
                       volumeKind={exercise?.defaultVolumeKind ?? 'reps'}
                       trackEffort={exercise?.trackEffort ?? false}
-                      bandLabels={bandLabels}
                       freeTextSuggestions={[]}
                       prefill={undefined}
                       unit={settings.defaultUnit}
@@ -482,7 +478,6 @@ export function SessionDetailScreen() {
                           ),
                         }))
                       }
-                      onSaveBandLabels={(labels) => setBandLabels(labels)}
                     />
                   </ExerciseEntryCard>
                 </div>

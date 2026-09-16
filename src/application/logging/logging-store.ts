@@ -37,7 +37,6 @@ import {
   createExercise as createExerciseUseCase,
   updateExerciseTemplate as updateExerciseTemplateUseCase,
   suggestFreeTextLoads as suggestFreeTextLoadsUseCase,
-  saveBandLabels as saveBandLabelsUseCase,
   renameExerciseWithCollisionCheck as renameExerciseWithCollisionCheckUseCase,
   mergeExercises as mergeExercisesUseCase,
   deleteExerciseCascade as deleteExerciseCascadeUseCase,
@@ -100,7 +99,6 @@ export interface LoggingSessionState {
   undoStack: UndoEntry[];
   catalogue: Exercise[];
   sessions: Session[];
-  bandLabels: string[];
   /** entryId → ms epoch of the last confirmed set on that entry (FR-025). */
   lastConfirmedAt: Record<string, number>;
   /** Set true only by `registerWorkout`'s success (ADR-0009) — the one
@@ -175,7 +173,6 @@ export interface LoggingSessionState {
     template: ExerciseTemplate,
   ) => Promise<void>;
   suggestFreeTextLoads: (exerciseId: ExerciseId) => string[];
-  saveBandLabels: (labels: string[]) => Promise<void>;
   addBlock: (
     name: string | undefined,
     type: DraftBlock['type'],
@@ -214,8 +211,8 @@ export interface LoggingSessionState {
 
 export const useLoggingSession = create<LoggingSessionState>((set, get) => {
   // Two independent queues, not one shared queue for every storage
-  // operation: draft writes/reads (`enqueueDraftOp`) and catalogue/
-  // band-label writes/reads (`enqueueCatalogueOp`) are unrelated most of
+  // operation: draft writes/reads (`enqueueDraftOp`) and catalogue
+  // writes/reads (`enqueueCatalogueOp`) are unrelated most of
   // the time (an `addSet` commit has no reason to wait on an unrelated
   // `createExercise`'s call, or on `initialize()`'s `listExercises` read),
   // and forcing them through one shared queue serializes them anyway —
@@ -343,7 +340,6 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     undoStack: [],
     catalogue: [],
     sessions: [],
-    bandLabels: [],
     lastConfirmedAt: {},
     justRegisteredWorkout: false,
     lastAddedSetId: undefined,
@@ -369,7 +365,6 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       const draftBeforeReads = get().draft;
       const pendingDraftBeforeReads = get().pendingDraft;
       const catalogueBeforeReads = get().catalogue;
-      const bandLabelsBeforeReads = get().bandLabels;
       // `readDraft` (not calling `openLoggingForm` directly) queues this
       // read behind whatever draft write is already pending — a debounced
       // commit (ADR-0007's timer outlives unmount) can be mid-write right
@@ -378,7 +373,7 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       // our own window, which the before/after identity check right after
       // can't catch on its own (Copilot review, PR #22).
       //
-      // `catalogue`/`bandLabels` below are deliberately *not* queued the
+      // `catalogue` below is deliberately *not* queued the
       // same way: unlike the single draft, `createExercise`/
       // `updateExerciseTemplate` are designed to run concurrently against
       // each other (each keeps its own optimistic entry by reference —
@@ -391,16 +386,14 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
       // flight before it started remains a narrower, unclosed gap here
       // (Copilot review, PR #22) — closing it needs per-exercise
       // conflict tracking on the read side, not a write-side queue.
-      const [{ draft, pendingDraft }, catalogue, sessions, bandLabels] =
-        await Promise.all([
-          readDraft(storage),
-          storage.listExercises(),
-          storage.listSessions(FULL_RANGE),
-          storage.listBandLabels(),
-        ]);
+      const [{ draft, pendingDraft }, catalogue, sessions] = await Promise.all([
+        readDraft(storage),
+        storage.listExercises(),
+        storage.listSessions(FULL_RANGE),
+      ]);
       // Same reasoning as `draft` above, for the other slices these reads
       // can also race: `createExercise`/`updateExerciseTemplate` against
-      // `catalogue`, `saveBandLabels` against `bandLabels`,
+      // `catalogue`,
       // `recoverPendingDraft`/`discardPendingDraft` against `pendingDraft`
       // (Copilot review, PR #22 and PR #25) — only overwrite a slice if
       // nothing else already did while we were reading.
@@ -415,10 +408,6 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
             ? catalogue
             : state.catalogue,
         sessions,
-        bandLabels:
-          state.bandLabels === bandLabelsBeforeReads
-            ? bandLabels
-            : state.bandLabels,
       }));
     },
 
@@ -632,13 +621,6 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     suggestFreeTextLoads: (exerciseId) => {
       const { sessions } = get();
       return suggestFreeTextLoadsUseCase(exerciseId, sessions);
-    },
-
-    saveBandLabels: async (labels) => {
-      const { storage } = get();
-      if (!storage) return;
-      set({ bandLabels: labels });
-      await saveBandLabelsUseCase(storage, labels);
     },
 
     addBlock: async (name, type) => {

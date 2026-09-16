@@ -42,7 +42,6 @@ import { useEffect, useState } from 'react';
 import type { WheelEvent } from 'react';
 import { useUnconfirmedEntryTracker } from '@/application/logging/unconfirmed-entry-tracker';
 import { WeightLoadInput } from './weight-load-input';
-import { BandLoadInput } from './band-load-input';
 import { BodyweightLoadInput } from './bodyweight-load-input';
 import { FreeTextLoadInput } from './free-text-load-input';
 import { VolumeInput, MAX_REPS } from './volume-input';
@@ -67,7 +66,6 @@ export interface SetRowProps {
   loadKind: Load['kind'];
   volumeKind: VolumeKind;
   trackEffort: boolean;
-  bandLabels: string[];
   freeTextSuggestions: string[];
   /** Settings' `defaultUnit` (spec 006 FR-001/SC-003) — labels and tags a
    * new Weight load; never rewrites an already-recorded one (`domain/
@@ -81,7 +79,6 @@ export interface SetRowProps {
    * `ExerciseSetList` passes this for both add and edit — closing the form
    * without entering/changing anything. */
   onCancel?: (() => void) | undefined;
-  onSaveBandLabels: (labels: string[]) => void;
 }
 
 /** Only these load kinds require the user to actually type/pick a value —
@@ -91,7 +88,6 @@ export interface SetRowProps {
  * name these words for the user is gone (design-refinement request). */
 const LOAD_KIND_WORDS: Partial<Record<Load['kind'], string>> = {
   weight: 'a weight',
-  band: 'a band',
   freeText: 'a value',
 };
 
@@ -125,7 +121,6 @@ function initialVolumeValue(
 
 interface FieldSnapshot {
   weightKg: number | undefined;
-  bandLabel: string | undefined;
   bodyweightKg: number | undefined;
   freeText: string;
   volumeValue: number | undefined;
@@ -138,13 +133,11 @@ export function SetRow({
   loadKind,
   volumeKind,
   trackEffort,
-  bandLabels,
   freeTextSuggestions,
   unit,
   quickIncrements,
   onConfirm,
   onCancel,
-  onSaveBandLabels,
 }: SetRowProps) {
   // An already-recorded set keeps exactly the kind it was given (ADR-0006)
   // — editing it must use *that* kind, never the exercise's current
@@ -171,11 +164,6 @@ export function SetRow({
   const [weightKg, setWeightKg] = useState<number | undefined>(
     loadMatchesEffectiveKind && initialLoad!.kind === 'weight'
       ? initialLoad!.value
-      : undefined,
-  );
-  const [bandLabel, setBandLabel] = useState<string | undefined>(
-    loadMatchesEffectiveKind && initialLoad!.kind === 'band'
-      ? initialLoad!.label
       : undefined,
   );
   const [bodyweightKg, setBodyweightKg] = useState<number | undefined>(
@@ -214,8 +202,6 @@ export function SetRow({
       switch (effectiveLoadKind) {
         case 'weight':
           return { kind: 'weight', present: fields.weightKg !== undefined };
-        case 'band':
-          return { kind: 'band', present: Boolean(fields.bandLabel) };
         case 'bodyweight':
           return { kind: 'bodyweight', present: true };
         case 'freeText':
@@ -231,18 +217,16 @@ export function SetRow({
     const builtLoad: AddSetInput['load'] =
       effectiveLoadKind === 'weight' && fields.weightKg !== undefined
         ? { kind: 'weight', value: fields.weightKg, unit: effectiveUnit }
-        : effectiveLoadKind === 'band' && fields.bandLabel
-          ? { kind: 'band', label: fields.bandLabel }
-          : effectiveLoadKind === 'bodyweight'
-            ? {
-                kind: 'bodyweight',
-                ...(fields.bodyweightKg !== undefined
-                  ? { addedOrAssistedKg: fields.bodyweightKg }
-                  : {}),
-              }
-            : effectiveLoadKind === 'freeText' && fields.freeText.trim() !== ''
-              ? { kind: 'freeText', text: fields.freeText.trim() }
-              : { kind: 'none' };
+        : effectiveLoadKind === 'bodyweight'
+          ? {
+              kind: 'bodyweight',
+              ...(fields.bodyweightKg !== undefined
+                ? { addedOrAssistedKg: fields.bodyweightKg }
+                : {}),
+            }
+          : effectiveLoadKind === 'freeText' && fields.freeText.trim() !== ''
+            ? { kind: 'freeText', text: fields.freeText.trim() }
+            : { kind: 'none' };
 
     const builtVolume: AddSetInput['volume'] =
       fields.volumeValue === undefined
@@ -273,7 +257,6 @@ export function SetRow({
 
   const currentFields: FieldSnapshot = {
     weightKg,
-    bandLabel,
     bodyweightKg,
     freeText,
     volumeValue,
@@ -283,8 +266,6 @@ export function SetRow({
     switch (effectiveLoadKind) {
       case 'weight':
         return { present: weightKg !== undefined };
-      case 'band':
-        return { present: Boolean(bandLabel) };
       case 'bodyweight':
         return { present: true };
       case 'freeText':
@@ -315,7 +296,7 @@ export function SetRow({
   // table's own Reps/Load columns, Claude Design canvas exploration) only
   // covers the common case this app was originally tuned for: a plain
   // Weight load, reps volume, no effort tracking. Every other combination
-  // (band/bodyweight/freeText loads, duration/distance volume, effort)
+  // (bodyweight/freeText loads, duration/distance volume, effort)
   // keeps the fuller stacked form below — collapsing those into one line
   // would either drop a real field or force horizontal scrolling on a
   // narrow phone, which the compact row is specifically trying to avoid.
@@ -422,14 +403,6 @@ export function SetRow({
           value={weightKg}
           unit={effectiveUnit}
           onChange={setWeightKg}
-        />
-      )}
-      {effectiveLoadKind === 'band' && (
-        <BandLoadInput
-          bandLabels={bandLabels}
-          selectedLabel={bandLabel}
-          onSelectLabel={setBandLabel}
-          onSaveBandLabels={onSaveBandLabels}
         />
       )}
       {effectiveLoadKind === 'bodyweight' && (

@@ -128,7 +128,7 @@ describe('buildTabularExport (spec 006 FR-009)', () => {
     expect(csv).not.toMatch(/,=cmd/);
   });
 
-  it('neutralizes a formula-leading exercise name and band/free-text load label', () => {
+  it('neutralizes a formula-leading exercise name and free-text load label', () => {
     const exercise = makeExercise({ canonicalName: '+1+1' });
     const session: Session = {
       id: 'sess-1' as SessionId,
@@ -144,7 +144,7 @@ describe('buildTabularExport (spec 006 FR-009)', () => {
               sets: [
                 createSet({
                   volume: createVolume({ kind: 'reps', count: 5 }),
-                  load: createLoad({ kind: 'band', label: '@SUM(1,1)' }),
+                  load: createLoad({ kind: 'freeText', text: '@SUM(1,1)' }),
                   setKind: 'working',
                   completed: true,
                 }),

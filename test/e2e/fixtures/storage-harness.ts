@@ -37,6 +37,7 @@ import {
 } from '../../../src/infrastructure/indexed-db/schema';
 import type { StoragePort } from '../../../src/application/ports/storage-port';
 import type { StorageStatus } from '../../../src/application/ports/storage-status';
+import { DEFAULT_SETTINGS } from '../../../src/application/ports/settings';
 import { StorageError } from '../../../src/application/errors';
 import type { Exercise } from '../../../src/domain/exercise';
 import type { Session } from '../../../src/domain/session';
@@ -131,7 +132,7 @@ window.__runPermissionLossTest = async () => {
   const adapter = new FileSystemStorageAdapter(async () => storeDir, db);
 
   try {
-    await adapter.saveBandLabels(['should-not-write']);
+    await adapter.saveSettings(DEFAULT_SETTINGS);
     return { threw: false as const };
   } catch (error) {
     return {
@@ -183,7 +184,7 @@ window.__runReconfirmAccessTest = async () => {
 
   try {
     // Acquire a real, cached handle first (any write does).
-    await adapter.saveBandLabels(['seed']);
+    await adapter.saveSettings(DEFAULT_SETTINGS);
 
     (storeDir as { queryPermission: () => Promise<'denied'> }).queryPermission =
       () => Promise.resolve('denied');
@@ -254,7 +255,7 @@ export interface MigrationTestResult {
  * migrates the stored record. File System's check is write-only by design
  * (`FileSystemStorageAdapter`'s own doc comment — a read must never
  * prompt), so its `getExercise` normalizes the *returned* shape without
- * touching disk; a real write (`saveBandLabels` here, chosen only because
+ * touching disk; a real write (`saveSettings` here, chosen only because
  * it touches no exercise data) is what actually backfills the stored
  * `exercises.json` and bumps `_meta.json`. Both paths are asserted here.
  */
@@ -339,7 +340,7 @@ async function runMigrationTestFileSystem(): Promise<MigrationTestResult> {
   const readNormalized = await adapter.getExercise('legacy-1' as ExerciseId);
 
   // A real write is what actually migrates the on-disk files + version.
-  await adapter.saveBandLabels([]);
+  await adapter.saveSettings(DEFAULT_SETTINGS);
   const storedSchemaVersion = await adapter.getSchemaVersion();
 
   // Read the raw file directly — bypassing the port's own read-time
@@ -405,12 +406,12 @@ async function runMigrationTestFileSystemFreshAcquire(): Promise<MigrationTestRe
 
   // The mount-time write: no gesture yet, degrades to the in-memory
   // overlay (this is what used to queue the wrong `_meta.json` guess).
-  await adapter.saveBandLabels([]);
+  await adapter.saveSettings(DEFAULT_SETTINGS);
 
   // A later write, now with a real gesture — first real handle
   // acquisition against a directory that already holds v1 data.
   gestureAvailable = true;
-  await adapter.saveBandLabels(['after-gesture']);
+  await adapter.saveSettings(DEFAULT_SETTINGS);
 
   const migrated = await adapter.getExercise('legacy-1' as ExerciseId);
   const storedSchemaVersion = await adapter.getSchemaVersion();
@@ -518,7 +519,7 @@ async function runV2ToV3MigrationTestFileSystem(): Promise<V2ToV3MigrationResult
   const migrated = await adapter.getSession('v2-session-1' as SessionId);
   // A real write is what actually migrates the stored `_meta.json` version
   // (see `runMigrationTestFileSystem`'s own doc comment).
-  await adapter.saveBandLabels([]);
+  await adapter.saveSettings(DEFAULT_SETTINGS);
   const storedSchemaVersion = await adapter.getSchemaVersion();
 
   db.close();
@@ -622,7 +623,7 @@ async function runV3ToV4MigrationTestFileSystem(): Promise<V3ToV4MigrationResult
   const migrated = await adapter.getSession('v3-session-1' as SessionId);
   // A real write is what actually migrates the stored `_meta.json` version
   // (see `runMigrationTestFileSystem`'s own doc comment).
-  await adapter.saveBandLabels([]);
+  await adapter.saveSettings(DEFAULT_SETTINGS);
   const storedSchemaVersion = await adapter.getSchemaVersion();
 
   db.close();
@@ -696,7 +697,7 @@ async function runQueuedExerciseMergeTest(): Promise<QueuedExerciseMergeResult> 
   // A later write, now with a real gesture — first real handle
   // acquisition against a directory that already holds `legacy-1`.
   gestureAvailable = true;
-  await adapter.saveBandLabels(['after-gesture']);
+  await adapter.saveSettings(DEFAULT_SETTINGS);
 
   const all = await adapter.listExercises();
 
@@ -794,7 +795,7 @@ async function runQueuedMergeTombstoneTest(): Promise<QueuedMergeTombstoneResult
   // A later write, now with a real gesture — first real handle
   // acquisition against a directory whose *real* file still has both.
   gestureAvailable = true;
-  await adapter.saveBandLabels(['after-gesture']);
+  await adapter.saveSettings(DEFAULT_SETTINGS);
 
   const all = await adapter.listExercises();
 

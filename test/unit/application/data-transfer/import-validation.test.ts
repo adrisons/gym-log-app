@@ -217,12 +217,44 @@ describe('parseAndValidateExportFile (spec 006 FR-013/014)', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('rejects malformed band labels (not a string array)', () => {
+  it('ignores an unrecognized top-level field (e.g. a pre-v5 export’s leftover bandLabels)', () => {
     const result = parseAndValidateExportFile(
-      validFileJson({ bandLabels: [1, 2, 3] }),
+      validFileJson({ bandLabels: ['Red', 'Blue'] }),
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.message).toContain('band labels');
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a legacy Set.load of kind "band" structurally (ADR-0016) — apply-import.ts migrates it to freeText, this layer does not reject it', () => {
+    const result = parseAndValidateExportFile(
+      validFileJson({
+        sessions: [
+          {
+            id: 'sess-1',
+            dateTime: '2026-01-01T00:00:00.000Z',
+            notes: '',
+            blocks: [
+              {
+                type: 'straightSets',
+                exercises: [
+                  {
+                    exerciseId: 'ex-1',
+                    notes: '',
+                    sets: [
+                      {
+                        load: { kind: 'band', label: 'Red' },
+                        setKind: 'working',
+                        completed: true,
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(result.ok).toBe(true);
   });
 
   it('rejects malformed settings (bad theme enum)', () => {

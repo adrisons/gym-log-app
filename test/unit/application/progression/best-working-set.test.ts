@@ -40,13 +40,13 @@ describe('bestWorkingSet', () => {
   it('falls back to the highest rep count when no set has a numeric load', () => {
     const fewer = createSet({
       volume: createVolume({ kind: 'reps', count: 10 }),
-      load: createLoad({ kind: 'band', label: 'red' }),
+      load: createLoad({ kind: 'freeText', text: 'red band' }),
       setKind: 'working',
       completed: true,
     });
     const more = createSet({
       volume: createVolume({ kind: 'reps', count: 15 }),
-      load: createLoad({ kind: 'band', label: 'red' }),
+      load: createLoad({ kind: 'freeText', text: 'red band' }),
       setKind: 'working',
       completed: true,
     });

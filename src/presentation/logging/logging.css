@@ -450,11 +450,60 @@
 }
 
 .sets-header-cell {
+  position: relative;
+  /* Grid items default to `min-width: auto`, which ignores the column's
+     own `50px`/`1fr` track size and lets long text (e.g. "Duration")
+     overflow past its cell into the next one instead of truncating —
+     `min-width: 0` opts back into normal shrink-to-fit-then-ellipsis
+     behavior. The ellipsis/truncation styles themselves live only on
+     `.sets-header-cell__button` below — this outer element stays
+     `overflow: visible` so `.sets-header-cell__tooltip`, positioned
+     `top: 100%` of it, isn't clipped by the same rule that truncates the
+     label (Copilot review, PR #39). */
+  min-width: 0;
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--color-foreground-subtle);
+}
+
+/* Header cells double as a button so a label truncated by the ellipsis
+   above can still be read in full — tapped, not hovered, since this is a
+   touch-first layout. */
+.sets-header-cell__button {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sets-header-cell__tooltip {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1;
+  margin-top: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  box-shadow: 0 2px 8px var(--color-border-strong);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-foreground);
+  white-space: nowrap;
 }
 
 .set-summary {

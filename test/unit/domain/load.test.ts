@@ -8,19 +8,6 @@ describe('Load (FR-007)', () => {
     expect(load).toEqual({ kind: 'weight', value: 1.2, unit: 'kg' });
   });
 
-  it('constructs a band variant', () => {
-    const load = createLoad({
-      kind: 'band',
-      label: 'red',
-      estimatedResistanceKg: 15,
-    });
-    expect(load).toEqual({
-      kind: 'band',
-      label: 'red',
-      estimatedResistanceKg: 15,
-    });
-  });
-
   it('constructs a bodyweight variant with a signed component', () => {
     const load = createLoad({ kind: 'bodyweight', addedOrAssistedKg: -20 });
     expect(load).toEqual({ kind: 'bodyweight', addedOrAssistedKg: -20 });
@@ -41,7 +28,7 @@ describe('Load (FR-007)', () => {
     expect(load).toEqual({ kind: 'none' });
   });
 
-  // A compile-time check that the Load union type itself rejects a sixth
+  // A compile-time check that the Load union type itself rejects a fifth
   // variant (e.g. a `@ts-expect-error` fixture) is a separate concern from
   // this runtime test — Vitest cannot observe type-level rejection. Tracked
   // as part of load.ts's own type authoring, not asserted here.

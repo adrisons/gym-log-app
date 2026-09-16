@@ -24,7 +24,6 @@ export interface SingletonPreview {
 export interface ImportPreview {
   sessions: RecordSetPreview;
   exercises: RecordSetPreview;
-  bandLabels: SingletonPreview;
   settings: SingletonPreview;
   loggingDraft: SingletonPreview;
   schemaVersion: { fileVersion: number; willMigrate: boolean };
@@ -33,7 +32,6 @@ export interface ImportPreview {
 export interface LocalImportSnapshot {
   sessions: Session[];
   exercises: Exercise[];
-  bandLabels: string[];
   settings: Settings | undefined;
   loggingDraft: LoggingDraft | undefined;
 }
@@ -75,10 +73,6 @@ export function computeImportPreview(
   return {
     sessions: recordSetPreview(local.sessions, file.sessions),
     exercises: recordSetPreview(local.exercises, file.exerciseCatalogue),
-    bandLabels: singletonPreview(
-      file.bandLabels !== undefined,
-      local.bandLabels.length > 0,
-    ),
     settings: singletonPreview(
       file.settings !== undefined,
       local.settings !== undefined,

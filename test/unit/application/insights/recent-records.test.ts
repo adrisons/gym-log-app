@@ -55,7 +55,7 @@ function weightSession(
   });
 }
 
-function bandSession(
+function freeTextSession(
   id: string,
   dateTime: string,
   exerciseId: ExerciseId,
@@ -67,7 +67,7 @@ function bandSession(
     sets: [
       createSet({
         volume: createVolume({ kind: 'reps', count: reps }),
-        load: createLoad({ kind: 'band', label: 'red' }),
+        load: createLoad({ kind: 'freeText', text: 'red band' }),
         setKind: 'working',
         completed: true,
       }),
@@ -116,12 +116,15 @@ describe('buildRecentRecords', () => {
     expect(e1rmEntries[0]!.sessionId).toBe('s2');
   });
 
-  it('never produces an e1rm entry for a Band-only exercise', () => {
-    const bandEx = exercise('ex-band', 'Band Row', 'band');
+  it('never produces an e1rm entry for a FreeText-only exercise', () => {
+    const freeTextEx = exercise('ex-freetext', 'Band Row', 'freeText');
     const sessions = [
-      bandSession('s1', '2026-05-25T10:00:00.000Z', bandEx.id, 15),
+      freeTextSession('s1', '2026-05-25T10:00:00.000Z', freeTextEx.id, 15),
     ];
-    const entries = buildRecentRecords([{ exercise: bandEx, sessions }], NOW);
+    const entries = buildRecentRecords(
+      [{ exercise: freeTextEx, sessions }],
+      NOW,
+    );
     expect(entries.find((e) => e.metric === 'e1rm')).toBeUndefined();
   });
 });

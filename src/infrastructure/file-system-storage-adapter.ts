@@ -13,12 +13,15 @@ import { StorageError } from '../application/errors';
 import {
   migrateExerciseCatalogue,
   migrateExerciseTemplateDefaults as withTemplateDefaults,
+  migrateExerciseCatalogueLoadType,
+  migrateExerciseDefaultLoadType,
+  migrateSessionBandLoads,
+  migrateDraftBandLoad,
 } from '../application/schema-migration';
 import {
   SESSIONS_DIR,
   EXERCISES_FILE,
   DRAFT_FILE,
-  BAND_LABELS_FILE,
   SETTINGS_FILE,
   META_FILE,
   PENDING_BULK_WRITE_FILE,
@@ -309,6 +312,36 @@ export class FileSystemStorageAdapter implements StoragePort {
         );
       }
     }
+    if (action === 'migrate' && stored < 5) {
+      // v4 -> v5 (ADR-0016): see IndexedDbStorageAdapter's own comment —
+      // rewrites every stored Session's Set.load with kind 'band' to
+      // freeText.
+      await this.#migrateSessionBandLoadsOnHandle(handle);
+      // Same v4 -> v5 step, for the Exercise catalogue's own
+      // `defaultLoadType` and the one in-progress LoggingDraft (Copilot
+      // review, PR #39) — see IndexedDbStorageAdapter's #checkSchema.
+      const exercisesForLoadType =
+        (await this.#readJsonFromHandle<Exercise[]>(handle, EXERCISES_FILE)) ??
+        [];
+      if (exercisesForLoadType.length > 0) {
+        await this.#writeJsonToHandle(
+          handle,
+          EXERCISES_FILE,
+          migrateExerciseCatalogueLoadType(exercisesForLoadType, 4),
+        );
+      }
+      const draftForBandLoad = await this.#readJsonFromHandle<LoggingDraft>(
+        handle,
+        DRAFT_FILE,
+      );
+      if (draftForBandLoad) {
+        await this.#writeJsonToHandle(
+          handle,
+          DRAFT_FILE,
+          migrateDraftBandLoad(draftForBandLoad),
+        );
+      }
+    }
     if (action === 'migrate' || stored === 0) {
       await this.#writeJsonToHandle(handle, META_FILE, {
         schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -403,6 +436,15 @@ export class FileSystemStorageAdapter implements StoragePort {
     // v2 -> v3 (ADR-0008) and v3 -> v4 (ADR-0013): see
     // IndexedDbStorageAdapter's #checkSchema — nothing to backfill for
     // either step.
+    if (action === 'migrate' && stored < 5) {
+      // v4 -> v5 (ADR-0016): see #reconcileSchemaOnAcquire's own comment.
+      const root = await this.#resolveHandle(true);
+      if (root) {
+        await this.#migrateSessionBandLoadsOnHandle(root);
+        await this.#migrateExerciseDefaultLoadTypesOnHandle(root);
+        await this.#migrateDraftBandLoadOnHandle(root);
+      }
+    }
     if (action === 'migrate' || stored === 0) {
       // See IndexedDbStorageAdapter's #checkSchema for the full rationale
       // — the never-initialized sentinel (stored === 0) needs the same
@@ -423,6 +465,69 @@ export class FileSystemStorageAdapter implements StoragePort {
     await this.#writeJson(
       EXERCISES_FILE,
       migrateExerciseCatalogue(exercises, 1),
+    );
+  }
+
+  /** ADR-0016's v4->v5 migration: rewrites every stored Session file's
+   * `Set.load` values with `kind: 'band'` to `freeText`, preserving the
+   * label. Idempotent — `migrateSessionBandLoads` only rewrites a `Load`
+   * that is still `kind: 'band'`. */
+  async #migrateSessionBandLoadsOnHandle(
+    root: FileSystemDirectoryHandle,
+  ): Promise<void> {
+    let dir: FileSystemDirectoryHandle;
+    try {
+      dir = await root.getDirectoryHandle(SESSIONS_DIR, { create: false });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'NotFoundError') {
+        return;
+      }
+      throw error;
+    }
+    for await (const [name, entryHandle] of dir.entries()) {
+      if (entryHandle.kind !== 'file' || !name.endsWith('.json')) continue;
+      const fileHandle = entryHandle as FileSystemFileHandle;
+      const file = await fileHandle.getFile();
+      const session = JSON.parse(await file.text()) as Session;
+      const migrated = migrateSessionBandLoads(session);
+      if (JSON.stringify(migrated) === JSON.stringify(session)) continue;
+      await this.#run(async () => {
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(migrated));
+        await writable.close();
+      });
+    }
+  }
+
+  /** ADR-0016's v4->v5 migration, `Exercise.defaultLoadType`'s own
+   * `band` -> `freeText` backfill: see the call site's comment. */
+  async #migrateExerciseDefaultLoadTypesOnHandle(
+    root: FileSystemDirectoryHandle,
+  ): Promise<void> {
+    const exercises =
+      (await this.#readJsonFromHandle<Exercise[]>(root, EXERCISES_FILE)) ?? [];
+    if (exercises.length === 0) return;
+    await this.#writeJsonToHandle(
+      root,
+      EXERCISES_FILE,
+      migrateExerciseCatalogueLoadType(exercises, 4),
+    );
+  }
+
+  /** ADR-0016's v4->v5 migration, the in-progress LoggingDraft's own
+   * `band` -> `freeText` backfill: see the call site's comment. */
+  async #migrateDraftBandLoadOnHandle(
+    root: FileSystemDirectoryHandle,
+  ): Promise<void> {
+    const draft = await this.#readJsonFromHandle<LoggingDraft>(
+      root,
+      DRAFT_FILE,
+    );
+    if (!draft) return;
+    await this.#writeJsonToHandle(
+      root,
+      DRAFT_FILE,
+      migrateDraftBandLoad(draft),
     );
   }
 
@@ -598,7 +703,12 @@ export class FileSystemStorageAdapter implements StoragePort {
     );
     if (!fileHandle) return undefined;
     const file = await fileHandle.getFile();
-    return JSON.parse(await file.text()) as Session;
+    // Never gated behind `#ensureSchemaCheckedForWrite` (reads must not
+    // require a write gesture — see this class's own doc comment) — a
+    // still-on-disk pre-v5 `kind: 'band'` load is normalized in memory
+    // here instead, the same migration the on-disk backfill eventually
+    // applies for real (Copilot review, PR #39).
+    return migrateSessionBandLoads(JSON.parse(await file.text()) as Session);
   }
 
   async listSessions(range: DateRange): Promise<Session[]> {
@@ -624,7 +734,9 @@ export class FileSystemStorageAdapter implements StoragePort {
       const session = JSON.parse(await file.text()) as Session;
       if (inRange(session)) sessions.push(session);
     }
-    return sessions;
+    // See `getSession`'s own comment — same in-memory band-load
+    // normalization for every session this read path returns.
+    return sessions.map(migrateSessionBandLoads);
   }
 
   async deleteSession(id: SessionId): Promise<void> {
@@ -664,13 +776,20 @@ export class FileSystemStorageAdapter implements StoragePort {
     await this.#replayPendingBulkWriteIfHandleAlreadyAvailable();
     const exercises = (await this.#readJson<Exercise[]>(EXERCISES_FILE)) ?? [];
     const exercise = exercises.find((e) => e.id === id);
-    return exercise && withTemplateDefaults(exercise);
+    // See `getSession`'s own comment on why a read path normalizes
+    // in-memory rather than requiring a write gesture — same reasoning for
+    // a still-on-disk pre-v5 `defaultLoadType: 'band'`.
+    return (
+      exercise && migrateExerciseDefaultLoadType(withTemplateDefaults(exercise))
+    );
   }
 
   async listExercises(): Promise<Exercise[]> {
     await this.#replayPendingBulkWriteIfHandleAlreadyAvailable();
     const exercises = (await this.#readJson<Exercise[]>(EXERCISES_FILE)) ?? [];
-    return exercises.map(withTemplateDefaults);
+    return exercises
+      .map(withTemplateDefaults)
+      .map(migrateExerciseDefaultLoadType);
   }
 
   async mergeExercises(
@@ -782,24 +901,15 @@ export class FileSystemStorageAdapter implements StoragePort {
 
   async getDraft(): Promise<LoggingDraft | undefined> {
     await this.#replayPendingBulkWriteIfHandleAlreadyAvailable();
-    return this.#readJson<LoggingDraft>(DRAFT_FILE);
+    const draft = await this.#readJson<LoggingDraft>(DRAFT_FILE);
+    // See `getSession`'s own comment — same in-memory band-load
+    // normalization for a still-on-disk pre-v5 draft.
+    return draft && migrateDraftBandLoad(draft);
   }
 
   async discardDraft(): Promise<void> {
     await this.#ensureSchemaCheckedForWrite();
     await this.#deleteFile(DRAFT_FILE);
-  }
-
-  // Band labels
-
-  async listBandLabels(): Promise<string[]> {
-    await this.#replayPendingBulkWriteIfHandleAlreadyAvailable();
-    return (await this.#readJson<string[]>(BAND_LABELS_FILE)) ?? [];
-  }
-
-  async saveBandLabels(labels: string[]): Promise<void> {
-    await this.#ensureSchemaCheckedForWrite();
-    await this.#writeJson(BAND_LABELS_FILE, [...labels]);
   }
 
   // Schema version
@@ -993,11 +1103,6 @@ export class FileSystemStorageAdapter implements StoragePort {
         });
       }
     }
-    if (input.bandLabels !== undefined) {
-      await this.#writeJsonToHandle(root, BAND_LABELS_FILE, [
-        ...input.bandLabels,
-      ]);
-    }
     if (input.settings !== undefined) {
       await this.#writeJsonToHandle(root, SETTINGS_FILE, input.settings);
     }
@@ -1028,7 +1133,6 @@ export class FileSystemStorageAdapter implements StoragePort {
     }
     await this.#writeJsonToHandle(root, EXERCISES_FILE, payload.seedExercises);
     await this.#removeEntryIfPresent(root, DRAFT_FILE);
-    await this.#writeJsonToHandle(root, BAND_LABELS_FILE, []);
     await this.#removeEntryIfPresent(root, SETTINGS_FILE);
     await this.#writeJsonToHandle(root, META_FILE, {
       schemaVersion: payload.schemaVersion,

@@ -153,10 +153,11 @@ One vocabulary, used identically in code, UI and documentation.
 
 - **Load** — a sum type; exactly one variant per set:
   - `Weight` — numeric value + unit (kg/lb).
-  - `Band` — band label (colour or name) + optional estimated resistance.
   - `Bodyweight` — with optional added or assisted load (`+10 kg`, `−20 kg`).
-  - `FreeText` — short string ("machine level 4", "stack 3").
+  - `FreeText` — short string ("machine level 4", "stack 3", "red band").
   - `None` — for work where load does not apply.
+  - _(A `Band` variant existed through schema v4 and was removed by
+    ADR-0016 — a band exercise is now tracked with `FreeText` or `None`.)_
 - **Volume** — a sum type: `Reps` | `Duration` (seconds) | `Distance` (metres).
   A 45-second plank and an 8-rep press are both valid sets.
 - **Effort** — an integer level from 1 to 5, stored as the single canonical
@@ -262,12 +263,13 @@ Create a session and add blocks, exercises and sets.
   set-entry template (ADR-0006), not re-offered as a picker on every set: the
   set-entry form shows exactly the load input and volume control the
   template says, and nothing else, by default — for a fresh exercise, that's
-  Weight + Reps. Changing the template (including switching to Band/
-  Bodyweight/Free text/None, or to Duration/Distance, or turning effort
-  tracking on) happens through the exercise's own menu, with a warning that
-  it changes what a *new* set defaults to going forward; it never touches an
+  Weight + Reps. Changing the template (including switching to Bodyweight/
+  Free text/None, or to Duration/Distance, or turning effort tracking on)
+  happens through the exercise's own menu, with a warning that it changes
+  what a *new* set defaults to going forward; it never touches an
   already-recorded set (ADR-0006 — supersedes this FR's earlier per-set
-  override wording).
+  override wording). _(A `Band` load kind was also switchable to here
+  through schema v4; removed by ADR-0016 — see §3.2's own note.)_
 - Weight uses the numeric keypad by default (`inputMode="decimal"`) with no
   dedicated quick-increment buttons — entering a value directly is the whole
   interaction. Reps are chosen with a scrollable wheel (1 to 100, plus an
@@ -286,7 +288,9 @@ Create a session and add blocks, exercises and sets.
   wording below). A row that is merely pre-filled and still untouched does
   nothing on its own — see the next bullet for how an identical repeat
   still works in one tap.
-- Bands are picked from a user-owned, reorderable list with free labels.
+- _(Bands were picked from a user-owned, reorderable list with free labels
+  through schema v4; superseded by ADR-0016 — see §3.2's own note. A band
+  exercise is now tracked with `FreeText` or `None` instead.)_
 - Free text accepts up to 40 characters and autocompletes from what has already
   been used for that exercise.
 - An exercise entry holds any number of sets in the same session (e.g. three
@@ -427,8 +431,9 @@ discipline (§1.4) in v1 — its metrics (e1RM, tonnage) are defined in §5 for
   session tonnage, and reps at a fixed load.
 - Selectable range: 3 months, 6 months, 1 year, all.
 - Personal records are marked visually in both representations.
-- For band or free-text loads the app shows no estimated 1RM: it offers the
-  metrics that do apply and explains in one sentence why (degrade honestly).
+- For free-text or no-load work the app shows no estimated 1RM: it offers
+  the metrics that do apply and explains in one sentence why (degrade
+  honestly).
 
 ### FR-9 — Insights `[v1]`
 
@@ -454,8 +459,10 @@ cross-references elsewhere in the codebase are not renumbered.
 
 - Default unit (kg/lb), quick increments, theme (light / dark / system),
   first day of the week.
-- Band catalogue management.
 - Data section: export, import, delete everything (double confirmation).
+- _(Band catalogue management was removed by ADR-0016 — its label editor
+  blocked the "add set" flow; band exercises are now tracked with the
+  `FreeText`/`None` load kind instead.)_
 
 ### FR-12 — Export and import `[v1]`
 

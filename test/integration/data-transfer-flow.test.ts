@@ -48,7 +48,7 @@ const draft: LoggingDraft = {
 };
 
 describe('Data transfer flow: export from one install, import into another (US2 Independent Test)', () => {
-  it('sessions, exercises, band labels, settings, and the draft all match after import (SC-001)', async () => {
+  it('sessions, exercises, settings, and the draft all match after import (SC-001)', async () => {
     const source = createHarness();
     const exercise = makeExercise();
     await source.storage.saveExercise(exercise);
@@ -82,14 +82,12 @@ describe('Data transfer flow: export from one install, import into another (US2 
         ],
       }),
     );
-    await source.storage.saveBandLabels(['Red', 'Blue']);
     await source.storage.saveSettings(settings);
     await source.storage.saveDraft(draft);
 
     const file = buildExportFile({
       sessions: await source.storage.listSessions(allStoredDataRange()),
       exercises: await source.storage.listExercises(),
-      bandLabels: await source.storage.listBandLabels(),
       settings: await source.storage.getSettings(),
       loggingDraft: await source.storage.getDraft(),
     });
@@ -104,13 +102,11 @@ describe('Data transfer flow: export from one install, import into another (US2 
     const [
       importedSessions,
       importedExercises,
-      importedBandLabels,
       importedSettings,
       importedDraft,
     ] = await Promise.all([
       destination.storage.listSessions(allStoredDataRange()),
       destination.storage.listExercises(),
-      destination.storage.listBandLabels(),
       destination.storage.getSettings(),
       destination.storage.getDraft(),
     ]);
@@ -119,7 +115,6 @@ describe('Data transfer flow: export from one install, import into another (US2 
       await source.storage.listSessions(allStoredDataRange()),
     );
     expect(importedExercises).toEqual([exercise]);
-    expect(importedBandLabels).toEqual(['Red', 'Blue']);
     expect(importedSettings).toEqual(settings);
     expect(importedDraft).toEqual(draft);
   });
@@ -128,12 +123,10 @@ describe('Data transfer flow: export from one install, import into another (US2 
     const source = createHarness();
     const exercise = makeExercise();
     await source.storage.saveExercise(exercise);
-    await source.storage.saveBandLabels(['Red']);
 
     const file = buildExportFile({
       sessions: [],
       exercises: await source.storage.listExercises(),
-      bandLabels: await source.storage.listBandLabels(),
       settings: undefined,
       loggingDraft: undefined,
     });
@@ -152,6 +145,5 @@ describe('Data transfer flow: export from one install, import into another (US2 
     await second.prepared.commit();
 
     expect(await destination.storage.listExercises()).toEqual([exercise]);
-    expect(await destination.storage.listBandLabels()).toEqual(['Red']);
   });
 });

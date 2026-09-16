@@ -1,5 +1,5 @@
 /**
- * `Load` — a value object, one of five variants
+ * `Load` — a value object, one of four variants
  * (`docs/requirements.md` §3.2; FR-007).
  *
  * The union type below is structural, like any TypeScript interface — it
@@ -14,7 +14,6 @@ import { InvalidLoadError } from './errors';
 
 export type Load =
   | { kind: 'weight'; value: number; unit: 'kg' | 'lb' }
-  | { kind: 'band'; label: string; estimatedResistanceKg?: number }
   | { kind: 'bodyweight'; addedOrAssistedKg?: number }
   | { kind: 'freeText'; text: string }
   | { kind: 'none' };
@@ -25,7 +24,7 @@ const BODYWEIGHT_COMPONENT_MAX = 300;
 /**
  * The only supported way to produce a `Load` value.
  *
- * - `weight`/`band`/`freeText` values are stored exactly as entered
+ * - `weight`/`freeText` values are stored exactly as entered
  *   (FR-015) — no unit conversion, no rounding.
  * - `bodyweight.addedOrAssistedKg` MUST be within -300..+300 (spec 001
  *   FR-014 precedent); outside that range throws `InvalidLoadError`.
