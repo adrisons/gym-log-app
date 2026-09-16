@@ -4,7 +4,9 @@
 
 **Created**: 2026-09-16
 
-**Status**: Draft
+**Status**: Reviewed — passed `spec-reviewer` (findings resolved by direct
+edit) and `schema-guardian` (no schema-version impact); `plan.md`/`tasks.md`
+not yet written.
 
 **Input**: User description: "Review whether the specs already cover showing
 the user, from Settings, where their data is being stored — on iPhone no
@@ -87,12 +89,12 @@ Principle II (NON-NEGOTIABLE) today, not just a missing convenience — an
 uncontrolled reload can interrupt the exact moment (recording a set) the
 whole product exists to protect.
 
-**Independent Test**: install the app, start logging a set (at least one
-field filled, not yet confirmed), trigger a new-version deployment, and
-confirm: no reload happens while the set is unconfirmed, a non-blocking
-notice appears, and choosing to update only reloads once the user
-explicitly confirms it (or once no set is in progress, whichever the
-chosen design guarantees — see FR-010).
+**Independent Test**: install the app, start filling in the add-set form
+without tapping its Confirm control, trigger a new-version deployment, and
+confirm: no reload happens while the form is unconfirmed, the update
+notice does not appear until that entry is confirmed or cancelled, and
+choosing to update from the notice only reloads on the user's own tap
+(FR-002, FR-003).
 
 **Acceptance Scenarios**:
 
@@ -106,15 +108,21 @@ chosen design guarantees — see FR-010).
    app, **Then** nothing is forced — the current version keeps working
    normally until the user chooses to update or closes and reopens the app
    (which picks up the new version like any normal launch).
-4. **Given** a set actively being logged (at least one field entered, not
-   yet confirmed) when a new version finishes downloading, **When** the
-   update becomes available, **Then** the update notice is deferred (or
-   shown without ever auto-applying) so the in-progress set is never
-   discarded or interrupted by a reload the user didn't ask for.
+4. **Given** the add/edit-set form has at least one field filled in but the
+   user has not yet tapped its Confirm control (`SetConfirmControl`,
+   `docs/requirements.md` D17/ADR-0010) when a new version finishes
+   downloading, **When** the update becomes available, **Then** the notice
+   is not shown yet; it appears only once that Confirm/Cancel resolves
+   (the set is saved or discarded) — never interrupting or discarding the
+   unconfirmed entry.
 5. **Given** the app is closed and reopened after a new version was
    published, **When** it launches, **Then** it simply runs the new
    version, the same as any fresh page load — no notice is needed for a
    version that was already picked up at launch.
+6. **Given** the user is on the logging screen (`/log`) for any reason,
+   confirmed set or not, **When** an update becomes available, **Then**
+   the notice is not rendered there at all (FR-018) — it appears once the
+   user navigates to another screen.
 
 ---
 
@@ -149,8 +157,14 @@ name — independently of whether User Story 1 or 3 exist yet.
 3. **Given** the File System Access adapter is active but its stored
    permission to the chosen folder has been revoked or needs
    re-confirmation, **When** the user opens Settings, **Then** the storage
-   section says so plainly (e.g. that access needs to be reconfirmed)
-   rather than silently showing stale or incorrect information.
+   section says so plainly (e.g. that access needs to be reconfirmed) and
+   offers a control to re-request that permission (FR-017), rather than
+   silently showing stale or incorrect information with no way to fix it.
+4. **Given** the File System Access adapter is active but no folder has
+   been chosen yet (nothing has been saved since install), **When** the
+   user opens Settings, **Then** the storage section states that a folder
+   will be chosen the first time something is saved, rather than showing a
+   blank or error-like value.
 
 ---
 
@@ -224,6 +238,22 @@ ever shown there.
   (there is nothing to update from); the storage section still reflects
   whichever adapter this session selected; the install invitation may
   apply if running in a plain tab.
+- What happens if the File System Access adapter is active but the user has
+  not yet saved anything, so no folder has been chosen yet (the folder
+  picker is asked lazily, on first save)? → The storage section states that
+  a folder will be chosen automatically the first time something is saved,
+  rather than showing a blank, broken, or error-like folder name (FR-007).
+- What happens to the logging critical path itself — not just the Settings
+  screen — when File System Access permission has been revoked (e.g. the
+  user removed the app's folder access from browser settings)? → Unchanged
+  by this spec: `specs/003-persistence` (FR-012a) already defines that a
+  write on the logging path surfaces a distinguishable `StorageError` for
+  "permission lost," and explicitly left the user-facing re-permission flow
+  itself as "presentation-layer work for a future spec" (spec 003
+  Non-Goals). This spec is that future spec for the re-permission flow
+  (FR-017) and adds Settings-level visibility (FR-009) — but does not
+  redefine how the logging path itself surfaces or retries the error,
+  which stays spec 003's own responsibility.
 
 ## Non-Goals *(mandatory)*
 
@@ -232,9 +262,11 @@ ever shown there.
   only displays the outcome of that existing choice. There is no UI to
   force, switch, or override the adapter.
 - **A folder-picker "change storage location" control.** Moving data
-  between adapters or folders is already covered by export/import
-  (`specs/006-settings-data`, FR-12); this spec does not add a second way
-  to relocate data.
+  between adapters or to a *different* folder is already covered by
+  export/import (`specs/006-settings-data`, FR-12); this spec does not add
+  a second way to relocate data. This is distinct from FR-017 below, which
+  only re-requests permission for the *same*, already-chosen folder — it
+  never lets the user pick a different one.
 - **A changelog, release notes, or version-history UI.** The update notice
   (User Story 1) says an update is available and lets the user apply it —
   it does not describe what changed.
@@ -247,8 +279,9 @@ ever shown there.
   canonical entity (`docs/requirements.md` §3.1); the one new piece of
   state this spec introduces (whether the install invitation was
   permanently dismissed) is Settings-shaped, non-canonical, additive state
-  on the same footing as an existing Settings field (D14) — no version
-  bump, no migration.
+  on the same D14-exempt footing as an existing Settings field — no version
+  bump, no migration — even though (FR-016) it is kept out of the portable
+  `Settings` record itself.
 - **Changing the update mechanism's underlying technology.** Whether the
   service worker keeps `autoUpdate`-style registration or moves to a
   prompt-driven one is a `/speckit-plan` decision; this spec only fixes the
@@ -265,8 +298,13 @@ ever shown there.
   the system MUST tell the user via a non-blocking notice rather than
   applying it silently.
 - **FR-002**: The system MUST NOT reload or otherwise apply a downloaded
-  update while a set is actively being logged (at least one field entered
-  and not yet confirmed) — Principle II (NON-NEGOTIABLE).
+  update while the add/edit-set form has at least one field entered and its
+  Confirm control (`SetConfirmControl`, `docs/requirements.md`
+  D17/ADR-0010) has not yet been tapped — Principle II (NON-NEGOTIABLE).
+  This is the transient, per-form "unconfirmed entry" state, distinct from
+  and narrower than `specs/001-log-a-session` FR-024's durable, per-session
+  pending draft; it applies equally whether the form is adding a new set or
+  editing an already-recorded one (D17).
 - **FR-003**: The user MUST be able to apply an available update on demand
   from the notice, at which point the app reloads to the new version.
 - **FR-004**: Declining or ignoring the update notice MUST leave the
@@ -310,20 +348,46 @@ ever shown there.
 - **FR-015**: The install offer MUST NOT block or overlay any control on
   the logging screen (Principle II).
 
+**Cross-cutting**
+
+- **FR-016**: The install-offer-dismissed preference (Key Entities) MUST
+  NOT be included in the export/import interchange file
+  (`specs/006-settings-data` FR-007/FR-010/FR-011): it is device-local, so
+  importing a file produced on a different device MUST NOT overwrite or
+  reveal this device's own dismissal state, and exporting from this device
+  MUST NOT leak it either. It is stored separately from the portable
+  `Settings` record `specs/006-settings-data` defines, even though both are
+  Settings-shaped, non-canonical, D14-exempt state.
+- **FR-017**: When the File System Access adapter's permission for the
+  already-chosen folder has been revoked (`specs/003-persistence` FR-012a),
+  the Settings storage section MUST offer a control that re-requests that
+  same permission, from a user gesture (`docs/requirements.md` §7.5); this
+  closes `specs/003-persistence`'s own Non-Goals item ("a user-facing
+  re-permission flow ... is presentation-layer work for a future spec").
+  It MUST NOT offer to choose a different folder (see Non-Goals).
+- **FR-018**: Neither the update notice (FR-001) nor the install offer
+  (FR-010) MUST ever render while the active screen is the logging screen
+  (`/log`) — not merely non-blocking there, but not shown there at all.
+  Both are deferred until the user is on any other screen.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Storage status.** Read-only, derived state describing which of
   `ADR-0002`'s two adapters is active on this device and, where
-  applicable, the chosen folder's display name and whether its permission
-  is still valid. Not persisted by this feature — recomputed from the
-  existing adapter/handle the composition root already holds.
+  applicable, the chosen folder's display name (or that none has been
+  chosen yet, if the File System Access adapter is active but nothing has
+  been saved) and whether its permission is still valid. Not persisted
+  by this feature — recomputed from the existing adapter/handle the
+  composition root already holds.
 - **Update availability.** Transient, non-persisted state reflecting
   whether the running service worker has a newer version ready to apply.
   Cleared once the update is applied or the app is reloaded/reopened.
 - **Install-offer preference.** One new, small, non-canonical, per-device
   setting: whether the user has permanently dismissed the install offer.
-  Additive Settings-shaped state on the same footing as an existing
-  Settings field (`docs/requirements.md` D14) — no schema-version bump.
+  Additive, Settings-*shaped* state on the same D14-exempt footing as an
+  existing Settings field, but — per FR-016 — stored and kept separate from
+  the portable `Settings` record itself, so it is never carried by
+  export/import.
 
 ## Success Criteria *(mandatory)*
 
@@ -346,14 +410,33 @@ ever shown there.
 - **SC-005**: An update notice never appears for a version that was already
   current when the app launched — it only appears for a version that
   becomes available during an already-open session.
+- **SC-006**: A user whose File System Access permission has been revoked
+  can, from Settings alone, restore full read/write access to their
+  existing data folder without exporting/re-importing or losing any data —
+  verified by revoking permission, then using FR-017's control to restore
+  it.
 
 ## Assumptions
 
-- **"Actively being logged" (FR-002) reuses the existing logging-draft
-  concept.** A set counts as in progress the same way
-  `specs/001-log-a-session` FR-024's logging draft already defines "at
-  least one field entered, not yet confirmed" — this spec does not invent
-  a second definition of "mid-set."
+- **"Actively being logged" (FR-002) means the add/edit-set form's own
+  transient, per-form, unconfirmed-entry state — not
+  `specs/001-log-a-session` FR-024's pending draft.** FR-024 is a coarser,
+  durable, per-*session* concept (persists across an app close, true for
+  most of a workout's duration once any exercise has been added); the state
+  FR-002 actually needs to protect is the narrow, few-seconds, per-*form*
+  window between the user filling in a field and tapping Confirm
+  (`docs/requirements.md` D17/ADR-0010's `SetConfirmControl`), which is
+  never itself persisted. Gating update-deferral on FR-024 instead would
+  block updates for nearly the whole time the app is open on `/log`; gating
+  it on the Confirm-control state is both the behavior Principle II is
+  actually protecting and the one FR-018 can reason about precisely
+  (deferred only while `/log` has an unconfirmed form, not for the route's
+  entire lifetime).
+- **A "visit" (FR-014, SC-003) is one browser tab/window's lifetime**, from
+  load until it is closed, reloaded, or navigated away from the app's
+  origin — not a durable, cross-tab, or cross-session concept, and not
+  itself persisted; only the *permanent* dismissal (FR-014) survives across
+  visits.
 - **The install offer is shown at most once per visit, not on every
   navigation within the app.** Repeating it on every screen change within
   the same open tab would be intrusive; "dismissed for now" (as opposed to
@@ -370,10 +453,14 @@ ever shown there.
 - **"Folder name" (FR-007) is whatever display name the platform itself
   reports for the chosen directory** (e.g. via the File System Access API's
   own handle), not a name this feature invents or lets the user edit.
-- **No new permission is requested by this feature.** Storage-location
-  display (User Story 2) only reads state the existing adapter already
-  holds; it never itself triggers a folder picker or a permission prompt
-  (`docs/requirements.md` §7.5's "background code checks permission and
+- **No *background* permission request is added by this feature.**
+  Storage-location display (User Story 2) only reads state the existing
+  adapter already holds; it never itself triggers a folder picker or a
+  permission prompt outside a user gesture. FR-017's re-permission control
+  is the one deliberate exception, and it is not a background prompt: it
+  only requests permission from an explicit tap on that control, matching
+  `docs/requirements.md` §7.5's own rule ("platform-gated capabilities are
+  requested inside a user gesture; background code checks permission and
   never prompts").
 - **This feature ships before swimming (`ADR-0006`) or any other new
   discipline**, per `docs/requirements.md` D22 — recorded here for

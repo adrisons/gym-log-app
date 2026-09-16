@@ -42,10 +42,28 @@
   `vite-plugin-pwa`) is used inside `spec.md` itself; those appear only in
   `Context`/`Input` as the existing implementation this spec reacts to, not
   as part of the requirements.
-- All items pass on first draft; no `/speckit-clarify` follow-up judged
-  necessary — the three ambiguous points identified during drafting
-  (non-permanent install-dismiss re-offer cadence; update-check interval;
-  which mechanism ultimately implements "never reload mid-set") were each
-  resolved as reasonable, spec-agnostic defaults in the Assumptions
-  section rather than left as open questions, since none of them change
-  this spec's user-facing guarantees.
+- **`spec-reviewer` pass (2026-09-16)** found two contradictions and one
+  uncovered edge case, all resolved by direct edit rather than
+  `/speckit-clarify` (the correct answers were already unambiguous from
+  existing specs, not open questions needing the user's input):
+  - FR-002's "actively being logged" had misattributed its definition to
+    `specs/001-log-a-session` FR-024 (a coarser, durable, per-session
+    concept); corrected to cite the actual, narrower source
+    (`docs/requirements.md` D17/ADR-0010's per-form Confirm-control state)
+    in both FR-002 and Assumptions.
+  - The install-offer-dismissed preference's Settings-shaped framing
+    implied it would be swept into `specs/006-settings-data`'s
+    export/import of the `Settings` record, contradicting FR-014's
+    per-device guarantee; resolved by new FR-016, explicitly excluding it
+    from export/import and keeping it a separate, device-local record.
+  - No remediation existed for a revoked File System Access permission,
+    despite `specs/003-persistence` (FR-012a, Non-Goals) having explicitly
+    deferred that "user-facing re-permission flow" to a future spec;
+    resolved by new FR-017, which is that flow, scoped narrowly (re-request
+    the same folder's permission only, never a different folder).
+  - Also tightened: where the update/install notices may render (new
+    FR-018: never on `/log`), the "no folder chosen yet" state (new
+    Acceptance Scenario, User Story 2), the "visit" definition (Assumptions,
+    for FR-014/SC-003), and Acceptance Scenario 4's previously two-outcome
+    wording (now single, testable behavior).
+- All items pass after this revision.
