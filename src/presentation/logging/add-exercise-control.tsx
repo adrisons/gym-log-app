@@ -5,12 +5,22 @@
  * §2), matching `BlockCard`'s own rename-dialog pattern (backdrop +
  * `role="dialog"`). Closes back to the button on a selection/creation,
  * Escape, or a tap on the backdrop.
+ *
+ * `aria-modal="true"` alone doesn't trap focus or make the rest of the
+ * page inert (Copilot review, PR #40) — a keyboard user tabbing past the
+ * dialog's last focusable element would otherwise land back on the
+ * trigger button and the rest of the page behind this backdrop, which
+ * they can't see or reach. The dialog's own `onKeyDown` below wraps Tab/
+ * Shift+Tab between its first and last focusable elements instead.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { Exercise } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
 import { ExerciseSearchField } from './exercise-search-field';
 import './logging.css';
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export interface AddExerciseControlProps {
   buttonLabel: string;
@@ -29,6 +39,7 @@ export function AddExerciseControl({
 }: AddExerciseControlProps) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const wasOpenRef = useRef(false);
 
   // The trigger button stays mounted underneath the popup (unlike the old
@@ -69,10 +80,29 @@ export function AddExerciseControl({
           }}
         >
           <div
+            ref={dialogRef}
             className="add-exercise-control__dialog"
             role="dialog"
             aria-modal="true"
             aria-label={fieldLabel}
+            onKeyDown={(event) => {
+              if (event.key !== 'Tab' || !dialogRef.current) return;
+              const focusable = Array.from(
+                dialogRef.current.querySelectorAll<HTMLElement>(
+                  FOCUSABLE_SELECTOR,
+                ),
+              );
+              if (focusable.length === 0) return;
+              const first = focusable[0]!;
+              const last = focusable[focusable.length - 1]!;
+              if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+              } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+              }
+            }}
           >
             <ExerciseSearchField
               label={fieldLabel}

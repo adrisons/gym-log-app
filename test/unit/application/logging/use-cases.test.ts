@@ -282,6 +282,57 @@ describe('searchExercises (FR-002, FR-016, SC-004)', () => {
       'ex-never',
     ]);
   });
+
+  it('caps a non-empty query at 3 results even when more exercises match', () => {
+    const catalogue = [
+      makeExercise({ id: 'ex-1' as ExerciseId, canonicalName: 'Squat 1' }),
+      makeExercise({ id: 'ex-2' as ExerciseId, canonicalName: 'Squat 2' }),
+      makeExercise({ id: 'ex-3' as ExerciseId, canonicalName: 'Squat 3' }),
+      makeExercise({ id: 'ex-4' as ExerciseId, canonicalName: 'Squat 4' }),
+      makeExercise({ id: 'ex-5' as ExerciseId, canonicalName: 'Squat 5' }),
+    ];
+
+    const results = searchExercises('squat', catalogue, []);
+
+    expect(results).toHaveLength(3);
+  });
+
+  it('with an empty query, excludes exercises already in excludeIds (already added to the session being built)', () => {
+    const oftenUsed = makeExercise({
+      id: 'ex-often' as ExerciseId,
+      canonicalName: 'Often used',
+    });
+    const rarelyUsed = makeExercise({
+      id: 'ex-rare' as ExerciseId,
+      canonicalName: 'Rarely used',
+    });
+    const neverUsed = makeExercise({
+      id: 'ex-never' as ExerciseId,
+      canonicalName: 'Never used (seeded)',
+    });
+    const catalogue = [neverUsed, rarelyUsed, oftenUsed];
+
+    const results = searchExercises(
+      '',
+      catalogue,
+      [],
+      [oftenUsed.id, rarelyUsed.id],
+    );
+
+    expect(results.map((e) => e.id)).toEqual(['ex-never']);
+  });
+
+  it('a non-empty query ignores excludeIds — a search hit may be re-added deliberately', () => {
+    const squat = makeExercise({
+      id: 'ex-squat' as ExerciseId,
+      canonicalName: 'Barbell squat',
+    });
+    const catalogue = [squat];
+
+    const results = searchExercises('squat', catalogue, [], [squat.id]);
+
+    expect(results.map((e) => e.id)).toEqual(['ex-squat']);
+  });
 });
 
 describe('createExercise (FR-002, FR-015)', () => {

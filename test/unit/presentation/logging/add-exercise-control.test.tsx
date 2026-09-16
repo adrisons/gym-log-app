@@ -50,7 +50,9 @@ describe('AddExerciseControl', () => {
     await userEvent.click(
       screen.getByRole('button', { name: '+ Add exercise' }),
     );
-    expect(screen.getByRole('dialog', { name: 'Exercise' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('dialog', { name: 'Exercise' }),
+    ).toBeInTheDocument();
     const input = screen.getByRole('textbox');
     await userEvent.click(input);
     await userEvent.click(screen.getByText('Back squat'));
@@ -130,5 +132,41 @@ describe('AddExerciseControl', () => {
     await userEvent.click(dialog.parentElement!);
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('traps Tab focus inside the popup (aria-modal alone does not do this)', async () => {
+    const search = vi.fn(() => [squat]);
+    render(
+      <>
+        <AddExerciseControl
+          buttonLabel="+ Add exercise"
+          fieldLabel="Exercise"
+          search={search}
+          onSelectExercise={() => {}}
+          onCreateExercise={() => {}}
+        />
+        <button type="button">Outside control</button>
+      </>,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: '+ Add exercise' }),
+    );
+    const input = screen.getByRole('textbox');
+    await userEvent.click(input);
+    const lastFocusable = screen.getByText('Back squat');
+
+    lastFocusable.focus();
+    await userEvent.tab();
+
+    // Forward Tab from the last focusable element inside the dialog wraps
+    // back to the first one (the input) rather than escaping to the
+    // trigger button or "Outside control" behind the backdrop.
+    expect(input).toHaveFocus();
+
+    await userEvent.tab({ shift: true });
+
+    // Shift+Tab from the first element wraps to the last one.
+    expect(lastFocusable).toHaveFocus();
   });
 });
