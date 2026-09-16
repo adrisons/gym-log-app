@@ -68,7 +68,7 @@ export function ExportControls() {
   }
 
   return (
-    <div>
+    <div className="settings-button-group">
       <button
         type="button"
         className="settings-button settings-button--primary"
@@ -76,7 +76,7 @@ export function ExportControls() {
         onClick={() => void exportJson()}
       >
         {busy === 'json' ? 'Exporting…' : 'Export data'}
-      </button>{' '}
+      </button>
       <button
         type="button"
         className="settings-button"

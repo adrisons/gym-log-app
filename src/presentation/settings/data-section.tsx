@@ -17,9 +17,11 @@ export function DataSection({ onDataChanged }: DataSectionProps) {
   return (
     <section className="settings-section" aria-label="Data">
       <h2>Data</h2>
-      <ExportControls />
-      <ImportFlow onImported={onDataChanged} />
-      <DeleteEverythingFlow onDeleted={onDataChanged} />
+      <div className="settings-data-actions">
+        <ExportControls />
+        <ImportFlow onImported={onDataChanged} />
+        <DeleteEverythingFlow onDeleted={onDataChanged} />
+      </div>
     </section>
   );
 }
