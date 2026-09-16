@@ -530,6 +530,35 @@ and offering a trend for it. Drafted, not yet built or scheduled —
 - Toggled from the exercise catalogue screen (FR-5), alongside its other
   per-exercise management actions.
 
+### FR-16 — PWA installability and update lifecycle `[v1.1]`
+
+Make the installed-app experience honest about where data lives and keep an
+installed copy from silently drifting out of date, without ever costing the
+logging critical path (Principle II) a blocking step. Drafted, not yet
+built or scheduled — sequenced ahead of any new discipline within v1.1
+(D22).
+
+- Settings surfaces, read-only, which storage adapter is active on this
+  device (ADR-0002) and, where the File System Access adapter is active,
+  the chosen folder's name — so a user is never left guessing where their
+  data physically lives. This closes the gap where iOS Safari's IndexedDB
+  adapter correctly never asks for or shows a location (ADR-0002), but a
+  Chromium desktop/Android user's chosen folder is asked once, lazily, and
+  never surfaced again anywhere in the app.
+- When the app is opened in a browser tab rather than its installed,
+  standalone form, and the platform can support installation, the app
+  offers to install itself as a PWA. On Chromium-based browsers this
+  captures and replays the native `beforeinstallprompt` flow from a user
+  gesture; iOS Safari exposes no such event, so there the offer is
+  instructional (how to use "Add to Home Screen") rather than a native
+  prompt. Never shown to a user already running the installed copy.
+- Once installed, the app detects when the service worker has fetched a
+  newer version and tells the user, rather than silently reloading
+  underneath them (today's `registerType: 'autoUpdate'` behavior,
+  `vite.config.ts`) or leaving them stuck on a stale version indefinitely.
+  The user controls when the update actually applies; it is never forced
+  during the logging critical path (Principle II).
+
 ---
 
 ## 5. Computation rules
@@ -699,6 +728,7 @@ before code.
 | D17 | Whether recording a set requires an explicit confirm step (reopens D12); whether an already-recorded set can be edited in place; whether the per-exercise progression view (FR-013) stays reachable from a session detail view; whether the `/exercises` screen can create a new catalogue Exercise and edit an existing one's set-entry template | **Closed, all together (one design-refinement pass):** (1) Confirm is explicit again — a set commits only on an explicit "Add set"/"Save changes" tap, enabled only once every field the exercise's current template tracks is filled; the auto-commit-on-edit behavior and its "Repeat last set"/"Log this set" controls (D12/ADR-0007) are retired. (2) A `Set` can now be edited in place (load/volume/effort), not only added or deleted — new capability, still no schema change (`Set`'s shape is unaffected; only *how* one is produced changes). (3) A session detail view's per-exercise entries no longer link to the progression screen — for now, that stays reachable only from search results (spec 004 FR-013) and Insights (spec 005); FR-013 is amended accordingly, not removed (the progression screen itself, and its other two entry points, are unaffected). (4) The `/exercises` screen (spec 004 FR-5) gains "New exercise" (name + set-entry template together) alongside its existing rename/merge/delete, and its management panel gains "Edit tracked fields…" (ADR-0006) for an existing exercise — previously only reachable per-entry from the logging/session-detail screens. No schema change for (3) or (4) either — purely which screens link where, and use-cases (`createExercise`, `updateExerciseTemplate`) both already existed. → ADR-0010 |
 | D18 | Whether an exercise entry can exist without belonging to any block (the "loose" block) | **Closed:** no — every exercise entry always belongs to a real block; the draft-only "loose" flag that used to render a blockless exercise without block chrome is removed. It caused a real bug: the flag was never part of the persisted `Block` shape, so a blockless exercise silently gained block chrome the moment the session was saved and reopened. The logging form now opens with one empty block already present, and each block (including that first one) carries its own "add exercise" control; "Add block" below the last block still adds more. No schema change — `Block` never had a "loose" concept to begin with. → ADR-0011 |
 | D19 | Whether excluding an exercise (e.g. a warm-up) from FR-8/FR-9's progression and Insights computations warrants its own spec, rather than a quick change inside spec 004/005 | **Closed:** yes, its own spec — this is a new, additive field on the canonical `Exercise` entity (§3.1), so it needs the §6/Principle III schema-version-bump-and-migration treatment spec 004/005 themselves didn't need to reopen; it also changes eligibility filtering inside both FR-8 (personal records) and every one of FR-9's six card types, and has its own open questions (e.g. whether an excluded exercise's progression screen stays manually reachable) that deserve their own Acceptance Scenarios rather than being folded silently into either existing spec. Targeted at the "Later" phase (§9), pending its own scheduling decision — drafted, not yet built. → FR-15, `specs/008-exercise-progression-opt-out/spec.md` |
+| D22 | Whether the app should prioritize polishing its existing gym-logging (Strength-only, v1) experience — including how it behaves as an installed PWA — over expanding to a new sport/discipline | **Closed:** yes. Before any further discipline beyond Strength is prioritized (swimming per ADR-0006, or anything after it), the app's existing gym-logging experience must be solid first, including storage-location visibility, a browser-to-install prompt, and honest update-lifecycle notification for an installed copy (FR-16). This does not reopen or delay ADR-0006's own decision that swimming is the next discipline added — it only fixes the relative order between "polish what v1 already ships" and "add a new discipline" inside v1.1 (§9), which `docs/agent-brief.md`'s Swimming section previously left explicitly unsequenced relative to Phase 7 (Templates). |
 | D20 | Whether a Block should still carry a target round count (reopens D15) | **Closed:** no — removed entirely. Redundant with each exercise entry's own set count, which already says how many times it was actually done; a separate block-level "planned rounds" number added nothing FR-2's exercise-level data didn't already show, and one less field to edit is one less thing to keep in sync with what was actually logged. No replacement field, no migration for the field's removal (an old stored `rounds` value, if any, is simply never read again — the same reasoning ADR-0008's own no-op v2→v3 migration already established for its *absence*). → ADR-0013 |
 | D21 | Whether the sets list still renders as one "x"-joined compact line (reopens the ADR-0013/ADR-0014 wording), and whether Reps still requires a scrollable wheel in every case (reopens FR-3's wheel binding) | **Closed, both together (one design-refinement pass):** (1) The sets list renders as a two-column Reps/Duration/Distance + Load table with shared column headers, instead of literally one "x"-joined string — `summaryLine` is kept only as a computed convenience, not the rendered shape; each row's "⋮" Edit/Delete menu is replaced by a bare trailing "×" (delete only) plus tap-the-row-to-edit. (2) For the common Weight+Reps, no-effort case only, the add-set form renders as one compact line of plain numeric fields sharing the table's own columns, with no wheel; every other load/volume/effort combination is unaffected and keeps the reps wheel-picker and stacked form exactly as before. No schema change either way — purely how already-recorded/in-progress `Set` data is displayed and entered. → ADR-0015 |
 
@@ -720,11 +750,13 @@ before code.
   complete, useful application on its own, still Strength-only (§1.4). Body
   composition (formerly planned as FR-10) is not part of this or any
   version — see Decision D10.
-- **v1.1** — FR-13 templates; extra progression metrics; a quick-log widget
-  or shortcut; swimming as the first non-Strength discipline (§1.4, D8 →
-  ADR-0006) — its own feature spec, computation rule and schema migration,
-  not yet written. Running, or any discipline beyond swimming, is still an
-  open question (§8) pending its own future decision.
+- **v1.1** — FR-16 (PWA installability and update lifecycle), sequenced
+  first per D22; FR-13 templates; extra progression metrics; a quick-log
+  widget or shortcut; swimming as the first non-Strength discipline (§1.4,
+  D8 → ADR-0006), sequenced after FR-16 per D22 — its own feature spec,
+  computation rule and schema migration, not yet written. Running, or any
+  discipline beyond swimming, is still an open question (§8) pending its
+  own future decision.
 - **Later, only with a recorded decision** — multi-device sync, import from
   other apps, report export, further exercise disciplines beyond the first
   one added under v1.1, sharing training content as an image for external

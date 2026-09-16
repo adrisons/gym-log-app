@@ -119,11 +119,22 @@ Export and import with preview and rejection of newer schema versions. Full
 accessibility audit against `docs/requirements.md` §7.4. Performance measured
 against §7.1, before and after any optimisation.
 
-### Phase 7 — Templates (FR-13) — v1.1
+### Phase 7 — PWA installability and update lifecycle (FR-16) — v1.1
+
+Per `docs/requirements.md` D22: before any further discipline is added,
+the existing (Strength-only) gym-logging experience is polished first,
+including how the app behaves as an installed PWA — storage-location
+visibility in Settings, a browser-to-install prompt, and honest
+update-lifecycle notification instead of today's silent
+`registerType: 'autoUpdate'` reload (`vite.config.ts`). No schema change;
+never adds a blocking step to the logging critical path (Principle II).
+Spec: `specs/009-pwa-installability-and-updates/spec.md`.
+
+### Phase 8 — Templates (FR-13) — v1.1
 
 Session templates, kept off the logging critical path (D7).
 
-### Swimming, the first non-Strength discipline — v1.1, not yet sequenced
+### Swimming, the first non-Strength discipline — v1.1, sequenced after Phase 7
 
 D8 is closed for swimming (ADR-0006): the `discipline` field becomes a real
 enum, a distance/duration-based progression metric and its own insight card
@@ -137,9 +148,9 @@ not identically reconciled, so this phase's own eventual spec should
 address §6 explicitly too, not just re-cite Principle III. A tested
 migration (existing exercises default to `Strength`) ships with it per
 `docs/requirements.md` §6. Not yet specced, and deliberately **not**
-numbered "Phase 8": this document's own rule (§3 above) is strict build
-order — a phase does not start before the previous one closes — and
-ADR-0006 left this item's order relative to Phase 7 (Templates) explicitly
-undecided, so assigning it a sequential number here would claim an
-ordering this document hasn't actually settled. It gets a real phase
-number, in its correct sequence, once that ordering is decided.
+numbered "Phase 9": this document's own rule (§3 above) is strict build
+order — a phase does not start before the previous one closes. D22 settled
+this item's order relative to Phase 7 (PWA hardening, which now comes
+first) but left it unsequenced relative to Phase 8 (Templates) — it gets a
+real phase number, in its correct sequence, once that narrower ordering is
+decided.
