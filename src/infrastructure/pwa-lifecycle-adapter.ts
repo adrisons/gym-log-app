@@ -41,7 +41,7 @@ export class PwaLifecycleAdapter implements PwaLifecyclePort {
     (kind: InstallOfferKind) => void
   >();
   #installOfferKind: InstallOfferKind;
-  #deferredPrompt: BeforeInstallPromptEvent | undefined;
+  #pendingInstallPrompt: BeforeInstallPromptEvent | undefined;
 
   constructor() {
     this.#installOfferKind =
@@ -62,11 +62,11 @@ export class PwaLifecycleAdapter implements PwaLifecyclePort {
 
     window.addEventListener('beforeinstallprompt', (event) => {
       event.preventDefault();
-      this.#deferredPrompt = event as BeforeInstallPromptEvent;
+      this.#pendingInstallPrompt = event as BeforeInstallPromptEvent;
       this.#setInstallOfferKind('native');
     });
     window.addEventListener('appinstalled', () => {
-      this.#deferredPrompt = undefined;
+      this.#pendingInstallPrompt = undefined;
       this.#setInstallOfferKind('unavailable');
     });
   }
@@ -104,10 +104,10 @@ export class PwaLifecycleAdapter implements PwaLifecyclePort {
   }
 
   async promptNativeInstall(): Promise<'accepted' | 'dismissed'> {
-    const event = this.#deferredPrompt;
+    const event = this.#pendingInstallPrompt;
     if (!event) return 'dismissed';
     // A captured `beforeinstallprompt` event can only be used once.
-    this.#deferredPrompt = undefined;
+    this.#pendingInstallPrompt = undefined;
     await event.prompt();
     const { outcome } = await event.userChoice;
     return outcome;
