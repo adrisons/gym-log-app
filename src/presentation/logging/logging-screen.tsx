@@ -182,8 +182,10 @@ export function LoggingScreen() {
     // try to grow the header alongside `.logging-screen` (Copilot review,
     // PR #33: that double-stretch made the header-less-than-full route
     // root taller than the viewport, producing a blank scroll region).
-    // The header stays a fixed-size flex item; `.logging-screen` is the
-    // one part that scrolls.
+    // `.app-shell__content` itself is the only scroll container (see
+    // `logging.css`'s comment on `.logging-screen__root`) — the header
+    // just stays visually pinned via `position: sticky` as that one region
+    // scrolls, rather than owning a second nested scrollbar of its own.
     <div className="logging-screen__root">
       {/* Matches `HeaderNav`'s own bar (`header-nav.css`) so the logging
           screen — the one screen with no `HeaderNav`, ADR-0009 — still

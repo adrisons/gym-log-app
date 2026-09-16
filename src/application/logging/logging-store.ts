@@ -540,8 +540,12 @@ export const useLoggingSession = create<LoggingSessionState>((set, get) => {
     },
 
     searchExercises: (query) => {
-      const { catalogue, sessions } = get();
-      return searchExercisesUseCase(query, catalogue, sessions);
+      const { catalogue, sessions, draft } = get();
+      const usedInDraft =
+        draft?.blocks.flatMap((block) =>
+          block.exercises.map((entry) => entry.exerciseId),
+        ) ?? [];
+      return searchExercisesUseCase(query, catalogue, sessions, usedInDraft);
     },
 
     createExercise: async (input) => {

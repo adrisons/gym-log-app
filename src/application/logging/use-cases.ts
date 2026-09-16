@@ -130,38 +130,52 @@ function computeUsage(sessions: Session[]): Map<ExerciseId, ExerciseUsage> {
   return usage;
 }
 
+/** How many suggestions the search popup shows at once, in every mode. */
+const SUGGESTION_LIMIT = 3;
+
 /**
- * FR-002, FR-016, SC-004. With an empty query, ranks by most-used then
- * most-recently-used (Acceptance Scenario US1-5), computed from `sessions`
- * — no separate stored usage field on `Exercise`. With a non-empty query,
- * ranks by match quality via `shared/fuzzy-match.ts` (typo/alias-tolerant,
- * FR-016) — usage is not blended into relevance ranking while actively
- * searching.
+ * FR-002, FR-016, SC-004. With an empty query, suggests the
+ * `SUGGESTION_LIMIT` most-used/most-recently-used exercises (Acceptance
+ * Scenario US1-5), computed from `sessions` — no separate stored usage
+ * field on `Exercise` — excluding anything already in `excludeIds` (the
+ * exercises already added to the session being built, which have nothing
+ * left to suggest). With a non-empty query, ranks by match quality via
+ * `shared/fuzzy-match.ts` (typo/alias-tolerant, FR-016) — usage is not
+ * blended into relevance ranking while actively searching, and
+ * `excludeIds` does not apply (re-adding an already-used exercise to a
+ * search hit is a valid, explicit choice).
  */
 export function searchExercises(
   query: string,
   catalogue: Exercise[],
   sessions: Session[],
+  excludeIds: ExerciseId[] = [],
 ): Exercise[] {
   const trimmed = query.trim();
   if (trimmed === '') {
+    const excluded = new Set(excludeIds);
     const usage = computeUsage(sessions);
-    return [...catalogue].sort((a, b) => {
-      const ua = usage.get(a.id) ?? { count: 0, lastUsedAt: undefined };
-      const ub = usage.get(b.id) ?? { count: 0, lastUsedAt: undefined };
-      if (ua.count !== ub.count) return ub.count - ua.count;
-      const la = ua.lastUsedAt ?? '';
-      const lb = ub.lastUsedAt ?? '';
-      if (la !== lb) return lb.localeCompare(la);
-      return a.canonicalName.localeCompare(b.canonicalName);
-    });
+    return [...catalogue]
+      .filter((exercise) => !excluded.has(exercise.id))
+      .sort((a, b) => {
+        const ua = usage.get(a.id) ?? { count: 0, lastUsedAt: undefined };
+        const ub = usage.get(b.id) ?? { count: 0, lastUsedAt: undefined };
+        if (ua.count !== ub.count) return ub.count - ua.count;
+        const la = ua.lastUsedAt ?? '';
+        const lb = ub.lastUsedAt ?? '';
+        if (la !== lb) return lb.localeCompare(la);
+        return a.canonicalName.localeCompare(b.canonicalName);
+      })
+      .slice(0, SUGGESTION_LIMIT);
   }
   const candidates = catalogue.map((exercise) => ({
     exercise,
     name: exercise.canonicalName,
     aliases: exercise.aliases,
   }));
-  return matchExercise(trimmed, candidates).map((c) => c.exercise);
+  return matchExercise(trimmed, candidates)
+    .map((c) => c.exercise)
+    .slice(0, SUGGESTION_LIMIT);
 }
 
 export interface CreateExerciseInput {

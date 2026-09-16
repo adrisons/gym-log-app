@@ -34,7 +34,7 @@ describe('AddExerciseControl', () => {
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 
-  it('expands into the search field on tap, and selecting an exercise collapses it back', async () => {
+  it('opens a popup with the search field on tap, and selecting an exercise closes it back', async () => {
     const search = vi.fn(() => [squat]);
     const onSelectExercise = vi.fn();
     render(
@@ -50,6 +50,9 @@ describe('AddExerciseControl', () => {
     await userEvent.click(
       screen.getByRole('button', { name: '+ Add exercise' }),
     );
+    expect(
+      screen.getByRole('dialog', { name: 'Exercise' }),
+    ).toBeInTheDocument();
     const input = screen.getByRole('textbox');
     await userEvent.click(input);
     await userEvent.click(screen.getByText('Back squat'));
@@ -58,10 +61,11 @@ describe('AddExerciseControl', () => {
     expect(
       screen.getByRole('button', { name: '+ Add exercise' }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
-  it('restores focus to the trigger button after a selection collapses the field', async () => {
+  it('restores focus to the trigger button after a selection closes the popup', async () => {
     render(
       <AddExerciseControl
         buttonLabel="+ Add exercise"
@@ -83,37 +87,86 @@ describe('AddExerciseControl', () => {
     ).toHaveFocus();
   });
 
-  it('does not steal focus back to the trigger when the field closes because the user tabbed away (blur-driven close regression)', async () => {
+  it('closes the popup and restores focus to the trigger on Escape', async () => {
+    render(
+      <AddExerciseControl
+        buttonLabel="+ Add exercise"
+        fieldLabel="Exercise"
+        search={() => []}
+        onSelectExercise={() => {}}
+        onCreateExercise={() => {}}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: '+ Add exercise' }),
+    );
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '+ Add exercise' }),
+    ).toHaveFocus();
+  });
+
+  it('closes the popup on a backdrop click', async () => {
+    render(
+      <AddExerciseControl
+        buttonLabel="+ Add exercise"
+        fieldLabel="Exercise"
+        search={() => []}
+        onSelectExercise={() => {}}
+        onCreateExercise={() => {}}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: '+ Add exercise' }),
+    );
+    const dialog = screen.getByRole('dialog');
+
+    // Clicking the backdrop itself (the dialog's own parent), not the
+    // dialog panel — a tap inside the panel must not close it.
+    await userEvent.click(dialog.parentElement!);
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('traps Tab focus inside the popup (aria-modal alone does not do this)', async () => {
+    const search = vi.fn(() => [squat]);
     render(
       <>
         <AddExerciseControl
           buttonLabel="+ Add exercise"
           fieldLabel="Exercise"
-          search={() => []}
+          search={search}
           onSelectExercise={() => {}}
           onCreateExercise={() => {}}
         />
-        <button type="button">Next control</button>
+        <button type="button">Outside control</button>
       </>,
     );
 
     await userEvent.click(
       screen.getByRole('button', { name: '+ Add exercise' }),
     );
-    expect(screen.getByRole('textbox')).toHaveFocus();
+    const input = screen.getByRole('textbox');
+    await userEvent.click(input);
+    const lastFocusable = screen.getByText('Back squat');
 
-    // No results/create button rendered for an empty query, so the input
-    // is the only focusable element inside the expanded field — Tab moves
-    // straight to "Next control".
+    lastFocusable.focus();
     await userEvent.tab();
 
-    // Confirms the blur actually closed the field back to the trigger
-    // button (the collapsed state)...
-    expect(
-      screen.getByRole('button', { name: '+ Add exercise' }),
-    ).toBeInTheDocument();
-    // ...but the close must leave focus exactly where Tab just put it —
-    // never yank it back to the now-remounted trigger button.
-    expect(screen.getByRole('button', { name: 'Next control' })).toHaveFocus();
+    // Forward Tab from the last focusable element inside the dialog wraps
+    // back to the first one (the input) rather than escaping to the
+    // trigger button or "Outside control" behind the backdrop.
+    expect(input).toHaveFocus();
+
+    await userEvent.tab({ shift: true });
+
+    // Shift+Tab from the first element wraps to the last one.
+    expect(lastFocusable).toHaveFocus();
   });
 });
