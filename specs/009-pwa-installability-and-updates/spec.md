@@ -5,8 +5,8 @@
 **Created**: 2026-09-16
 
 **Status**: Planned — `plan.md`/`research.md`/`data-model.md`/`contracts/`/
-`quickstart.md` exist (Constitution Check: PASS, no violations);
-`tasks.md` not yet written; implementation not yet merged.
+`quickstart.md`/`tasks.md` all exist (Constitution Check: PASS, no
+violations); implementation not yet merged.
 
 **Input**: User description: "Review whether the specs already cover showing
 the user, from Settings, where their data is being stored — on iPhone no
