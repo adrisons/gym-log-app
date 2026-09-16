@@ -36,6 +36,7 @@ import {
   SCHEMA_VERSION_ROW_KEY,
 } from '../../../src/infrastructure/indexed-db/schema';
 import type { StoragePort } from '../../../src/application/ports/storage-port';
+import type { StorageStatus } from '../../../src/application/ports/storage-status';
 import { StorageError } from '../../../src/application/errors';
 import type { Exercise } from '../../../src/domain/exercise';
 import type { Session } from '../../../src/domain/session';
@@ -138,6 +139,78 @@ window.__runPermissionLossTest = async () => {
       isStorageError: error instanceof StorageError,
       kind: error instanceof StorageError ? error.kind : undefined,
     };
+  } finally {
+    db.close();
+  }
+};
+
+/**
+ * A fresh `FileSystemStorageAdapter` with nothing ever saved reports "no
+ * folder chosen yet" rather than an error (spec 009 User Story 2,
+ * Acceptance Scenario 4) — `getStorageStatus()` never forces a picker
+ * (FR-004a's discipline), so this must not itself trigger acquisition.
+ */
+window.__runStorageStatusNoFolderTest = async () => {
+  const db = new GymLogDatabase(uniqueName('storage-status-no-folder'));
+  const adapter = new FileSystemStorageAdapter(
+    () => Promise.reject(new Error('should never be called')),
+    db,
+  );
+  try {
+    return await adapter.getStorageStatus();
+  } finally {
+    db.close();
+  }
+};
+
+/**
+ * Simulates a lost File System Access permission surfacing through
+ * `getStorageStatus` (rather than a thrown error, spec 009 FR-009), then
+ * exercises `reconfirmFileSystemAccess` both ways: the user re-granting
+ * (status returns to `'granted'`) and the user declining again (rejects
+ * with the existing `'permission-lost'` `StorageError`, spec 009 FR-017).
+ * Same OPFS `queryPermission`/`requestPermission` stubbing technique as
+ * `__runPermissionLossTest` above.
+ */
+window.__runReconfirmAccessTest = async () => {
+  const opfsRoot = await navigator.storage.getDirectory();
+  const storeDir = await opfsRoot.getDirectoryHandle(
+    uniqueName('reconfirm-access'),
+    { create: true },
+  );
+  const db = new GymLogDatabase(uniqueName('reconfirm-access-handles'));
+  const adapter = new FileSystemStorageAdapter(async () => storeDir, db);
+
+  try {
+    // Acquire a real, cached handle first (any write does).
+    await adapter.saveBandLabels(['seed']);
+
+    (storeDir as { queryPermission: () => Promise<'denied'> }).queryPermission =
+      () => Promise.resolve('denied');
+    const lostStatus = await adapter.getStorageStatus();
+
+    (
+      storeDir as { requestPermission: () => Promise<'denied'> }
+    ).requestPermission = () => Promise.resolve('denied');
+    let declinedThrew = false;
+    let declinedKind: string | undefined;
+    try {
+      await adapter.reconfirmFileSystemAccess();
+    } catch (error) {
+      declinedThrew = true;
+      declinedKind = error instanceof StorageError ? error.kind : undefined;
+    }
+
+    (
+      storeDir as { requestPermission: () => Promise<'granted'> }
+    ).requestPermission = () => Promise.resolve('granted');
+    (
+      storeDir as { queryPermission: () => Promise<'granted'> }
+    ).queryPermission = () => Promise.resolve('granted');
+    await adapter.reconfirmFileSystemAccess();
+    const restoredStatus = await adapter.getStorageStatus();
+
+    return { lostStatus, declinedThrew, declinedKind, restoredStatus };
   } finally {
     db.close();
   }
@@ -758,5 +831,12 @@ declare global {
     ) => Promise<V3ToV4MigrationResult>;
     __runQueuedExerciseMergeTest: () => Promise<QueuedExerciseMergeResult>;
     __runQueuedMergeTombstoneTest: () => Promise<QueuedMergeTombstoneResult>;
+    __runStorageStatusNoFolderTest: () => Promise<StorageStatus>;
+    __runReconfirmAccessTest: () => Promise<{
+      lostStatus: StorageStatus;
+      declinedThrew: boolean;
+      declinedKind: string | undefined;
+      restoredStatus: StorageStatus;
+    }>;
   }
 }

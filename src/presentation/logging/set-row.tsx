@@ -38,8 +38,9 @@
  * pre-fills effort, since that is genuinely the value already recorded on
  * this exact set, not a guess forwarded from a different one.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { WheelEvent } from 'react';
+import { useUnconfirmedEntryTracker } from '@/application/logging/unconfirmed-entry-tracker';
 import { WeightLoadInput } from './weight-load-input';
 import { BandLoadInput } from './band-load-input';
 import { BodyweightLoadInput } from './bodyweight-load-input';
@@ -197,6 +198,16 @@ export function SetRow({
   const [effort, setEffort] = useState<1 | 2 | 3 | 4 | 5 | undefined>(
     editingSet?.effort,
   );
+
+  // Spec 009 FR-002/FR-018: this row being mounted at all — add or edit —
+  // is an unconfirmed entry an update must never interrupt
+  // (`application/logging/unconfirmed-entry-tracker.ts`). Registered once
+  // per mount/unmount, not per keystroke.
+  useEffect(() => {
+    const { increment, decrement } = useUnconfirmedEntryTracker.getState();
+    increment();
+    return decrement;
+  }, []);
 
   const buildInput = (fields: FieldSnapshot): AddSetInput | undefined => {
     const load: { kind: Load['kind']; present: boolean } = (() => {

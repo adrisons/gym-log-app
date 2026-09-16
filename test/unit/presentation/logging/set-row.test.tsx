@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SetRow } from '@/presentation/logging/set-row';
+import { useUnconfirmedEntryTracker } from '@/application/logging/unconfirmed-entry-tracker';
 
 const baseProps = {
   loadKind: 'weight' as const,
@@ -596,5 +597,40 @@ describe('SetRow editing an existing set in place (ADR-0010)', () => {
     expect(
       screen.getByRole('button', { name: /save changes/i }),
     ).toBeDisabled();
+  });
+
+  describe('unconfirmed-entry-tracker integration (spec 009 FR-002/FR-018)', () => {
+    beforeEach(() => {
+      useUnconfirmedEntryTracker.setState({ count: 0 });
+    });
+
+    it('increments the tracker while mounted and decrements on unmount', () => {
+      const { unmount } = render(
+        <SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />,
+      );
+
+      expect(useUnconfirmedEntryTracker.getState().count).toBe(1);
+
+      unmount();
+
+      expect(useUnconfirmedEntryTracker.getState().count).toBe(0);
+    });
+
+    it('tracks more than one open row at once (different exercises/blocks)', () => {
+      const { unmount: unmountFirst } = render(
+        <SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />,
+      );
+      const { unmount: unmountSecond } = render(
+        <SetRow {...baseProps} prefill={undefined} onConfirm={() => {}} />,
+      );
+
+      expect(useUnconfirmedEntryTracker.getState().count).toBe(2);
+
+      unmountFirst();
+      expect(useUnconfirmedEntryTracker.getState().count).toBe(1);
+
+      unmountSecond();
+      expect(useUnconfirmedEntryTracker.getState().count).toBe(0);
+    });
   });
 });

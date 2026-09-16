@@ -45,7 +45,6 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { registerSW } from 'virtual:pwa-register';
 import { AppShell, LoggingShell } from './app-shell';
 import { LoggingScreen } from './logging/logging-screen';
 import { DiaryScreen } from './diary/diary-screen';
@@ -59,12 +58,15 @@ import { useLoggingSession } from '../application/logging/logging-store';
 import { useStorageAccess } from '../application/storage-access';
 import { useFileExchangeAccess } from '../application/file-exchange-access';
 import { useSettingsStore } from '../application/settings-store';
+import { useStorageStatusStore } from '../application/storage-status-store';
+import { usePwaLifecycleStore } from '../application/pwa-lifecycle-store';
 import { buildSeedCatalogue } from '../application/catalogue/seed-exercises';
 import { CURRENT_SCHEMA_VERSION } from '../application/schema-migration';
 import type { StoragePort } from '../application/ports/storage-port';
 import { IndexedDbStorageAdapter } from '../infrastructure/indexed-db-storage-adapter';
 import { FileSystemStorageAdapter } from '../infrastructure/file-system-storage-adapter';
 import { FileExchangeAdapter } from '../infrastructure/file-exchange-adapter';
+import { PwaLifecycleAdapter } from '../infrastructure/pwa-lifecycle-adapter';
 import { selectAdapterClass } from '../infrastructure/select-adapter';
 import { applyTheme } from './theme';
 // tokens.css is linked directly from index.html (not imported here) so it
@@ -190,6 +192,8 @@ function mount(): void {
   useStorageAccess.getState().configure(storage);
   useFileExchangeAccess.getState().configure(new FileExchangeAdapter());
   useSettingsStore.getState().configure(storage);
+  useStorageStatusStore.getState().configure(storage);
+  usePwaLifecycleStore.getState().configure(new PwaLifecycleAdapter());
   // Fire-and-forget: must not block first paint (Principle II) or
   // first-render's use of `useSettingsStore.getState().settings`, which
   // already starts at `DEFAULT_SETTINGS` (theme 'system', matching this
@@ -210,4 +214,3 @@ function mount(): void {
 
 wireThemeToOsPreference();
 mount();
-registerSW({ immediate: true });

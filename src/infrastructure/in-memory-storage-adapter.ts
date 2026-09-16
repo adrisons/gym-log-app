@@ -5,6 +5,7 @@ import type {
   BulkImportInput,
 } from '../application/ports/storage-port';
 import type { Settings } from '../application/ports/settings';
+import type { StorageStatus } from '../application/ports/storage-status';
 import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
 import type { SessionId, ExerciseId } from '../domain/ids';
@@ -185,6 +186,18 @@ export class InMemoryStorageAdapter implements StoragePort {
 
   async saveSettings(settings: Settings): Promise<void> {
     this.#settings = settings;
+  }
+
+  // Storage status (spec 009 FR-006-009/FR-017) — test-only fake
+  // (ADR-0002), never observed by a real user; mirrors the IndexedDB
+  // shape rather than inventing a third user-facing `kind`.
+
+  async getStorageStatus(): Promise<StorageStatus> {
+    return { kind: 'indexed-db' };
+  }
+
+  async reconfirmFileSystemAccess(): Promise<void> {
+    // No-op — nothing to reconfirm on this adapter.
   }
 
   /**

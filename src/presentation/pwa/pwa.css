@@ -1,0 +1,78 @@
+/* Shared styles for the update notice and install offer (spec 009) — both
+   render once inside AppShell (never LoggingShell, FR-018). Every value is
+   a design-token reference (var(--…)), per constitution Principle V,
+   mirroring settings.css's own precedent. */
+
+.pwa-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-foreground);
+  font-size: 0.9rem;
+}
+
+.pwa-banner__message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.pwa-banner__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.pwa-button {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.pwa-button:hover {
+  border-color: var(--color-border-strong);
+}
+
+.pwa-button:active {
+  background: var(--color-border-strong);
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pwa-button:active {
+    transform: none;
+  }
+}
+
+.pwa-button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.pwa-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.pwa-button--primary {
+  background: var(--color-accent);
+  color: var(--color-accent-foreground);
+  border-color: var(--color-accent);
+}
+
+.pwa-button--quiet {
+  background: transparent;
+  border-color: transparent;
+}

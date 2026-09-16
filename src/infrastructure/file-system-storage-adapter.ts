@@ -5,6 +5,7 @@ import type {
   BulkImportInput,
 } from '../application/ports/storage-port';
 import type { Settings } from '../application/ports/settings';
+import type { StorageStatus } from '../application/ports/storage-status';
 import type { Session } from '../domain/session';
 import type { Exercise } from '../domain/exercise';
 import type { SessionId, ExerciseId } from '../domain/ids';
@@ -822,6 +823,64 @@ export class FileSystemStorageAdapter implements StoragePort {
   async saveSettings(settings: Settings): Promise<void> {
     await this.#ensureSchemaCheckedForWrite();
     await this.#writeJson(SETTINGS_FILE, settings);
+  }
+
+  // Storage status (spec 009 FR-006-009/FR-017)
+
+  /**
+   * Whichever handle is already cached — `this.#root`, or the Dexie
+   * handle-cache — without forcing acquisition (no picker) and without
+   * throwing on a lost permission (unlike `#tryDirectoryHandle`, which
+   * `#assertPermission`s and throws). Used only by `getStorageStatus`/
+   * `reconfirmFileSystemAccess`, which report/act on permission state
+   * themselves rather than treating it as a hard failure.
+   */
+  async #resolveHandleForStatus(): Promise<
+    FileSystemDirectoryHandle | undefined
+  > {
+    if (this.#root) return this.#root;
+    const cached = await this.#db.fileSystemHandle.get(
+      FILE_SYSTEM_HANDLE_ROW_KEY,
+    );
+    return cached?.value;
+  }
+
+  async getStorageStatus(): Promise<StorageStatus> {
+    const handle = await this.#resolveHandleForStatus();
+    if (!handle) {
+      // Nothing chosen yet (folder is asked lazily, on first save) — not
+      // an error state (spec 009 User Story 2, Acceptance Scenario 4).
+      return {
+        kind: 'file-system',
+        folderName: undefined,
+        permission: 'granted',
+      };
+    }
+    const permission = await handle.queryPermission({ mode: 'readwrite' });
+    return {
+      kind: 'file-system',
+      folderName: handle.name,
+      permission: permission === 'granted' ? 'granted' : 'needs-reconfirmation',
+    };
+  }
+
+  async reconfirmFileSystemAccess(): Promise<void> {
+    const handle = await this.#resolveHandleForStatus();
+    if (!handle) {
+      throw new StorageError(
+        'No folder has been chosen yet — nothing to reconfirm access to.',
+      );
+    }
+    const permission = await handle.requestPermission({ mode: 'readwrite' });
+    if (permission !== 'granted') {
+      throw new StorageError(
+        'File System Access permission was lost or revoked for this directory.',
+        undefined,
+        'permission-lost',
+      );
+    }
+    this.#root = handle;
+    this.#permissionVerified = true;
   }
 
   // Bulk atomic write (spec 006 FR-011/FR-015-016) — write-ahead journal,

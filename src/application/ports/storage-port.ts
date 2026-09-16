@@ -24,6 +24,7 @@ import type { Exercise } from '../../domain/exercise';
 import type { SessionId, ExerciseId } from '../../domain/ids';
 import type { LoggingDraft } from './logging-draft';
 import type { Settings } from './settings';
+import type { StorageStatus } from './storage-status';
 
 /** A closed date-time range, both bounds inclusive, ISO 8601 strings. */
 export interface DateRange {
@@ -142,6 +143,30 @@ export interface StoragePort {
    * constant). Same all-or-nothing guarantee as `importBulk`.
    */
   resetToFreshInstall(seedExercises: Exercise[]): Promise<void>;
+
+  /**
+   * Read-only, derived description of which adapter (ADR-0002) is active
+   * and, for the File System Access adapter, the chosen folder's display
+   * name and whether its permission is still valid (spec 009
+   * FR-006-009). Never triggers a picker or a permission prompt — mirrors
+   * every other read method's FR-004a discipline. Never throws for the
+   * "permission lost" case; that state is reported via the return
+   * value's `permission` field, not a rejection.
+   */
+  getStorageStatus(): Promise<StorageStatus>;
+
+  /**
+   * Re-requests permission for the File System Access adapter's
+   * already-chosen folder (spec 009 FR-017) — the one deliberate
+   * exception to "background code checks permission and never prompts"
+   * (`docs/requirements.md` §7.5), since this method is only ever called
+   * from a live user gesture (a Settings-screen button tap). Never
+   * offers to choose a *different* folder. A no-op, resolving
+   * immediately, on the IndexedDB and in-memory adapters (there is
+   * nothing to reconfirm). Rejects with `StorageError` (existing
+   * `'permission-lost'` cause) if the user declines the re-request.
+   */
+  reconfirmFileSystemAccess(): Promise<void>;
 }
 
 /** Input to `StoragePort.importBulk` (spec 006 contracts/storage-port-additions.md). */

@@ -393,6 +393,18 @@ describe('InMemoryStorage (StoragePort fake)', () => {
     });
   });
 
+  describe('Storage status (spec 009 FR-006-009/FR-017)', () => {
+    it('reports kind: indexed-db (test-only fake mirrors the IndexedDB shape, ADR-0002)', async () => {
+      expect(await storage.getStorageStatus()).toEqual({ kind: 'indexed-db' });
+    });
+
+    it('reconfirmFileSystemAccess is a no-op — nothing to reconfirm', async () => {
+      await expect(
+        storage.reconfirmFileSystemAccess(),
+      ).resolves.toBeUndefined();
+    });
+  });
+
   describe('importBulk (spec 006 FR-011)', () => {
     it('adds sessions/exercises and leaves band labels/settings/draft untouched when absent from the input', async () => {
       await storage.saveBandLabels(['Red']);
