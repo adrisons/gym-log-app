@@ -6,21 +6,25 @@
    visually-related controls, not independent design surfaces. */
 
 /* The one flex child `.app-shell__content > *` (app-shell.css) expects and
-   sizes `flex: 1 0 auto` — holds the header and the scrollable
-   `.logging-screen` body as its own flex column, so only ONE element
-   stretches to fill `LoggingShell`'s content area rather than both the
-   header and `.logging-screen` trying to (Copilot review, PR #33). */
+   sizes `flex: 1 0 auto`. Unlike an earlier revision, this root no longer
+   scrolls on its own — `.app-shell__content` is the single scroll
+   container for every screen (matching `.diary-screen`'s own pattern), so
+   there is exactly one scrollbar instead of this root's `.logging-screen`
+   body and `.app-shell__content` both trying to own vertical scrolling at
+   once (the double/sticky scroll bug from the design-refinement pass:
+   `.logging-screen__root`'s `height: 100%` never actually clipped its own
+   content to the viewport, so the outer container ended up scrolling an
+   oversized root while the inner one also fought for the same gesture).
+   `min-height: 100%` still lets a short screen's content fill the
+   viewport instead of collapsing to its own height. */
 .logging-screen__root {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  height: 100%;
+  min-height: 100%;
 }
 
 .logging-screen {
   flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
   background: var(--color-canvas);
   color: var(--color-foreground);
   padding: var(--space-4);
@@ -37,8 +41,15 @@
    as the same chrome as every other screen's, not a visually distinct
    one-off (design refinement request). Kept as a sibling class rather
    than reusing `.header-nav` directly since this screen has no hamburger
-   menu to lay out — only the back arrow + title need to match. */
+   menu to lay out — only the back arrow + title need to match.
+   `position: sticky` keeps it pinned to the top of `.app-shell__content`'s
+   single scroll region as the body scrolls under it — the fixed-header
+   look this screen always had, without a second nested scroll container
+   to get it (see `.logging-screen__root`'s comment). */
 .logging-screen__header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   flex: none;
   display: flex;
   align-items: center;
