@@ -81,6 +81,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /delete 5 x 100kg/i }),
     );
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -157,6 +158,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /save changes/i }),
     );
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -215,6 +217,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       screen.getByRole('button', { name: 'Push day actions' }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Move down' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -287,6 +290,8 @@ describe('SessionDetailScreen (FR-004/005)', () => {
         screen.getByRole('heading', { name: 'Deadlift' }),
       ).toBeInTheDocument();
     });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -398,6 +403,8 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       ).toBeInTheDocument();
     });
 
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
+
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
       // The delete survived: "Leg day" never comes back.
@@ -415,7 +422,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     });
   });
 
-  it('a save that fails does not permanently block later saves from persisting (queue-recovery regression)', async () => {
+  it('a failed "Save session" leaves the edits in place and retrying succeeds (save-retry regression)', async () => {
     const storage = new InMemoryStorage();
     const exerciseId = 'ex-1' as ExerciseId;
     const sessionId = 's1' as SessionId;
@@ -445,9 +452,9 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     useStorageAccess.getState().configure(storage);
     useLoggingSession.getState().configure(storage);
 
-    // The first save this screen attempts (triggered by the "Add exercise"
-    // edit below) rejects, simulating a transient storage failure (e.g. a
-    // lost File System Access permission). Every save after that succeeds.
+    // The first "Save session" click below rejects, simulating a transient
+    // storage failure (e.g. a lost File System Access permission). Every
+    // save after that succeeds.
     let nextSaveShouldFail = true;
     const realSaveSession = storage.saveSession.bind(storage);
     storage.saveSession = async (session) => {
@@ -475,7 +482,6 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       ).toBeInTheDocument();
     });
 
-    // First edit: its save is the one rejected above.
     await userEvent.click(
       screen.getByRole('button', { name: 'Add exercise to Block 1' }),
     );
@@ -485,6 +491,8 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     );
     await userEvent.click(screen.getByText('Create "Deadlift"'));
 
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
+
     await waitFor(() => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Failed to save session',
@@ -492,29 +500,25 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       );
     });
 
-    // Second edit, after the first save's rejection: a broken queue would
-    // never call `saveSession` again from this point on, so this edit
-    // would silently never persist.
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
-    );
-    await userEvent.type(
-      screen.getByPlaceholderText(/search or create an exercise/i),
-      'Bench press',
-    );
-    await userEvent.click(screen.getByText('Create "Bench press"'));
+    // The failed save must not have navigated away or dropped the edit —
+    // Deadlift is still on screen, and clicking "Save session" again
+    // retries against the (now unblocked) storage.
+    expect(
+      screen.getByRole('heading', { name: 'Deadlift' }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
-      const catalogue = await storage.listExercises();
-      const benchPressId = catalogue.find(
-        (e) => e.canonicalName === 'Bench press',
-      )?.id;
-      expect(benchPressId).toBeDefined();
       const exerciseIds = saved?.blocks.flatMap((block) =>
         block.exercises.map((entry) => entry.exerciseId),
       );
-      expect(exerciseIds).toContain(benchPressId);
+      const catalogue = await storage.listExercises();
+      const deadliftId = catalogue.find(
+        (e) => e.canonicalName === 'Deadlift',
+      )?.id;
+      expect(exerciseIds).toContain(deadliftId);
     });
 
     consoleErrorSpy.mockRestore();
@@ -979,5 +983,266 @@ describe('SessionDetailScreen (FR-004/005)', () => {
         '/diary',
       );
     });
+  });
+
+  it('disables "Save session" while an exercise creation is still in flight (race-condition regression, Copilot review PR #42)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const sessionId = 's1' as SessionId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [
+          createBlock({
+            type: 'straightSets',
+            exercises: [{ exerciseId, notes: '', sets: [] }],
+          }),
+        ],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+
+    let releaseSave: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseSave = resolve;
+    });
+    const realSaveExercise = storage.saveExercise.bind(storage);
+    storage.saveExercise = async (exercise) => {
+      await gate;
+      return realSaveExercise(exercise);
+    };
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <Routes>
+          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Squat' }),
+      ).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
+    );
+    await userEvent.type(
+      screen.getByPlaceholderText(/search or create an exercise/i),
+      'Deadlift',
+    );
+    await userEvent.click(screen.getByText('Create "Deadlift"'));
+
+    // Still pending: a tap here must not serialize `editable` from before
+    // this creation's own `addExerciseToBlock` lands.
+    expect(screen.getByRole('button', { name: 'Save session' })).toBeDisabled();
+
+    releaseSave();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Deadlift' }),
+      ).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Save session' }),
+      ).not.toBeDisabled();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
+
+    await waitFor(async () => {
+      const saved = await storage.getSession(sessionId);
+      const exerciseIds = saved?.blocks.flatMap((block) =>
+        block.exercises.map((entry) => entry.exerciseId),
+      );
+      const catalogue = await storage.listExercises();
+      const deadliftId = catalogue.find(
+        (e) => e.canonicalName === 'Deadlift',
+      )?.id;
+      expect(exerciseIds).toEqual([exerciseId, deadliftId]);
+    });
+  });
+
+  it('shows an accessible error and keeps edits in place when "Save session" fails (Copilot review PR #42)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const sessionId = 's1' as SessionId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [
+          createBlock({
+            type: 'straightSets',
+            exercises: [{ exerciseId, notes: '', sets: [] }],
+          }),
+        ],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+    storage.saveSession = vi.fn().mockRejectedValue(new Error('disk full'));
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <Routes>
+          <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Squat' }),
+      ).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /couldn't save your changes/i,
+      );
+    });
+    // Stayed on this screen — a failed save must not navigate away and
+    // strand the user with no way to retry.
+    expect(screen.getByRole('heading', { name: 'Squat' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Save session' }),
+    ).not.toBeDisabled();
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('confirms before discarding unsaved edits via the navbar back arrow, and stays put if cancelled (Copilot review PR #42)', async () => {
+    const storage = new InMemoryStorage();
+    const exerciseId = 'ex-1' as ExerciseId;
+    const sessionId = 's1' as SessionId;
+    await storage.saveExercise({
+      id: exerciseId,
+      canonicalName: 'Squat',
+      aliases: [],
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: false,
+      unilateral: false,
+      discipline: 'Strength',
+    });
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [
+          createBlock({
+            type: 'straightSets',
+            name: 'Push day',
+            exercises: [{ exerciseId, notes: '', sets: [] }],
+          }),
+        ],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <ScreenTitleProvider>
+          <HeaderNav />
+          <Routes>
+            <Route path="/diary" element={<p>Diary screen</p>} />
+            <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+          </Routes>
+        </ScreenTitleProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Squat' }),
+      ).toBeInTheDocument();
+    });
+
+    // An edit with nothing saved yet.
+    await userEvent.click(screen.getByRole('button', { name: /rename/i }));
+    await userEvent.type(screen.getByLabelText(/block name/i), ' (edited)');
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await userEvent.click(screen.getByRole('link', { name: 'Back' }));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(screen.queryByText('Diary screen')).not.toBeInTheDocument();
+
+    confirmSpy.mockReturnValue(true);
+    await userEvent.click(screen.getByRole('link', { name: 'Back' }));
+    expect(screen.getByText('Diary screen')).toBeInTheDocument();
+
+    confirmSpy.mockRestore();
+  });
+
+  it('navigates via the navbar back arrow without confirming when nothing has been edited', async () => {
+    const storage = new InMemoryStorage();
+    const sessionId = 's1' as SessionId;
+    await storage.saveSession(
+      createSession({
+        id: sessionId,
+        dateTime: '2026-09-11T10:00:00.000Z',
+        notes: '',
+        blocks: [],
+      }),
+    );
+    useStorageAccess.getState().configure(storage);
+
+    render(
+      <MemoryRouter initialEntries={[`/diary/${sessionId}`]}>
+        <ScreenTitleProvider>
+          <HeaderNav />
+          <Routes>
+            <Route path="/diary" element={<p>Diary screen</p>} />
+            <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
+          </Routes>
+        </ScreenTitleProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Back' })).toBeInTheDocument();
+    });
+
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    await userEvent.click(screen.getByRole('link', { name: 'Back' }));
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(screen.getByText('Diary screen')).toBeInTheDocument();
+
+    confirmSpy.mockRestore();
   });
 });

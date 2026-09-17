@@ -398,6 +398,13 @@ export function SetRow({
 
   return (
     <div className="set-row">
+      <VolumeInput
+        kind={effectiveVolumeKind}
+        value={volumeValue}
+        durationIncrement={quickIncrements.durationSeconds}
+        distanceIncrement={quickIncrements.distanceMetres}
+        onValueChange={setVolumeValue}
+      />
       {effectiveLoadKind === 'weight' && (
         <WeightLoadInput
           value={weightKg}
@@ -418,13 +425,6 @@ export function SetRow({
           onChange={setFreeText}
         />
       )}
-      <VolumeInput
-        kind={effectiveVolumeKind}
-        value={volumeValue}
-        durationIncrement={quickIncrements.durationSeconds}
-        distanceIncrement={quickIncrements.distanceMetres}
-        onValueChange={setVolumeValue}
-      />
       {trackEffort && <EffortPicker value={effort} onChange={setEffort} />}
       <div className="set-row__inputs">
         <button

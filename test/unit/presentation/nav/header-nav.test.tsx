@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { HeaderNav } from '@/presentation/nav/header-nav';
 import {
   ScreenTitleProvider,
@@ -76,6 +76,47 @@ describe('HeaderNav', () => {
       'href',
       '/diary',
     );
+  });
+
+  it("does not navigate when a screen's backGuard (useSetScreenTitle's third argument) returns false", () => {
+    function Screen() {
+      useSetScreenTitle('Session', '/diary', () => false);
+      return <p>Session screen</p>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/diary/s1']}>
+        <ScreenTitleProvider>
+          <HeaderNav />
+          <Routes>
+            <Route path="/diary" element={<p>Diary screen</p>} />
+            <Route path="/diary/:id" element={<Screen />} />
+          </Routes>
+        </ScreenTitleProvider>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('link', { name: 'Back' }));
+    expect(screen.getByText('Session screen')).toBeInTheDocument();
+    expect(screen.queryByText('Diary screen')).not.toBeInTheDocument();
+  });
+
+  it("navigates when a screen's backGuard returns true", () => {
+    function Screen() {
+      useSetScreenTitle('Session', '/diary', () => true);
+      return <p>Session screen</p>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/diary/s1']}>
+        <ScreenTitleProvider>
+          <HeaderNav />
+          <Routes>
+            <Route path="/diary" element={<p>Diary screen</p>} />
+            <Route path="/diary/:id" element={<Screen />} />
+          </Routes>
+        </ScreenTitleProvider>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('link', { name: 'Back' }));
+    expect(screen.getByText('Diary screen')).toBeInTheDocument();
   });
 
   it('opens the menu with exactly Diary, Insights, Exercises, Settings — no Search (ADR-0009, spec 006 FR-001/006)', () => {

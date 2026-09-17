@@ -15,10 +15,11 @@
  * - `'closed'` — neither: the "+ Add set" button shows.
  *
  * Cancel closes the form without saving in either mode (add or edit), back
- * to the "+ Add set" button — except for an entry with zero recorded sets:
- * there the add form is the entry's only content (there is no "+ Add set"
- * button to fall back to and no sets to show), so closing it would leave
- * nothing rendered at all. Cancel is withheld in that one case.
+ * to the "+ Add set" button — including for an entry with zero recorded
+ * sets, where the add form opens by default (ADR-0012 §4: opening the form
+ * is no longer a commitment to entering a value). The "+ Add set" button
+ * itself is unconditional on `sets.length`, so there is always somewhere
+ * for Cancel to land.
  *
  * Deleting an entry's last remaining set reopens the `'add'` form
  * automatically (there is once again "no data entered").
@@ -189,15 +190,38 @@ export function ExerciseSetList({
         }
         closeForm();
       }}
-onCancel={closeForm}
+      onCancel={closeForm}
     />
   );
 
+  // The header row also needs to show above the add form for an exercise
+  // with zero recorded sets — otherwise its compact-row inputs (a plain
+  // reps/weight pair with no field labels of their own, unlike the fuller
+  // stacked form) render with nothing identifying which is which.
+  const showHeaderRow = sets.length > 0 || form === 'add';
+
+  // The Load column only earns the Volume header's expanded width
+  // (`--expand` below) when nothing will ever render a value in it — the
+  // *current* template's `loadKind` alone isn't enough: ADR-0006 keeps an
+  // already-recorded set's own load kind even after the template moves on,
+  // so a `none`-kind template can still have historical sets carrying a
+  // real Weight/FreeText load (Copilot review, PR #42). Expanding the
+  // header in that case would leave those rows' values sitting under no
+  // column heading at all.
+  const loadColumnEmpty =
+    loadKind === 'none' && sets.every((s) => s.load.kind === 'none');
+
   return (
     <>
-      {sets.length > 0 && (
+      {showHeaderRow && (
         <div className="sets-header-row">
-          <span className="sets-header-cell">
+          <span
+            className={
+              loadColumnEmpty
+                ? 'sets-header-cell sets-header-cell--expand'
+                : 'sets-header-cell'
+            }
+          >
             <button
               type="button"
               className="sets-header-cell__button"
@@ -216,8 +240,13 @@ onCancel={closeForm}
               </span>
             )}
           </span>
-          <span className="sets-header-cell">
-            {loadKind !== 'none' && (
+          {/* Omitted outright, not just left empty, when there's nothing to
+              label — an empty-but-present cell here would still consume a
+              grid auto-placement slot ahead of the trailing delete-column
+              spacer below, pushing that spacer onto a second row instead of
+              column 3 (Copilot review, PR #42). */}
+          {!loadColumnEmpty && (
+            <span className="sets-header-cell">
               <button
                 type="button"
                 className="sets-header-cell__button"
@@ -230,13 +259,13 @@ onCancel={closeForm}
               >
                 {LOAD_COLUMN_LABEL[loadKind] ?? 'Load'}
               </button>
-            )}
-            {openHeaderTooltip === 'load' && (
-              <span className="sets-header-cell__tooltip" role="tooltip">
-                {LOAD_COLUMN_LABEL[loadKind] ?? 'Load'}
-              </span>
-            )}
-          </span>
+              {openHeaderTooltip === 'load' && (
+                <span className="sets-header-cell__tooltip" role="tooltip">
+                  {LOAD_COLUMN_LABEL[loadKind] ?? 'Load'}
+                </span>
+              )}
+            </span>
+          )}
           <span className="sets-header-cell" aria-hidden="true" />
         </div>
       )}
