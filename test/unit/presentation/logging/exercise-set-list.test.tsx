@@ -178,7 +178,7 @@ describe('ExerciseSetList (ADR-0010)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it("withholds Cancel from the add form while the entry has zero recorded sets, so the form can't be closed to nothing", () => {
+  it('offers Cancel on the add form even while the entry has zero recorded sets, closing back to "+ Add set" rather than leaving nothing to land on (ADR-0012 §4)', async () => {
     render(
       <ExerciseSetList
         {...baseProps}
@@ -189,9 +189,9 @@ describe('ExerciseSetList (ADR-0010)', () => {
       />,
     );
 
-    expect(
-      screen.queryByRole('button', { name: 'Cancel' }),
-    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.getByRole('button', { name: 'Add set' })).toBeInTheDocument();
   });
 
   it('shows no load column at all for a none-kind load, rather than a "—" placeholder (only entered data shows)', () => {

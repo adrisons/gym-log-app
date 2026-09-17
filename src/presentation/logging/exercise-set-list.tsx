@@ -15,10 +15,11 @@
  * - `'closed'` — neither: the "+ Add set" button shows.
  *
  * Cancel closes the form without saving in either mode (add or edit), back
- * to the "+ Add set" button — except for an entry with zero recorded sets:
- * there the add form is the entry's only content (there is no "+ Add set"
- * button to fall back to and no sets to show), so closing it would leave
- * nothing rendered at all. Cancel is withheld in that one case.
+ * to the "+ Add set" button — including for an entry with zero recorded
+ * sets, where the add form opens by default (ADR-0012 §4: opening the form
+ * is no longer a commitment to entering a value). The "+ Add set" button
+ * itself is unconditional on `sets.length`, so there is always somewhere
+ * for Cancel to land.
  *
  * Deleting an entry's last remaining set reopens the `'add'` form
  * automatically (there is once again "no data entered").
