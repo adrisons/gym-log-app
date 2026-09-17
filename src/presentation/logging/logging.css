@@ -503,13 +503,16 @@
   color: var(--color-foreground-subtle);
 }
 
-/* When the Load column has no header at all (`loadKind === 'none'`), that
-   track's space would otherwise sit empty next to the Volume column's
-   fixed 50px track — too narrow for a longer label like "Duration", which
-   ellipsized even though the row had plenty of unused room right next to
-   it. Spanning the Volume header cell across both tracks gives it that
-   space instead, so a label that fits in the combined width never
-   truncates. */
+/* When every rendered set's load is 'none'-kind (`ExerciseSetList`'s own
+   `loadColumnEmpty`, which also omits the Load header cell outright rather
+   than leaving it empty — an empty-but-present cell would still claim a
+   grid auto-placement slot ahead of the trailing delete-column spacer,
+   pushing that spacer onto a second row), that track's space would
+   otherwise sit unused next to the Volume column's fixed 50px track — too
+   narrow for a longer label like "Duration", which ellipsized even though
+   the row had plenty of unused room right next to it. Spanning the Volume
+   header cell across both tracks gives it that space instead, so a label
+   that fits in the combined width never truncates. */
 .sets-header-cell--expand {
   grid-column: 1 / span 2;
 }

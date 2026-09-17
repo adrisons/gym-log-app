@@ -49,10 +49,14 @@ same reason ADR-0010/ADR-0011 already gather their own multi-item passes:
 || !draftHasContent(draft)}` replaces the surrounding `{condition && (...)}`.
 This matches `SetRow`'s own Confirm control and FR-019's "unavailable" wording
 one level up (FR-027 amended to describe this explicitly, rather than "there
-must be no such action"). No other screen in this codebase has an equivalent
-save/commit button to reconcile — `SessionDetailScreen` has none by design
-(FR-1: "every change persists automatically, there is no Save button"), so
-this fix is entirely scoped to `LoggingScreen`'s single "Log workout" control.
+must be no such action"). At the time of this ADR, no other screen in this
+codebase had an equivalent save/commit button to reconcile —
+`SessionDetailScreen` had none, persisting every change automatically. _(ADR-0017
+supersedes this: `SessionDetailScreen` gained its own explicit "Save
+session"/"Discard changes" pair, and the "every change persists
+automatically" framing above was never spec 004 FR-005's own requirement —
+only spec 001 FR-1's, which is scoped to the logging screen this fix
+actually covers.)_
 
 ### 2. `loadLabel` is omitted, not "—", for a `none`-kind load
 

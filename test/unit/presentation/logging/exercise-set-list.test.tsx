@@ -217,6 +217,61 @@ describe('ExerciseSetList (ADR-0010)', () => {
     expect(screen.queryByText('—')).not.toBeInTheDocument();
   });
 
+  it('expands the Volume header across the empty Load column for a none-kind load with no historical loaded sets (PR #42)', () => {
+    const noneLoadSet: DraftSet = {
+      id: 'set-none',
+      volume: { kind: 'duration', seconds: 15 },
+      load: { kind: 'none' },
+      setKind: 'working',
+      completed: true,
+    };
+    render(
+      <ExerciseSetList
+        {...baseProps}
+        loadKind="none"
+        volumeKind="duration"
+        sets={[noneLoadSet]}
+        onAddSet={() => {}}
+        onUpdateSet={() => {}}
+        onDeleteSet={() => {}}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Duration' }).parentElement,
+    ).toHaveClass('sets-header-cell--expand');
+    // No second header cell/button for Load — a none-kind template with no
+    // historical loaded sets has nothing to label there.
+    expect(
+      screen.queryByRole('button', { name: 'Load' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps a separate Load header (not expanded) when a none-kind template still has a historical set with a real load (ADR-0006, Copilot review PR #42)', () => {
+    const historicalWeightSet: DraftSet = {
+      id: 'set-historical',
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'weight', value: 60, unit: 'kg' },
+      setKind: 'working',
+      completed: true,
+    };
+    render(
+      <ExerciseSetList
+        {...baseProps}
+        loadKind="none"
+        sets={[historicalWeightSet]}
+        onAddSet={() => {}}
+        onUpdateSet={() => {}}
+        onDeleteSet={() => {}}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Reps' }).parentElement,
+    ).not.toHaveClass('sets-header-cell--expand');
+    expect(screen.getByRole('button', { name: 'Load' })).toBeInTheDocument();
+  });
+
   it("attaches the effort suffix to the volume cell's accessible name, not an empty Load cell, for a none-kind load (Copilot review, PR #33)", () => {
     const noneLoadWithEffort: DraftSet = {
       id: 'set-none-effort',

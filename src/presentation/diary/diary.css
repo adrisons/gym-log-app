@@ -26,6 +26,12 @@
   flex: 1;
 }
 
+.session-detail-screen__save-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.875rem;
+}
+
 /* The FAB/bulk-bar below float `space-4` above the viewport's own bottom
    edge — there is no bottom nav bar left to clear now that primary
    navigation moved into `HeaderNav` (ADR-0009, `nav/header-nav.tsx`). */

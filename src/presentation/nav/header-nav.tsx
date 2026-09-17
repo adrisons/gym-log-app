@@ -34,7 +34,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { Icon } from '@/presentation/design/icons';
 import type { IconName } from '@/presentation/design/icons';
-import { useScreenBackTo, useScreenTitle } from './screen-title';
+import {
+  useScreenBackGuard,
+  useScreenBackTo,
+  useScreenTitle,
+} from './screen-title';
 import './header-nav.css';
 
 const DESTINATIONS: { to: string; label: string; icon: IconName }[] = [
@@ -50,6 +54,7 @@ export function HeaderNav() {
   const menuRef = useRef<HTMLDivElement>(null);
   const title = useScreenTitle();
   const backTo = useScreenBackTo();
+  const backGuard = useScreenBackGuard();
 
   useEffect(() => {
     if (!open) return;
@@ -79,7 +84,14 @@ export function HeaderNav() {
   return (
     <header className="header-nav">
       {backTo && (
-        <Link to={backTo} className="header-nav__back" aria-label="Back">
+        <Link
+          to={backTo}
+          className="header-nav__back"
+          aria-label="Back"
+          onClick={(event) => {
+            if (backGuard && !backGuard()) event.preventDefault();
+          }}
+        >
           <Icon name="chevron-right" style={{ transform: 'rotate(180deg)' }} />
         </Link>
       )}

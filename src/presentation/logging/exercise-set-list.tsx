@@ -199,13 +199,24 @@ onCancel={closeForm}
   // stacked form) render with nothing identifying which is which.
   const showHeaderRow = sets.length > 0 || form === 'add';
 
+  // The Load column only earns the Volume header's expanded width
+  // (`--expand` below) when nothing will ever render a value in it — the
+  // *current* template's `loadKind` alone isn't enough: ADR-0006 keeps an
+  // already-recorded set's own load kind even after the template moves on,
+  // so a `none`-kind template can still have historical sets carrying a
+  // real Weight/FreeText load (Copilot review, PR #42). Expanding the
+  // header in that case would leave those rows' values sitting under no
+  // column heading at all.
+  const loadColumnEmpty =
+    loadKind === 'none' && sets.every((s) => s.load.kind === 'none');
+
   return (
     <>
       {showHeaderRow && (
         <div className="sets-header-row">
           <span
             className={
-              loadKind === 'none'
+              loadColumnEmpty
                 ? 'sets-header-cell sets-header-cell--expand'
                 : 'sets-header-cell'
             }
@@ -228,8 +239,13 @@ onCancel={closeForm}
               </span>
             )}
           </span>
-          <span className="sets-header-cell">
-            {loadKind !== 'none' && (
+          {/* Omitted outright, not just left empty, when there's nothing to
+              label — an empty-but-present cell here would still consume a
+              grid auto-placement slot ahead of the trailing delete-column
+              spacer below, pushing that spacer onto a second row instead of
+              column 3 (Copilot review, PR #42). */}
+          {!loadColumnEmpty && (
+            <span className="sets-header-cell">
               <button
                 type="button"
                 className="sets-header-cell__button"
@@ -242,13 +258,13 @@ onCancel={closeForm}
               >
                 {LOAD_COLUMN_LABEL[loadKind] ?? 'Load'}
               </button>
-            )}
-            {openHeaderTooltip === 'load' && (
-              <span className="sets-header-cell__tooltip" role="tooltip">
-                {LOAD_COLUMN_LABEL[loadKind] ?? 'Load'}
-              </span>
-            )}
-          </span>
+              {openHeaderTooltip === 'load' && (
+                <span className="sets-header-cell__tooltip" role="tooltip">
+                  {LOAD_COLUMN_LABEL[loadKind] ?? 'Load'}
+                </span>
+              )}
+            </span>
+          )}
           <span className="sets-header-cell" aria-hidden="true" />
         </div>
       )}

@@ -13,12 +13,23 @@
  * Saving is explicit (design-refinement request), the same as creating a
  * new session (`LoggingScreen`'s own "Log workout"): every edit here only
  * touches this screen's local `editable` state, and nothing reaches
- * `StoragePort.saveSession` until "Save changes" is pressed. "Discard
- * changes" resets `editable` back to `original` instead. Both then
- * navigate back to the diary — there is nothing left on this screen to
- * keep looking at once either one runs.
+ * `StoragePort.saveSession` until "Save session" is pressed. "Discard
+ * changes" navigates away without saving instead. Both then leave for the
+ * diary — there is nothing left on this screen to keep looking at once
+ * either one runs. Scope note: "Discard changes" only ever covers this
+ * screen's own block/exercise-entry/set edits (`editable`) — an exercise
+ * *template* edit (`ExerciseTemplatePanel`'s own "Save changes") persists
+ * immediately, the same as it does from `LoggingScreen`, since ADR-0006
+ * already treats a template as catalogue-level and independent of any
+ * particular session's edit history (Copilot review, PR #42).
+ *
+ * `dirtyRef` tracks whether `editable` has actually been edited since load
+ * (or since the last save) — `backGuard` below reads it to ask for
+ * confirmation before the navbar's own back arrow (reachable from
+ * anywhere on this screen, unlike "Discard changes") would otherwise
+ * silently drop those edits (Copilot review, PR #42).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { requireStorage } from '@/application/storage-access';
 import { useLoggingSession } from '@/application/logging/logging-store';
@@ -72,12 +83,26 @@ export function SessionDetailScreen() {
     Exercise | undefined
   >(undefined);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  // Not state: read only inside `backGuard`/`handleDiscard`, both called
+  // from an event handler rather than during render, so there's nothing
+  // for a `useState` here to ever cause a re-render for.
+  const dirtyRef = useRef(false);
+  // Every in-flight `createExerciseInSession` call (the two `onCreateExercise`
+  // handlers below) — gates "Save session" shut while any is pending, so a
+  // quick tap can't serialize `editable` from *before* that call's own
+  // `addExerciseToBlock` lands, silently dropping the new entry (Copilot
+  // review, PR #42).
+  const [pendingCreates, setPendingCreates] = useState(0);
 
   useSetScreenTitle(
     editable
       ? `Session — ${new Date(editable.dateTime).toLocaleString()}`
       : 'Session',
     '/diary',
+    () =>
+      !dirtyRef.current ||
+      window.confirm('Discard your unsaved changes to this session?'),
   );
 
   useEffect(() => {
@@ -89,6 +114,7 @@ export function SessionDetailScreen() {
         storage.listExercises(),
       ]);
       if (session) {
+        dirtyRef.current = false;
         setOriginal(session);
         setEditable(sessionToEditable(session));
       }
@@ -97,18 +123,29 @@ export function SessionDetailScreen() {
   }, [sessionId]);
 
   const handleSave = () => {
-    if (!editable || !original) return;
+    if (!editable || !original || pendingCreates > 0) return;
     setSaving(true);
+    setSaveError(false);
     void requireStorage()
       .saveSession(editableToSession(editable, original))
-      .then(() => navigate('/diary'))
+      .then(() => {
+        dirtyRef.current = false;
+        navigate('/diary');
+      })
       .catch((error: unknown) => {
         console.error('Failed to save session', error);
         setSaving(false);
+        setSaveError(true);
       });
   };
 
   const handleDiscard = () => {
+    if (
+      dirtyRef.current &&
+      !window.confirm('Discard your unsaved changes to this session?')
+    ) {
+      return;
+    }
     navigate('/diary');
   };
 
@@ -124,6 +161,7 @@ export function SessionDetailScreen() {
   // commit (StrictMode's own impurity check among other reasons), and a
   // side effect inside one would fire that many times.
   const persist = (update: (current: EditableSession) => EditableSession) => {
+    dirtyRef.current = true;
     setEditable((current) => (current ? update(current) : current));
   };
 
@@ -293,12 +331,17 @@ export function SessionDetailScreen() {
                   addExerciseToBlock(block.id, exercise.id)
                 }
                 onCreateExercise={(name) => {
+                  setPendingCreates((n) => n + 1);
                   void (async () => {
-                    const exercise = await createExerciseInSession({
-                      canonicalName: name,
-                    });
-                    setCatalogue((current) => [...current, exercise]);
-                    addExerciseToBlock(block.id, exercise.id);
+                    try {
+                      const exercise = await createExerciseInSession({
+                        canonicalName: name,
+                      });
+                      setCatalogue((current) => [...current, exercise]);
+                      addExerciseToBlock(block.id, exercise.id);
+                    } finally {
+                      setPendingCreates((n) => n - 1);
+                    }
                   })();
                 }}
               />
@@ -488,11 +531,18 @@ export function SessionDetailScreen() {
         Add block
       </button>
 
+      {saveError && (
+        <p className="session-detail-screen__save-error" role="alert">
+          Couldn&apos;t save your changes — check your connection and try
+          again. Nothing here has been lost.
+        </p>
+      )}
+
       <div className="session-detail-screen__actions">
         <button
           type="button"
           className="logging-button logging-button--primary"
-          disabled={saving}
+          disabled={saving || pendingCreates > 0}
           onClick={handleSave}
         >
           Save session
