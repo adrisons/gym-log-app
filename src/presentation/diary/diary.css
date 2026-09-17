@@ -14,6 +14,18 @@
   gap: var(--space-5);
 }
 
+/* Save/Discard, the explicit commit step for an existing session's edits
+   (design-refinement request) — mirrors LoggingScreen's own "Log workout"
+   primary action rather than auto-saving every field edit. */
+.session-detail-screen__actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.session-detail-screen__actions .logging-button {
+  flex: 1;
+}
+
 /* The FAB/bulk-bar below float `space-4` above the viewport's own bottom
    edge — there is no bottom nav bar left to clear now that primary
    navigation moved into `HeaderNav` (ADR-0009, `nav/header-nav.tsx`). */

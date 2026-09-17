@@ -9,9 +9,17 @@
  * more. "Add block" sits at the bottom; each block has its own "Add
  * exercise to …" footer control, and each exercise's set-entry template
  * (ADR-0006) is editable through its own menu.
+ *
+ * Saving is explicit (design-refinement request), the same as creating a
+ * new session (`LoggingScreen`'s own "Log workout"): every edit here only
+ * touches this screen's local `editable` state, and nothing reaches
+ * `StoragePort.saveSession` until "Save changes" is pressed. "Discard
+ * changes" resets `editable` back to `original` instead. Both then
+ * navigate back to the diary — there is nothing left on this screen to
+ * keep looking at once either one runs.
  */
-import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { requireStorage } from '@/application/storage-access';
 import { useLoggingSession } from '@/application/logging/logging-store';
 import {
@@ -38,6 +46,7 @@ import { ExerciseTemplatePanel } from '../logging/exercise-template-panel';
 import './diary.css';
 
 export function SessionDetailScreen() {
+  const navigate = useNavigate();
   const { sessionId } = useParams<{ sessionId: string }>();
   // Routed through the logging store's own action, not the bare use-case
   // directly: LoggingScreen reads its exercise templates from
@@ -62,6 +71,7 @@ export function SessionDetailScreen() {
   const [editingTemplateFor, setEditingTemplateFor] = useState<
     Exercise | undefined
   >(undefined);
+  const [saving, setSaving] = useState(false);
 
   useSetScreenTitle(
     editable
@@ -69,12 +79,6 @@ export function SessionDetailScreen() {
       : 'Session',
     '/diary',
   );
-
-  // Guards the very first `editable` a load populates from re-triggering
-  // the persist effect below with an unchanged snapshot — set right
-  // before that initial `setEditable`, for the mount *and* for a later
-  // `sessionId` change while this screen stays mounted.
-  const skipNextSaveRef = useRef(true);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -85,7 +89,6 @@ export function SessionDetailScreen() {
         storage.listExercises(),
       ]);
       if (session) {
-        skipNextSaveRef.current = true;
         setOriginal(session);
         setEditable(sessionToEditable(session));
       }
@@ -93,40 +96,21 @@ export function SessionDetailScreen() {
     })();
   }, [sessionId]);
 
-  // Chains every save onto one queue, so completion always lands in call
-  // order regardless of individual network timing — without this, two
-  // edits fired close together could have their writes resolve out of
-  // order and leave the *older* edit persisted last, clobbering the
-  // newer one despite the UI already showing it.
-  const saveQueueRef = useRef(Promise.resolve());
-
-  // Persists `editable` itself (the effect below), not each individual
-  // edit's own snapshot — keeps this the single place that ever calls
-  // `saveSession`, so it's also the only place that needs to serialize.
-  useEffect(() => {
+  const handleSave = () => {
     if (!editable || !original) return;
-    if (skipNextSaveRef.current) {
-      skipNextSaveRef.current = false;
-      return;
-    }
-    const snapshot = editable;
-    const attempt = saveQueueRef.current.then(() =>
-      requireStorage().saveSession(editableToSession(snapshot, original)),
-    );
-    // Attaches `.catch` synchronously, in this same expression, so the
-    // promise stored back into the ref is one that never itself rejects —
-    // logging this attempt's failure (if any) right here rather than
-    // leaving it for whichever later save happens to chain onto this ref
-    // next. Without this, a rejected `saveQueueRef.current` would
-    // permanently short-circuit every later `.then` in the chain past its
-    // own `saveSession` call, silently dropping every edit from then on;
-    // and attaching the recovery only when the *next* save chains onto it
-    // would still report this rejection as unhandled in the meantime,
-    // since nothing observes it before then.
-    saveQueueRef.current = attempt.catch((error: unknown) => {
-      console.error('Failed to save session', error);
-    });
-  }, [editable, original]);
+    setSaving(true);
+    void requireStorage()
+      .saveSession(editableToSession(editable, original))
+      .then(() => navigate('/diary'))
+      .catch((error: unknown) => {
+        console.error('Failed to save session', error);
+        setSaving(false);
+      });
+  };
+
+  const handleDiscard = () => {
+    navigate('/diary');
+  };
 
   // Takes an updater, not a next value: every call site (including the
   // async onCreateExercise handlers below) can run after an `await`, by
@@ -503,6 +487,25 @@ export function SessionDetailScreen() {
         <Icon name="plus" />
         Add block
       </button>
+
+      <div className="session-detail-screen__actions">
+        <button
+          type="button"
+          className="logging-button logging-button--primary"
+          disabled={saving}
+          onClick={handleSave}
+        >
+          Save session
+        </button>
+        <button
+          type="button"
+          className="logging-button"
+          disabled={saving}
+          onClick={handleDiscard}
+        >
+          Discard changes
+        </button>
+      </div>
     </main>
   );
 }

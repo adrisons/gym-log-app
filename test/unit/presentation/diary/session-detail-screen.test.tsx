@@ -81,6 +81,9 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /delete 5 x 100kg/i }),
     );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save session' }),
+    );
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -157,6 +160,9 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /save changes/i }),
     );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save session' }),
+    );
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -215,6 +221,9 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       screen.getByRole('button', { name: 'Push day actions' }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Move down' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save session' }),
+    );
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -287,6 +296,10 @@ describe('SessionDetailScreen (FR-004/005)', () => {
         screen.getByRole('heading', { name: 'Deadlift' }),
       ).toBeInTheDocument();
     });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save session' }),
+    );
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -398,6 +411,10 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       ).toBeInTheDocument();
     });
 
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save session' }),
+    );
+
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
       // The delete survived: "Leg day" never comes back.
@@ -415,7 +432,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     });
   });
 
-  it('a save that fails does not permanently block later saves from persisting (queue-recovery regression)', async () => {
+  it('a failed "Save session" leaves the edits in place and retrying succeeds (save-retry regression)', async () => {
     const storage = new InMemoryStorage();
     const exerciseId = 'ex-1' as ExerciseId;
     const sessionId = 's1' as SessionId;
@@ -445,9 +462,9 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     useStorageAccess.getState().configure(storage);
     useLoggingSession.getState().configure(storage);
 
-    // The first save this screen attempts (triggered by the "Add exercise"
-    // edit below) rejects, simulating a transient storage failure (e.g. a
-    // lost File System Access permission). Every save after that succeeds.
+    // The first "Save session" click below rejects, simulating a transient
+    // storage failure (e.g. a lost File System Access permission). Every
+    // save after that succeeds.
     let nextSaveShouldFail = true;
     const realSaveSession = storage.saveSession.bind(storage);
     storage.saveSession = async (session) => {
@@ -475,7 +492,6 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       ).toBeInTheDocument();
     });
 
-    // First edit: its save is the one rejected above.
     await userEvent.click(
       screen.getByRole('button', { name: 'Add exercise to Block 1' }),
     );
@@ -485,6 +501,10 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     );
     await userEvent.click(screen.getByText('Create "Deadlift"'));
 
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save session' }),
+    );
+
     await waitFor(() => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Failed to save session',
@@ -492,29 +512,27 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       );
     });
 
-    // Second edit, after the first save's rejection: a broken queue would
-    // never call `saveSession` again from this point on, so this edit
-    // would silently never persist.
+    // The failed save must not have navigated away or dropped the edit —
+    // Deadlift is still on screen, and clicking "Save session" again
+    // retries against the (now unblocked) storage.
+    expect(
+      screen.getByRole('heading', { name: 'Deadlift' }),
+    ).toBeInTheDocument();
+
     await userEvent.click(
-      screen.getByRole('button', { name: 'Add exercise to Block 1' }),
+      screen.getByRole('button', { name: 'Save session' }),
     );
-    await userEvent.type(
-      screen.getByPlaceholderText(/search or create an exercise/i),
-      'Bench press',
-    );
-    await userEvent.click(screen.getByText('Create "Bench press"'));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
-      const catalogue = await storage.listExercises();
-      const benchPressId = catalogue.find(
-        (e) => e.canonicalName === 'Bench press',
-      )?.id;
-      expect(benchPressId).toBeDefined();
       const exerciseIds = saved?.blocks.flatMap((block) =>
         block.exercises.map((entry) => entry.exerciseId),
       );
-      expect(exerciseIds).toContain(benchPressId);
+      const catalogue = await storage.listExercises();
+      const deadliftId = catalogue.find(
+        (e) => e.canonicalName === 'Deadlift',
+      )?.id;
+      expect(exerciseIds).toContain(deadliftId);
     });
 
     consoleErrorSpy.mockRestore();
