@@ -139,6 +139,61 @@ describe('ExerciseSetList (ADR-0010)', () => {
     expect(screen.getByRole('button', { name: 'Add set' })).toBeInTheDocument();
   });
 
+  it('labels the load column "Load" for a weight-kind exercise', () => {
+    render(
+      <ExerciseSetList
+        {...baseProps}
+        sets={[loggedSet]}
+        onAddSet={() => {}}
+        onUpdateSet={() => {}}
+        onDeleteSet={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Load' })).toBeInTheDocument();
+  });
+
+  it('labels the load column "Setting" instead of "Load" for a free-text-kind exercise', () => {
+    const freeTextSet: DraftSet = {
+      id: 'set-free-text',
+      volume: { kind: 'reps', count: 8 },
+      load: { kind: 'freeText', text: 'Level 5' },
+      setKind: 'working',
+      completed: true,
+    };
+    render(
+      <ExerciseSetList
+        {...baseProps}
+        loadKind="freeText"
+        sets={[freeTextSet]}
+        onAddSet={() => {}}
+        onUpdateSet={() => {}}
+        onDeleteSet={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Setting' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Load' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("withholds Cancel from the add form while the entry has zero recorded sets, so the form can't be closed to nothing", () => {
+    render(
+      <ExerciseSetList
+        {...baseProps}
+        sets={[]}
+        onAddSet={() => {}}
+        onUpdateSet={() => {}}
+        onDeleteSet={() => {}}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Cancel' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('shows no load column at all for a none-kind load, rather than a "—" placeholder (only entered data shows)', () => {
     const noneLoadSet: DraftSet = {
       id: 'set-none',

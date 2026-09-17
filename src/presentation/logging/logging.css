@@ -369,15 +369,16 @@
 }
 
 /* Confirm and (when offered) Cancel share the grid's trailing column as a
-   tight pair — matching the approved design's single "+" trailing action
-   while still surfacing Cancel (`ExerciseSetList` passes it for both add
-   and edit) rather than dropping the only way to back out of an in-place
-   edit without saving. */
+   tight pair, set off from the input cells by a left border — without it
+   the confirm glyph reads as just another cell in the row instead of the
+   action that submits it (design refinement, user feedback). */
 .set-row__compact-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-1);
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--color-border);
 }
 
 /* 44px hit target (the app's own generous-minimum, matching every other
