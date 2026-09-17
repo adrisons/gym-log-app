@@ -197,7 +197,13 @@ onCancel={closeForm}
     <>
       {sets.length > 0 && (
         <div className="sets-header-row">
-          <span className="sets-header-cell">
+          <span
+            className={
+              loadKind === 'none'
+                ? 'sets-header-cell sets-header-cell--expand'
+                : 'sets-header-cell'
+            }
+          >
             <button
               type="button"
               className="sets-header-cell__button"

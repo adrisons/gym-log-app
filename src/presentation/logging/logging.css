@@ -503,6 +503,17 @@
   color: var(--color-foreground-subtle);
 }
 
+/* When the Load column has no header at all (`loadKind === 'none'`), that
+   track's space would otherwise sit empty next to the Volume column's
+   fixed 50px track — too narrow for a longer label like "Duration", which
+   ellipsized even though the row had plenty of unused room right next to
+   it. Spanning the Volume header cell across both tracks gives it that
+   space instead, so a label that fits in the combined width never
+   truncates. */
+.sets-header-cell--expand {
+  grid-column: 1 / span 2;
+}
+
 /* Header cells double as a button so a label truncated by the ellipsis
    above can still be read in full — tapped, not hovered, since this is a
    touch-first layout. */
