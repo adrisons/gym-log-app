@@ -193,9 +193,15 @@ onCancel={closeForm}
     />
   );
 
+  // The header row also needs to show above the add form for an exercise
+  // with zero recorded sets — otherwise its compact-row inputs (a plain
+  // reps/weight pair with no field labels of their own, unlike the fuller
+  // stacked form) render with nothing identifying which is which.
+  const showHeaderRow = sets.length > 0 || form === 'add';
+
   return (
     <>
-      {sets.length > 0 && (
+      {showHeaderRow && (
         <div className="sets-header-row">
           <span
             className={
