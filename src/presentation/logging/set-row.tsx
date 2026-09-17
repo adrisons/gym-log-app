@@ -379,7 +379,7 @@ export function SetRow({
             aria-label={editingSet ? 'Save changes' : 'Add set'}
             onClick={handleConfirm}
           >
-            <Icon name={editingSet ? 'check' : 'plus'} />
+            <Icon name="check" />
           </button>
           {onCancel && (
             <button

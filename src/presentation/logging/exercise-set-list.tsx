@@ -14,9 +14,11 @@
  *   "+ Add set" button until Save/Cancel.
  * - `'closed'` — neither: the "+ Add set" button shows.
  *
- * Cancel closes the form without saving in either mode (add or edit),
- * back to the "+ Add set" button — even for an entry with zero sets, so
- * opening the form isn't a commitment to entering one.
+ * Cancel closes the form without saving in either mode (add or edit), back
+ * to the "+ Add set" button — except for an entry with zero recorded sets:
+ * there the add form is the entry's only content (there is no "+ Add set"
+ * button to fall back to and no sets to show), so closing it would leave
+ * nothing rendered at all. Cancel is withheld in that one case.
  *
  * Deleting an entry's last remaining set reopens the `'add'` form
  * automatically (there is once again "no data entered").
@@ -66,6 +68,15 @@ const VOLUME_COLUMN_LABEL: Record<VolumeKind, string> = {
   reps: 'Reps',
   duration: 'Duration',
   distance: 'Distance',
+};
+
+/** Sets table header label for the load column — a free-text load isn't a
+ * "Load" in any measurable sense, it's a note on which machine/setting the
+ * exercise was performed at (`FreeTextLoadInput`'s own "Machine / setting"
+ * field label), so the header must call it that too rather than the
+ * numeric-load word every other load kind actually earns. */
+const LOAD_COLUMN_LABEL: Partial<Record<Load['kind'], string>> = {
+  freeText: 'Setting',
 };
 
 export function ExerciseSetList({
@@ -178,7 +189,7 @@ export function ExerciseSetList({
         }
         closeForm();
       }}
-      onCancel={closeForm}
+onCancel={closeForm}
     />
   );
 
@@ -217,12 +228,12 @@ export function ExerciseSetList({
                   )
                 }
               >
-                Load
+                {LOAD_COLUMN_LABEL[loadKind] ?? 'Load'}
               </button>
             )}
             {openHeaderTooltip === 'load' && (
               <span className="sets-header-cell__tooltip" role="tooltip">
-                Load
+                {LOAD_COLUMN_LABEL[loadKind] ?? 'Load'}
               </span>
             )}
           </span>
