@@ -189,7 +189,7 @@ export function ExerciseSetList({
         }
         closeForm();
       }}
-      onCancel={sets.length === 0 ? undefined : closeForm}
+onCancel={closeForm}
     />
   );
 
