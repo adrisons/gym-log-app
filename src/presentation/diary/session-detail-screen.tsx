@@ -533,8 +533,8 @@ export function SessionDetailScreen() {
 
       {saveError && (
         <p className="session-detail-screen__save-error" role="alert">
-          Couldn&apos;t save your changes — check your connection and try
-          again. Nothing here has been lost.
+          Couldn&apos;t save your changes — check your connection and try again.
+          Nothing here has been lost.
         </p>
       )}
 

@@ -60,9 +60,7 @@ const ScreenTitleContext = createContext<ScreenTitleContextValue | undefined>(
 export function ScreenTitleProvider({ children }: { children: ReactNode }) {
   const [title, setTitle] = useState('');
   const [backTo, setBackTo] = useState<string | undefined>(undefined);
-  const [backGuard, setBackGuard] = useState<BackGuard | undefined>(
-    undefined,
-  );
+  const [backGuard, setBackGuard] = useState<BackGuard | undefined>(undefined);
   return (
     <ScreenTitleContext.Provider
       value={{ title, setTitle, backTo, setBackTo, backGuard, setBackGuard }}
@@ -120,7 +118,9 @@ export function useSetScreenTitle(
   // what actually gets registered, always delegating to whatever
   // `backGuardRef` currently holds.
   const backGuardRef = useRef<BackGuard | undefined>(undefined);
-  const stableGuardRef = useRef<BackGuard>(() => backGuardRef.current?.() ?? true);
+  const stableGuardRef = useRef<BackGuard>(
+    () => backGuardRef.current?.() ?? true,
+  );
 
   // Keeps `backGuardRef` current every render, but as its own effect with
   // no dependency array (rather than a plain assignment during render,

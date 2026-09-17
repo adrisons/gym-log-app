@@ -81,9 +81,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /delete 5 x 100kg/i }),
     );
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save session' }),
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -160,9 +158,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /save changes/i }),
     );
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save session' }),
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -221,9 +217,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       screen.getByRole('button', { name: 'Push day actions' }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Move down' }));
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save session' }),
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -297,9 +291,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       ).toBeInTheDocument();
     });
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save session' }),
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -411,9 +403,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       ).toBeInTheDocument();
     });
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save session' }),
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -501,9 +491,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     );
     await userEvent.click(screen.getByText('Create "Deadlift"'));
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save session' }),
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(() => {
       expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -519,9 +507,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       screen.getByRole('heading', { name: 'Deadlift' }),
     ).toBeInTheDocument();
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save session' }),
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -1079,9 +1065,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       ).not.toBeDisabled();
     });
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save session' }),
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(async () => {
       const saved = await storage.getSession(sessionId);
@@ -1143,9 +1127,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
       ).toBeInTheDocument();
     });
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save session' }),
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save session' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(
@@ -1154,9 +1136,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
     });
     // Stayed on this screen — a failed save must not navigate away and
     // strand the user with no way to retry.
-    expect(
-      screen.getByRole('heading', { name: 'Squat' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Squat' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Save session' }),
     ).not.toBeDisabled();
@@ -1200,10 +1180,7 @@ describe('SessionDetailScreen (FR-004/005)', () => {
           <HeaderNav />
           <Routes>
             <Route path="/diary" element={<p>Diary screen</p>} />
-            <Route
-              path="/diary/:sessionId"
-              element={<SessionDetailScreen />}
-            />
+            <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
           </Routes>
         </ScreenTitleProvider>
       </MemoryRouter>,
@@ -1251,19 +1228,14 @@ describe('SessionDetailScreen (FR-004/005)', () => {
           <HeaderNav />
           <Routes>
             <Route path="/diary" element={<p>Diary screen</p>} />
-            <Route
-              path="/diary/:sessionId"
-              element={<SessionDetailScreen />}
-            />
+            <Route path="/diary/:sessionId" element={<SessionDetailScreen />} />
           </Routes>
         </ScreenTitleProvider>
       </MemoryRouter>,
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('link', { name: 'Back' }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Back' })).toBeInTheDocument();
     });
 
     const confirmSpy = vi.spyOn(window, 'confirm');
