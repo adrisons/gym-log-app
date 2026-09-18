@@ -5,7 +5,7 @@
  * steps) — plus rename-collision → merge-offer, and delete-with-history
  * (confirm-or-merge-instead in the same popup).
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   Exercise,
   RenameExerciseResult,
@@ -51,18 +51,41 @@ export function ExerciseCataloguePanel({
     Extract<RenameExerciseResult, { status: 'collision' }> | undefined
   >(undefined);
   const [mergeQuery, setMergeQuery] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Same focus-restore lifecycle as `ExerciseTemplatePanel`/
+  // `CreateExercisePanel`: this form is inserted in place of the row's own
+  // "Manage" button, which unmounts as this mounts, so keyboard focus would
+  // otherwise drop to the document body. Moves focus into the name field on
+  // mount and hands it back to whatever had it before (the "Manage"
+  // trigger) once this panel unmounts (Save/Close/Delete).
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    nameInputRef.current?.focus();
+    return () => {
+      previouslyFocused?.focus();
+    };
+  }, []);
 
   const handleSaveSubmit = async () => {
-    const result = await onSave(newName, {
-      defaultLoadType: loadType,
-      defaultVolumeKind: volumeKind,
-      trackEffort,
-    });
-    if (result.status === 'collision') {
-      setCollision(result);
-    } else {
-      setCollision(undefined);
-      onClose();
+    setSubmitting(true);
+    try {
+      const result = await onSave(newName, {
+        defaultLoadType: loadType,
+        defaultVolumeKind: volumeKind,
+        trackEffort,
+      });
+      if (result.status === 'collision') {
+        setCollision(result);
+        setSubmitting(false);
+      } else {
+        setCollision(undefined);
+        onClose();
+      }
+    } catch (error) {
+      console.error('Failed to save exercise changes', error);
+      setSubmitting(false);
     }
   };
 
@@ -77,6 +100,7 @@ export function ExerciseCataloguePanel({
           <label className="logging-screen__field-label">
             <span>Rename exercise</span>
             <input
+              ref={nameInputRef}
               type="text"
               className="logging-field-input"
               value={newName}
@@ -96,6 +120,8 @@ export function ExerciseCataloguePanel({
           <button
             type="button"
             className="logging-button logging-button--primary logging-button--icon-label"
+            disabled={submitting}
+            aria-disabled={submitting}
             onClick={() => void handleSaveSubmit()}
           >
             <Icon name="check" />

@@ -94,6 +94,60 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
     });
   });
 
+  it('moves focus into the name field on mount, and restores it on unmount (keyboard accessibility)', () => {
+    const trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    const { unmount } = render(
+      <ExerciseCataloguePanel
+        exercise={exercise}
+        hasHistory={false}
+        search={() => []}
+        onSave={vi.fn()}
+        onMerge={() => {}}
+        onDeleteConfirm={() => {}}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(document.activeElement).toBe(
+      screen.getByLabelText(/rename exercise/i),
+    );
+
+    unmount();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
+  it('logs and recovers, rather than throwing, when saving rejects (Copilot review, PR #43)', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const onSave = vi.fn().mockRejectedValue(new Error('write failed'));
+    const onClose = vi.fn();
+    render(
+      <ExerciseCataloguePanel
+        exercise={exercise}
+        hasHistory={false}
+        search={() => []}
+        onSave={onSave}
+        onMerge={() => {}}
+        onDeleteConfirm={() => {}}
+        onClose={onClose}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    expect(consoleError).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeEnabled();
+    consoleError.mockRestore();
+  });
+
   it('closes once the save resolves without a collision', async () => {
     const onSave = vi.fn().mockResolvedValue({ status: 'renamed', exercise });
     const onClose = vi.fn();
