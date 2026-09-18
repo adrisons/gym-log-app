@@ -1,15 +1,18 @@
 /**
- * FR-017, FR-018, FR-020, FR-022: rename (with collision → merge-offer),
- * merge (explicit, irreversible confirmation — no 5-second undo, unlike
- * every other destructive action on this screen), and delete-with-history
- * (confirm-or-merge-instead in the same dialog).
+ * FR-017, FR-018, FR-020, FR-022: a single combined form for an existing
+ * catalogue exercise — rename and set-entry template edits share one
+ * "Save changes" button (no separate "Save name"/"Edit tracked fields…"
+ * steps) — plus rename-collision → merge-offer, and delete-with-history
+ * (confirm-or-merge-instead in the same popup).
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   Exercise,
   RenameExerciseResult,
   ExerciseId,
 } from '@/application/logging/use-cases';
+import { ExerciseTemplateFields } from './exercise-template-fields';
+import type { ExerciseTemplate } from './exercise-template-panel';
 import { Icon } from '@/presentation/design/icons';
 import './logging.css';
 
@@ -17,43 +20,72 @@ export interface ExerciseCataloguePanelProps {
   exercise: Exercise;
   hasHistory: boolean;
   search: (query: string) => Exercise[];
-  onRename: (newName: string) => Promise<RenameExerciseResult>;
+  /** Renames the exercise and, once the rename lands without a collision,
+   * also saves the template fields — one round-trip for the whole form. */
+  onSave: (
+    newName: string,
+    template: ExerciseTemplate,
+  ) => Promise<RenameExerciseResult>;
   onMerge: (survivorId: ExerciseId, loserId: ExerciseId) => void;
   onDeleteConfirm: () => void;
-  /** ADR-0010: opens the exercise's set-entry template editor
-   * (`ExerciseTemplatePanel`, ADR-0006) — closes this panel first, the
-   * same one-dialog-at-a-time convention `ExerciseEntryCard`'s own
-   * "Edit tracked fields…" menu item follows. */
-  onEditTemplate: () => void;
   onClose: () => void;
 }
 
-type Mode = 'rename' | 'delete' | 'delete-merge-search';
+type Mode = 'edit' | 'delete' | 'delete-merge-search';
 
 export function ExerciseCataloguePanel({
   exercise,
   hasHistory,
   search,
-  onRename,
+  onSave,
   onMerge,
   onDeleteConfirm,
-  onEditTemplate,
   onClose,
 }: ExerciseCataloguePanelProps) {
-  const [mode, setMode] = useState<Mode>('rename');
+  const [mode, setMode] = useState<Mode>('edit');
   const [newName, setNewName] = useState(exercise.canonicalName);
+  const [loadType, setLoadType] = useState(exercise.defaultLoadType);
+  const [volumeKind, setVolumeKind] = useState(exercise.defaultVolumeKind);
+  const [trackEffort, setTrackEffort] = useState(exercise.trackEffort);
   const [collision, setCollision] = useState<
     Extract<RenameExerciseResult, { status: 'collision' }> | undefined
   >(undefined);
   const [mergeQuery, setMergeQuery] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
-  const handleRenameSubmit = async () => {
-    const result = await onRename(newName);
-    if (result.status === 'collision') {
-      setCollision(result);
-    } else {
-      setCollision(undefined);
-      onClose();
+  // Same focus-restore lifecycle as `ExerciseTemplatePanel`/
+  // `CreateExercisePanel`: this form is inserted in place of the row's own
+  // "Manage" button, which unmounts as this mounts, so keyboard focus would
+  // otherwise drop to the document body. Moves focus into the name field on
+  // mount and hands it back to whatever had it before (the "Manage"
+  // trigger) once this panel unmounts (Save/Close/Delete).
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    nameInputRef.current?.focus();
+    return () => {
+      previouslyFocused?.focus();
+    };
+  }, []);
+
+  const handleSaveSubmit = async () => {
+    setSubmitting(true);
+    try {
+      const result = await onSave(newName, {
+        defaultLoadType: loadType,
+        defaultVolumeKind: volumeKind,
+        trackEffort,
+      });
+      if (result.status === 'collision') {
+        setCollision(result);
+        setSubmitting(false);
+      } else {
+        setCollision(undefined);
+        onClose();
+      }
+    } catch (error) {
+      console.error('Failed to save exercise changes', error);
+      setSubmitting(false);
     }
   };
 
@@ -63,24 +95,37 @@ export function ExerciseCataloguePanel({
       role="dialog"
       aria-label={`Manage ${exercise.canonicalName}`}
     >
-      {mode === 'rename' && (
+      {mode === 'edit' && (
         <>
           <label className="logging-screen__field-label">
             <span>Rename exercise</span>
             <input
+              ref={nameInputRef}
               type="text"
               className="logging-field-input"
               value={newName}
               onChange={(event) => setNewName(event.target.value)}
             />
           </label>
+
+          <ExerciseTemplateFields
+            loadType={loadType}
+            onLoadTypeChange={setLoadType}
+            volumeKind={volumeKind}
+            onVolumeKindChange={setVolumeKind}
+            trackEffort={trackEffort}
+            onTrackEffortChange={setTrackEffort}
+          />
+
           <button
             type="button"
-            className="logging-button logging-button--icon-label"
-            onClick={() => void handleRenameSubmit()}
+            className="logging-button logging-button--primary logging-button--icon-label"
+            disabled={submitting}
+            aria-disabled={submitting}
+            onClick={() => void handleSaveSubmit()}
           >
             <Icon name="check" />
-            Save name
+            Save changes
           </button>
 
           {collision && (
@@ -115,15 +160,6 @@ export function ExerciseCataloguePanel({
               </button>
             </div>
           )}
-
-          <button
-            type="button"
-            className="logging-button logging-button--icon-label"
-            onClick={onEditTemplate}
-          >
-            <Icon name="sliders" />
-            Edit tracked fields…
-          </button>
 
           <button
             type="button"
@@ -175,7 +211,7 @@ export function ExerciseCataloguePanel({
           <button
             type="button"
             className="logging-button logging-button--icon-label"
-            onClick={() => setMode('rename')}
+            onClick={() => setMode('edit')}
           >
             <Icon name="close" />
             Cancel

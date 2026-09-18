@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ExerciseCatalogueScreen } from '@/presentation/catalogue/exercise-catalogue-screen';
 import { useStorageAccess } from '@/application/storage-access';
@@ -89,7 +89,7 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
     });
   });
 
-  it('opens the management panel for the tapped exercise', async () => {
+  it('opens the management form in place of the tapped row, hiding its name and Manage button', async () => {
     useStorageAccess.getState().configure(await seededStorage());
     render(<ExerciseCatalogueScreen />);
 
@@ -104,9 +104,46 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
     expect(
       screen.getByRole('dialog', { name: /manage back squat/i }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Manage Back squat' }),
+    ).not.toBeInTheDocument();
+    // The row's plain name text is replaced by the form's own name input.
+    expect(screen.queryByText('Back squat')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/rename exercise/i)).toHaveValue('Back squat');
+    // The other row is unaffected.
+    expect(
+      screen.getByRole('button', { name: 'Manage Bench press' }),
+    ).toBeInTheDocument();
   });
 
-  it('refreshes the list to show the new name after a successful rename', async () => {
+  it("switching which exercise is managed shows that exercise's own data, not the previous one's (stale-form regression)", async () => {
+    useStorageAccess.getState().configure(await seededStorage());
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Manage Back squat' }),
+    );
+    await userEvent.clear(screen.getByLabelText(/rename exercise/i));
+    await userEvent.type(
+      screen.getByLabelText(/rename exercise/i),
+      'Something else entirely',
+    );
+    await userEvent.click(screen.getByRole('button', { name: /^close$/i }));
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Manage Bench press' }),
+    );
+
+    expect(screen.getByLabelText(/rename exercise/i)).toHaveValue(
+      'Bench press',
+    );
+  });
+
+  it('saves the rename and the tracked fields from the one combined form', async () => {
     const storage = await seededStorage();
     useStorageAccess.getState().configure(storage);
     // Rename is routed through the logging store's own action (matching
@@ -127,12 +164,21 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
       screen.getByLabelText(/rename exercise/i),
       'Barbell back squat',
     );
-    await userEvent.click(screen.getByRole('button', { name: /save name/i }));
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /track effort/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
 
     await waitFor(() => {
       expect(screen.getByText('Barbell back squat')).toBeInTheDocument();
     });
     expect(screen.queryByText('Back squat')).not.toBeInTheDocument();
+
+    const saved = await storage.getExercise('ex-1' as ExerciseId);
+    expect(saved?.canonicalName).toBe('Barbell back squat');
+    expect(saved?.trackEffort).toBe(true);
   });
 
   it('a merge re-syncs the logging store, not just this screen (stale-draft regression)', async () => {
@@ -189,7 +235,9 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
       screen.getByLabelText(/rename exercise/i),
       'Bench press',
     );
-    await userEvent.click(screen.getByRole('button', { name: /save name/i }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
     await userEvent.click(
       screen.getByRole('button', { name: /merge \(not undoable\)/i }),
     );
@@ -233,7 +281,9 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
       screen.getByLabelText(/rename exercise/i),
       'Barbell back squat',
     );
-    await userEvent.click(screen.getByRole('button', { name: /save name/i }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
 
     await waitFor(() => {
       expect(screen.getByText('Barbell back squat')).toBeInTheDocument();
@@ -246,6 +296,35 @@ describe('ExerciseCatalogueScreen (FR-5, FR-017..022)', () => {
     const catalogue = useLoggingSession.getState().catalogue;
     const renamed = catalogue.find((e) => e.id === 'ex-1');
     expect(renamed?.canonicalName).toBe('Barbell back squat');
+  });
+
+  it('deleting an exercise confirms via a popup, kept from the combined form', async () => {
+    const storage = await seededStorage();
+    useStorageAccess.getState().configure(storage);
+    useLoggingSession.getState().configure(storage);
+    render(<ExerciseCatalogueScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Back squat')).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Manage Back squat' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /delete exercise/i }),
+    );
+
+    const popup = screen.getByRole('alertdialog', {
+      name: /delete back squat/i,
+    });
+    await userEvent.click(
+      within(popup).getByRole('button', { name: /confirm delete/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText('Back squat')).not.toBeInTheDocument();
+    });
   });
 });
 
@@ -443,7 +522,7 @@ describe('ExerciseCatalogueScreen creating a new exercise (ADR-0010)', () => {
 });
 
 describe("ExerciseCatalogueScreen editing an existing exercise's tracked fields (ADR-0010)", () => {
-  it('opens the template editor from the management panel and re-syncs both storage and the logging store', async () => {
+  it('saves tracked-field changes from the same management form and re-syncs both storage and the logging store', async () => {
     const storage = await seededStorage();
     useStorageAccess.getState().configure(storage);
     useLoggingSession.getState().configure(storage);
@@ -457,11 +536,8 @@ describe("ExerciseCatalogueScreen editing an existing exercise's tracked fields 
     await userEvent.click(
       screen.getByRole('button', { name: 'Manage Back squat' }),
     );
-    await userEvent.click(
-      screen.getByRole('button', { name: /edit tracked fields/i }),
-    );
     expect(
-      screen.getByRole('dialog', { name: /edit back squat's tracked fields/i }),
+      screen.getByRole('dialog', { name: /manage back squat/i }),
     ).toBeInTheDocument();
 
     await userEvent.click(
@@ -500,9 +576,6 @@ describe("ExerciseCatalogueScreen editing an existing exercise's tracked fields 
       screen.getByRole('button', { name: 'Manage Back squat' }),
     );
     await userEvent.click(
-      screen.getByRole('button', { name: /edit tracked fields/i }),
-    );
-    await userEvent.click(
       screen.getByRole('checkbox', { name: /track effort/i }),
     );
     await userEvent.click(
@@ -514,9 +587,7 @@ describe("ExerciseCatalogueScreen editing an existing exercise's tracked fields 
       expect(saved?.trackEffort).toBe(true);
     });
     expect(
-      screen.queryByRole('dialog', {
-        name: /edit back squat's tracked fields/i,
-      }),
+      screen.queryByRole('dialog', { name: /manage back squat/i }),
     ).not.toBeInTheDocument();
   });
 });

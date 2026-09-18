@@ -28,21 +28,163 @@ const other: Exercise = {
 };
 
 describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
-  it('rename that collides opens a merge-offer dialog stating both names', async () => {
-    const onRename = vi.fn().mockResolvedValue({
-      status: 'collision',
-      collidesWith: other,
-    });
+  it('renders one combined form with the name and the tracked-fields controls, no separate steps', () => {
     render(
       <ExerciseCataloguePanel
         exercise={exercise}
         hasHistory={false}
         search={() => []}
-        onRename={onRename}
+        onSave={vi.fn()}
         onMerge={() => {}}
         onDeleteConfirm={() => {}}
-        onEditTemplate={() => {}}
         onClose={() => {}}
+      />,
+    );
+
+    expect(screen.getByLabelText(/rename exercise/i)).toHaveValue(
+      'Glute bridge',
+    );
+    expect(
+      screen.getByRole('radiogroup', { name: /volume kind/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: /track effort/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /save changes/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /save name/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /edit tracked fields/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('saves the name and the tracked fields together from a single "Save changes" click', async () => {
+    const onSave = vi.fn().mockResolvedValue({ status: 'renamed', exercise });
+    render(
+      <ExerciseCataloguePanel
+        exercise={exercise}
+        hasHistory={false}
+        search={() => []}
+        onSave={onSave}
+        onMerge={() => {}}
+        onDeleteConfirm={() => {}}
+        onClose={() => {}}
+      />,
+    );
+
+    await userEvent.clear(screen.getByLabelText(/rename exercise/i));
+    await userEvent.type(
+      screen.getByLabelText(/rename exercise/i),
+      'Hip bridge',
+    );
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /track effort/i }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    expect(onSave).toHaveBeenCalledWith('Hip bridge', {
+      defaultLoadType: 'weight',
+      defaultVolumeKind: 'reps',
+      trackEffort: true,
+    });
+  });
+
+  it('moves focus into the name field on mount, and restores it on unmount (keyboard accessibility)', () => {
+    const trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    const { unmount } = render(
+      <ExerciseCataloguePanel
+        exercise={exercise}
+        hasHistory={false}
+        search={() => []}
+        onSave={vi.fn()}
+        onMerge={() => {}}
+        onDeleteConfirm={() => {}}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(document.activeElement).toBe(
+      screen.getByLabelText(/rename exercise/i),
+    );
+
+    unmount();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
+  it('logs and recovers, rather than throwing, when saving rejects (Copilot review, PR #43)', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const onSave = vi.fn().mockRejectedValue(new Error('write failed'));
+    const onClose = vi.fn();
+    render(
+      <ExerciseCataloguePanel
+        exercise={exercise}
+        hasHistory={false}
+        search={() => []}
+        onSave={onSave}
+        onMerge={() => {}}
+        onDeleteConfirm={() => {}}
+        onClose={onClose}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    expect(consoleError).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeEnabled();
+    consoleError.mockRestore();
+  });
+
+  it('closes once the save resolves without a collision', async () => {
+    const onSave = vi.fn().mockResolvedValue({ status: 'renamed', exercise });
+    const onClose = vi.fn();
+    render(
+      <ExerciseCataloguePanel
+        exercise={exercise}
+        hasHistory={false}
+        search={() => []}
+        onSave={onSave}
+        onMerge={() => {}}
+        onDeleteConfirm={() => {}}
+        onClose={onClose}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('a rename that collides opens a merge-offer dialog stating both names, and does not close the form', async () => {
+    const onSave = vi.fn().mockResolvedValue({
+      status: 'collision',
+      collidesWith: other,
+    });
+    const onClose = vi.fn();
+    render(
+      <ExerciseCataloguePanel
+        exercise={exercise}
+        hasHistory={false}
+        search={() => []}
+        onSave={onSave}
+        onMerge={() => {}}
+        onDeleteConfirm={() => {}}
+        onClose={onClose}
       />,
     );
 
@@ -51,17 +193,20 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
       screen.getByLabelText(/rename exercise/i),
       'Hip thrust',
     );
-    await userEvent.click(screen.getByRole('button', { name: /save name/i }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
 
     expect(
       await screen.findByRole('alertdialog', { name: /name already in use/i }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Glute bridge/)).toBeInTheDocument();
     expect(screen.getByText(/Hip thrust/)).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('declining the merge offer cancels the rename', async () => {
-    const onRename = vi.fn().mockResolvedValue({
+    const onSave = vi.fn().mockResolvedValue({
       status: 'collision',
       collidesWith: other,
     });
@@ -71,15 +216,16 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
         exercise={exercise}
         hasHistory={false}
         search={() => []}
-        onRename={onRename}
+        onSave={onSave}
         onMerge={onMerge}
         onDeleteConfirm={() => {}}
-        onEditTemplate={() => {}}
         onClose={() => {}}
       />,
     );
 
-    await userEvent.click(screen.getByRole('button', { name: /save name/i }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
     await userEvent.click(
       await screen.findByRole('button', { name: /cancel rename/i }),
     );
@@ -91,7 +237,7 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
   });
 
   it('accepting the merge offer states plainly that it is not undoable, and has no undo affordance', async () => {
-    const onRename = vi.fn().mockResolvedValue({
+    const onSave = vi.fn().mockResolvedValue({
       status: 'collision',
       collidesWith: other,
     });
@@ -101,15 +247,16 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
         exercise={exercise}
         hasHistory={false}
         search={() => []}
-        onRename={onRename}
+        onSave={onSave}
         onMerge={onMerge}
         onDeleteConfirm={() => {}}
-        onEditTemplate={() => {}}
         onClose={() => {}}
       />,
     );
 
-    await userEvent.click(screen.getByRole('button', { name: /save name/i }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /save changes/i }),
+    );
     const mergeButton = await screen.findByRole('button', {
       name: /merge \(not undoable\)/i,
     });
@@ -119,16 +266,15 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
     expect(screen.queryByText(/undo/i)).not.toBeInTheDocument();
   });
 
-  it('delete-with-history offers merge as an alternative in the same dialog', async () => {
+  it('delete-with-history offers merge as an alternative in the same popup', async () => {
     render(
       <ExerciseCataloguePanel
         exercise={exercise}
         hasHistory={true}
         search={() => [other]}
-        onRename={vi.fn()}
+        onSave={vi.fn()}
         onMerge={() => {}}
         onDeleteConfirm={() => {}}
-        onEditTemplate={() => {}}
         onClose={() => {}}
       />,
     );
@@ -156,10 +302,9 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
         exercise={exercise}
         hasHistory={false}
         search={() => []}
-        onRename={vi.fn()}
+        onSave={vi.fn()}
         onMerge={() => {}}
         onDeleteConfirm={onDeleteConfirm}
-        onEditTemplate={() => {}}
         onClose={() => {}}
       />,
     );
@@ -174,25 +319,24 @@ describe('ExerciseCataloguePanel (FR-017, FR-018, FR-020, FR-022)', () => {
     expect(onDeleteConfirm).toHaveBeenCalled();
   });
 
-  it('offers "Edit tracked fields…" to open the set-entry template editor (ADR-0010)', async () => {
-    const onEditTemplate = vi.fn();
+  it('cancelling the delete popup returns to the combined edit form', async () => {
     render(
       <ExerciseCataloguePanel
         exercise={exercise}
         hasHistory={false}
         search={() => []}
-        onRename={vi.fn()}
+        onSave={vi.fn()}
         onMerge={() => {}}
         onDeleteConfirm={() => {}}
-        onEditTemplate={onEditTemplate}
         onClose={() => {}}
       />,
     );
 
     await userEvent.click(
-      screen.getByRole('button', { name: /edit tracked fields/i }),
+      screen.getByRole('button', { name: /delete exercise/i }),
     );
+    await userEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
 
-    expect(onEditTemplate).toHaveBeenCalled();
+    expect(screen.getByLabelText(/rename exercise/i)).toBeInTheDocument();
   });
 });
