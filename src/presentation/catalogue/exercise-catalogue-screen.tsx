@@ -7,10 +7,11 @@
  * state of its own, only catalogue reads and management writes.
  *
  * ADR-0010: also creates a brand-new exercise (name + set-entry template
- * together, `CreateExercisePanel`) and edits an existing one's template
- * (`ExerciseTemplatePanel`, from the management panel's own "Edit tracked
- * fields…") — previously only reachable per-entry from Logging/
- * SessionDetail.
+ * together, `CreateExercisePanel`). An existing exercise's management form
+ * (`ExerciseCataloguePanel`) opens inline in place of the tapped row's name
+ * and "Manage" button, and combines rename + set-entry template editing
+ * into that one form — previously two separate steps, each only reachable
+ * per-entry from Logging/SessionDetail.
  */
 import { useEffect, useState } from 'react';
 import { requireStorage } from '@/application/storage-access';
@@ -21,7 +22,6 @@ import type { Exercise, Session } from '@/application/logging/use-cases';
 import { Icon } from '@/presentation/design/icons';
 import { useSetScreenTitle } from '@/presentation/nav/screen-title';
 import { ExerciseCataloguePanel } from '../logging/exercise-catalogue-panel';
-import { ExerciseTemplatePanel } from '../logging/exercise-template-panel';
 import { CreateExercisePanel } from './create-exercise-panel';
 import './catalogue.css';
 
@@ -58,9 +58,6 @@ export function ExerciseCatalogueScreen() {
   const [query, setQuery] = useState('');
   const [managing, setManaging] = useState<Exercise | undefined>(undefined);
   const [creating, setCreating] = useState(false);
-  const [editingTemplateFor, setEditingTemplateFor] = useState<
-    Exercise | undefined
-  >(undefined);
 
   // Deliberately not shared with the mount effect below (react-hooks'
   // set-state-in-effect rule flags a named, externally-reusable function
@@ -130,24 +127,6 @@ export function ExerciseCatalogueScreen() {
         />
       )}
 
-      {editingTemplateFor && (
-        <ExerciseTemplatePanel
-          key={editingTemplateFor.id}
-          exercise={editingTemplateFor}
-          onSave={(template) => {
-            updateExerciseTemplateInSession(editingTemplateFor.id, template)
-              .then(() => {
-                setEditingTemplateFor(undefined);
-                void refresh();
-              })
-              .catch((error: unknown) => {
-                console.error('Failed to save exercise template', error);
-              });
-          }}
-          onClose={() => setEditingTemplateFor(undefined)}
-        />
-      )}
-
       {results.length === 0 && (
         <p className="catalogue-screen__empty">
           {catalogue.length === 0 ? (
@@ -159,52 +138,62 @@ export function ExerciseCatalogueScreen() {
       )}
 
       <ul className="catalogue-screen__list">
-        {results.map((exercise) => (
-          <li key={exercise.id} className="catalogue-screen__row">
-            <span>{exercise.canonicalName}</span>
-            <button
-              type="button"
-              className="logging-button logging-button--icon-label"
-              aria-label={`Manage ${exercise.canonicalName}`}
-              onClick={() => setManaging(exercise)}
-            >
-              <Icon name="sliders" />
-              Manage
-            </button>
-          </li>
-        ))}
+        {results.map((exercise) =>
+          managing?.id === exercise.id ? (
+            <li key={exercise.id}>
+              <ExerciseCataloguePanel
+                key={exercise.id}
+                exercise={exercise}
+                hasHistory={hasHistory(exercise.id)}
+                search={(q) => searchExercises(q, catalogue)}
+                onSave={async (newName, template) => {
+                  const result = await renameExerciseInSession(
+                    exercise.id,
+                    newName,
+                  );
+                  if (result.status === 'renamed') {
+                    await updateExerciseTemplateInSession(
+                      exercise.id,
+                      template,
+                    );
+                    await refresh();
+                  }
+                  return result;
+                }}
+                onMerge={(survivorId, loserId) => {
+                  void mergeExercisesInSession(survivorId, loserId).then(
+                    refresh,
+                  );
+                }}
+                onDeleteConfirm={() => {
+                  void deleteExerciseCascadeInSession(
+                    exercise.id,
+                    hasHistory(exercise.id),
+                    true,
+                  ).then(() => {
+                    setManaging(undefined);
+                    void refresh();
+                  });
+                }}
+                onClose={() => setManaging(undefined)}
+              />
+            </li>
+          ) : (
+            <li key={exercise.id} className="catalogue-screen__row">
+              <span>{exercise.canonicalName}</span>
+              <button
+                type="button"
+                className="logging-button logging-button--icon-label"
+                aria-label={`Manage ${exercise.canonicalName}`}
+                onClick={() => setManaging(exercise)}
+              >
+                <Icon name="sliders" />
+                Manage
+              </button>
+            </li>
+          ),
+        )}
       </ul>
-
-      {managing && (
-        <ExerciseCataloguePanel
-          exercise={managing}
-          hasHistory={hasHistory(managing.id)}
-          search={(q) => searchExercises(q, catalogue)}
-          onRename={async (newName) => {
-            const result = await renameExerciseInSession(managing.id, newName);
-            if (result.status === 'renamed') await refresh();
-            return result;
-          }}
-          onMerge={(survivorId, loserId) => {
-            void mergeExercisesInSession(survivorId, loserId).then(refresh);
-          }}
-          onDeleteConfirm={() => {
-            void deleteExerciseCascadeInSession(
-              managing.id,
-              hasHistory(managing.id),
-              true,
-            ).then(() => {
-              setManaging(undefined);
-              void refresh();
-            });
-          }}
-          onEditTemplate={() => {
-            setEditingTemplateFor(managing);
-            setManaging(undefined);
-          }}
-          onClose={() => setManaging(undefined)}
-        />
-      )}
     </main>
   );
 }
