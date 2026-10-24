@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-24
 
-**Status**: Draft
+**Status**: Reviewed
 
 **Input**: User description: "Storage size display and old-data retention
 cleanup in Settings — v1 follow-up to specs/006-settings-data. In Settings →
@@ -19,17 +19,20 @@ dated before that cutoff. Keep the UX minimal, as little text as possible."
 
 `specs/006-settings-data` built the Settings → Data section with export,
 import, and an all-or-nothing "delete everything" flow (double
-confirmation, resets to a fresh install). It gave the user no way to see
-how much space their data actually occupies, and no way to trim old
-training history short of exporting, deleting everything, and
-re-importing a hand-edited file — which is neither simple nor safe. This
-feature closes both gaps on the same Data section: a plain-language size
-readout next to the existing storage-status line
-(`storage-status-section.tsx`), and a focused "delete old data" action that
-removes only Sessions dated before a cutoff the user picks, leaving the
-exercise catalogue, Settings, and any in-progress logging draft untouched —
-a lighter, repeatable alternative to 006's nuclear "delete everything" for
-someone who just wants to stop carrying years of old history around.
+confirmation, resets to a fresh install). `specs/009-pwa-installability-and-updates`
+later added a storage-status line to the same section
+(`getStorageStatus()`, `storage-status-section.tsx` — which adapter is
+active and, for the File System Access adapter, its folder/permission
+state). Neither tells the user how much space their data actually
+occupies, and neither offers a way to trim old training history short of
+exporting, deleting everything, and re-importing a hand-edited file — which
+is neither simple nor safe. This feature closes both gaps on the same Data
+section: a plain-language size readout next to the existing storage-status
+line, and a focused "delete old data" action that removes only Sessions
+dated before a cutoff the user picks, leaving the exercise catalogue, band
+labels, Settings, and any in-progress logging draft untouched — a lighter,
+repeatable alternative to 006's nuclear "delete everything" for someone who
+just wants to stop carrying years of old history around.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -74,7 +77,8 @@ Settings → Data → "Delete old data", picks how far back to keep data —
 either a preloaded quick option (older than 1 year / 6 months / 3 months)
 or a specific date — and confirms. Every session dated before that cutoff
 is removed; everything from the cutoff date onward, the exercise catalogue,
-Settings, and any in-progress logging draft are left exactly as they were.
+band labels, Settings, and any in-progress logging draft are left exactly
+as they were.
 
 **Why this priority**: this is the feature's other independently valuable
 half — a repeatable, scoped alternative to 006's all-or-nothing delete,
@@ -100,8 +104,9 @@ earlier sessions are gone afterward.
    disabled (nothing to delete).
 4. **Given** the user confirms the delete action, **When** the deletion
    completes, **Then** every session dated before the cutoff is gone, every
-   session on or after the cutoff is unchanged, the exercise catalogue and
-   Settings are unchanged, and a brief success confirmation is shown.
+   session on or after the cutoff is unchanged, the exercise catalogue,
+   band labels, and Settings are unchanged, and a brief success
+   confirmation is shown.
 5. **Given** the user has an in-progress (not yet submitted) logging draft
    whose own date is before the chosen cutoff, **When** the deletion
    completes, **Then** the draft is left untouched (only already-saved
@@ -123,6 +128,16 @@ earlier sessions are gone afterward.
 - The size readout (User Story 1) and the deletion (User Story 2) must stay
   consistent with each other: deleting old data is reflected in the size
   the next time it is shown (Acceptance Scenario 1.4).
+- A session logged earlier the same calendar day as the chosen cutoff is
+  kept, not deleted, regardless of its time of day — the cutoff is always
+  the start of the chosen day, not a timestamp (see FR-009a). A user
+  picking "today" as an explicit date therefore deletes nothing logged
+  today, only strictly earlier days.
+- While the explicit-date field holds no complete, valid date yet (e.g. the
+  user is mid-typing), the modal has no cutoff to count against: it MUST
+  show no count (not a stale count from a previous selection) and the
+  delete action stays disabled, the same disabled state as having chosen
+  nothing at all (FR-008).
 
 ## Non-Goals *(mandatory)*
 
@@ -131,15 +146,25 @@ earlier sessions are gone afterward.
   second, narrower deletion path alongside it, and does not change it.
 - A live, continuously-updating byte counter — the size readout
   (User Story 1) is a snapshot computed when Settings is opened or
-  refreshed, per `docs/requirements.md` §7.5's existing "background code
-  never polls" discipline.
+  refreshed, not a background process watching storage for changes; this
+  keeps the feature to a simple on-demand read, consistent with how the
+  rest of this Data section (export, storage status) already only
+  computes its figures when the screen asks.
 - An exact, OS-reported disk/quota figure. See Assumptions for what the
   displayed size actually measures.
 - Deleting anything other than Sessions by date — the exercise catalogue,
-  Settings, and the pending logging draft are never touched by this
-  feature, regardless of their own dates, matching this spec's "entries"
-  scope (the user-facing term for stored training history) as distinct
-  from configuration data.
+  band labels, Settings, and the pending logging draft are never touched by
+  this feature, regardless of their own dates, matching this spec's
+  "entries" scope (the user-facing term for stored training history) as
+  distinct from configuration/catalogue data.
+- Designing the underlying atomic bulk-delete capability itself. This spec
+  requires that confirming "Delete old data" is all-or-nothing across every
+  matched Session (FR-010), which today's `StoragePort` cannot express
+  (`deleteSession` is single-record; `resetToFreshInstall`/`importBulk` are
+  whole-collection operations, not a filtered delete) — the same kind of
+  gap 006 itself flagged as its own open dependency rather than assumed
+  away. The concrete port addition is a `/speckit-plan` decision, not
+  fixed here.
 - Undo for the scoped delete-old-data action. Like every other destructive
   action already in this Data section (merge, delete-everything), it is
   irreversible once confirmed; a successful toast with a 5-second undo
@@ -158,11 +183,17 @@ earlier sessions are gone afterward.
 - **FR-001**: Settings → Data MUST show the total size occupied by the
   device's stored data, as a whole number with a KB or MB unit, with no
   decimal places.
-- **FR-002**: The displayed size MUST use MB once the size reaches 1024 KB
-  or more, and KB below that threshold.
-- **FR-003**: The displayed size MUST round to the nearest whole unit, and
-  MUST show at least "1 KB" for any device holding more than zero bytes of
-  stored data, never "0 KB".
+- **FR-002**: The unit (KB vs. MB) MUST be chosen from the data's exact
+  underlying size, before any rounding — MB once that exact size is 1024 KB
+  (1,048,576 bytes) or more, KB below that. Rounding (FR-003) is applied
+  only after the unit is chosen, so a value that rounds up to "1024 KB" is
+  never shown — it is shown as "1 MB" instead.
+- **FR-003**: Within whichever unit FR-002 chose, the displayed number MUST
+  round to the nearest whole unit, and MUST show at least "1 KB" for any
+  device holding more than zero bytes of stored data, never "0 KB" (a
+  defensive floor — in practice there is always at least a seed exercise
+  catalogue and these Settings themselves stored, so the figure measured is
+  never literally empty).
 - **FR-004**: The size figure MUST be recomputed whenever the Settings
   screen's Data section is shown, so it reflects additions, imports, and
   deletions made since the last time it was computed (not required to
@@ -174,16 +205,31 @@ earlier sessions are gone afterward.
   cutoff date, choosable either from three preloaded quick options (entries
   older than 1 year, older than 6 months, older than 3 months) or an
   explicit date field.
+- **FR-006a**: Each quick option's cutoff MUST be computed as "today's date,
+  minus that many calendar years/months," evaluated in the device's local
+  timezone. Where that arithmetic lands on a day that doesn't exist in the
+  target month (e.g. 6 months before August 31, or 1 year before a leap
+  day), it MUST clamp to the last valid day of that target month, the
+  common calendar-arithmetic convention, rather than overflowing into the
+  following month.
 - **FR-007**: The modal MUST show how many stored sessions are dated before
   the currently chosen cutoff before the user can confirm deletion, updating
-  as the cutoff selection changes.
+  as the cutoff selection changes. While no cutoff is yet resolvable (e.g.
+  an incomplete explicit date), no count is shown and the delete action
+  stays disabled (FR-008) — never a stale count left over from a previous
+  selection.
 - **FR-008**: The modal's delete action MUST be disabled until a cutoff is
   chosen, and MUST stay disabled (or otherwise prevent a no-op confirm) when
   the count of matching sessions is zero.
 - **FR-009**: Confirming the delete action MUST remove every stored Session
   whose own date is strictly before the chosen cutoff, and MUST NOT modify
-  any session dated on or after the cutoff, the exercise catalogue, Settings,
-  or the pending logging draft.
+  any session dated on or after the cutoff, the exercise catalogue, band
+  labels, Settings, or the pending logging draft.
+- **FR-009a**: The cutoff (from either a quick option or an explicit date)
+  denotes the start of that calendar day in the device's local timezone — a
+  Session is only deleted when its own `dateTime` falls entirely before
+  that instant, regardless of what time of day it was logged. A session
+  logged on the cutoff's own day is always kept (matching Edge Cases).
 - **FR-010**: The deletion MUST be all-or-nothing for the matched sessions —
   either every matched session is removed, or (on failure) the user is told
   plainly that the deletion may be incomplete, mirroring 006 FR-016's
@@ -197,11 +243,12 @@ earlier sessions are gone afterward.
 
 ### Key Entities
 
-- **Stored data size**: a derived, read-only figure — the total size of the
-  device's currently stored canonical data (Sessions, the Exercise
-  catalogue, Settings, and the pending logging draft if any), expressed to
-  the user as a whole-number KB/MB amount. Not persisted; recomputed on
-  demand (FR-004).
+- **Stored data size**: a derived, read-only figure — the total size of
+  everything the device's `StoragePort` currently holds (Sessions, the
+  Exercise catalogue, band labels, Settings, and the pending logging draft
+  if any — the same scope as 006's own "delete everything," FR-016),
+  expressed to the user as a whole-number KB/MB amount. Not persisted;
+  recomputed on demand (FR-004).
 - **Retention cutoff**: a single date, supplied by the user (via a quick
   option or an explicit date) for one run of the "Delete old data" action.
   Not persisted past that one action — reopening the modal later starts
@@ -225,19 +272,21 @@ earlier sessions are gone afterward.
 
 ## Assumptions
 
-- "The app's stored data" (FR-001) means every canonical record the
-  `StoragePort` holds on this device — Sessions, the Exercise catalogue,
-  Settings, and the pending logging draft, matching 006's own "delete
-  everything" scope (`resetToFreshInstall`) — not just Sessions. Only the
-  *deletion* in User Story 2 is scoped to Sessions by date; the *size
-  readout* in User Story 1 covers everything stored.
-- The displayed size is an approximation of each record's serialized size
-  summed together, not a literal OS/browser-reported disk or quota figure —
-  reasonable because the two storage adapters (ADR-0002) do not expose a
-  uniform, exact "bytes on disk" figure to the application layer the same
-  way across both the File System Access and IndexedDB adapters. This
-  matches how 006 already treats `getStorageStatus()` as a derived,
-  best-effort description rather than a guarantee.
+- "The app's stored data" (FR-001) means every record the `StoragePort`
+  holds on this device — Sessions, the Exercise catalogue, band labels,
+  Settings, and the pending logging draft — matching 006's own "delete
+  everything" scope (FR-016, `resetToFreshInstall`) exactly, not just
+  Sessions. Only the *deletion* in User Story 2 is scoped to Sessions by
+  date; the *size readout* in User Story 1 covers everything stored.
+- The displayed size is an approximation, not a literal OS/browser-reported
+  disk or quota figure — reasonable because the two storage adapters
+  (ADR-0002) do not expose a uniform, exact "bytes on disk" figure to the
+  application layer the same way across both the File System Access and
+  IndexedDB adapters. This matches how `specs/009-pwa-installability-and-updates`
+  already treats the adjacent `getStorageStatus()` readout as a derived,
+  best-effort description rather than a guarantee. The specific computation
+  (how the approximation is derived from the stored records) is a
+  `/speckit-plan` decision, not fixed here.
 - 1 KB = 1024 bytes and 1 MB = 1024 KB (binary units), consistent with how
   operating systems and browsers most commonly present storage figures to
   end users.
@@ -251,7 +300,7 @@ earlier sessions are gone afterward.
   existing double confirmation because it is total and resets the whole
   device. This keeps the UX minimal per the feature's own ask while still
   stating plainly, once, what is about to happen and how much it affects.
-- The exercise catalogue, Settings, and the pending logging draft are never
-  touched by the scoped deletion regardless of any date they might
-  individually carry, since none of them is "training history" in the
-  sense the user means by "entries" — only Sessions are.
+- The exercise catalogue, band labels, Settings, and the pending logging
+  draft are never touched by the scoped deletion regardless of any date
+  they might individually carry, since none of them is "training history"
+  in the sense the user means by "entries" — only Sessions are.
