@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-24
 
-**Status**: Reviewed
+**Status**: Planned
 
 **Input**: User description: "Storage size display and old-data retention
 cleanup in Settings — v1 follow-up to specs/006-settings-data. In Settings →
