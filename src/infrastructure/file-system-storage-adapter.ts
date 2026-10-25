@@ -56,7 +56,8 @@ type OverlayEntry = { kind: 'value'; value: unknown } | { kind: 'deleted' };
  */
 type PendingBulkWrite =
   | { kind: 'import'; input: BulkImportInput }
-  | { kind: 'reset'; seedExercises: Exercise[]; schemaVersion: number };
+  | { kind: 'reset'; seedExercises: Exercise[]; schemaVersion: number }
+  | { kind: 'delete-before'; cutoff: string };
 
 /**
  * Durable `StoragePort` implementation backed by the File System Access
@@ -1032,6 +1033,21 @@ export class FileSystemStorageAdapter implements StoragePort {
     await this.#removeEntryIfPresent(root, PENDING_BULK_WRITE_FILE);
   }
 
+  async deleteSessionsBefore(cutoff: string): Promise<number> {
+    await this.#ensureSchemaCheckedForWrite();
+    const root = await this.#resolveHandle(true);
+    if (!root) {
+      throw new StorageError(
+        'Delete old data needs File System Access permission — try again from a direct tap on Delete old data.',
+      );
+    }
+    const journal: PendingBulkWrite = { kind: 'delete-before', cutoff };
+    await this.#writeJsonToHandle(root, PENDING_BULK_WRITE_FILE, journal);
+    const removed = await this.#applyDeleteBeforeToHandle(root, cutoff);
+    await this.#removeEntryIfPresent(root, PENDING_BULK_WRITE_FILE);
+    return removed;
+  }
+
   /** Replayed on the next write-path schema check if a journal is found —
    * re-applying the same target-file writes is idempotent, so this simply
    * finishes whatever `importBulk`/`resetToFreshInstall` call was cut off
@@ -1069,8 +1085,10 @@ export class FileSystemStorageAdapter implements StoragePort {
     if (!pending) return;
     if (pending.kind === 'import') {
       await this.#applyBulkWriteToHandle(root, pending.input);
-    } else {
+    } else if (pending.kind === 'reset') {
       await this.#applyResetToHandle(root, pending);
+    } else {
+      await this.#applyDeleteBeforeToHandle(root, pending.cutoff);
     }
     await this.#removeEntryIfPresent(root, PENDING_BULK_WRITE_FILE);
   }
@@ -1137,6 +1155,35 @@ export class FileSystemStorageAdapter implements StoragePort {
     await this.#writeJsonToHandle(root, META_FILE, {
       schemaVersion: payload.schemaVersion,
     });
+  }
+
+  /** spec 010 FR-009/FR-009a/FR-010: removes every on-disk session file
+   * whose own `dateTime` is strictly before `cutoff`, returning the count
+   * removed. Reads each session file directly rather than through
+   * `listSessions` (no band-load migration needed just to read a
+   * `dateTime` field, and this avoids re-serializing every session back
+   * just to filter them). */
+  async #applyDeleteBeforeToHandle(
+    root: FileSystemDirectoryHandle,
+    cutoff: string,
+  ): Promise<number> {
+    const cutoffInstant = Date.parse(cutoff);
+    const sessionsDir = await this.#run(() =>
+      root.getDirectoryHandle(SESSIONS_DIR, { create: true }),
+    );
+    const matchNames: string[] = [];
+    for await (const [name, handle] of sessionsDir.entries()) {
+      if (handle.kind !== 'file' || !name.endsWith('.json')) continue;
+      const file = await (handle as FileSystemFileHandle).getFile();
+      const session = JSON.parse(await file.text()) as Session;
+      if (Date.parse(session.dateTime) < cutoffInstant) {
+        matchNames.push(name);
+      }
+    }
+    for (const name of matchNames) {
+      await this.#run(() => sessionsDir.removeEntry(name));
+    }
+    return matchNames.length;
   }
 
   async #removeEntryIfPresent(

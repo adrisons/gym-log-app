@@ -69,6 +69,18 @@ export class InMemoryStorageAdapter implements StoragePort {
     this.#sessions.delete(id);
   }
 
+  async deleteSessionsBefore(cutoff: string): Promise<number> {
+    const cutoffInstant = Date.parse(cutoff);
+    let removed = 0;
+    for (const [id, session] of this.#sessions) {
+      if (Date.parse(session.dateTime) < cutoffInstant) {
+        this.#sessions.delete(id);
+        removed += 1;
+      }
+    }
+    return removed;
+  }
+
   async saveExercise(exercise: Exercise): Promise<void> {
     this.#exercises.set(exercise.id, exercise);
   }
