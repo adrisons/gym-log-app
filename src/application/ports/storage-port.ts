@@ -51,6 +51,24 @@ export interface StoragePort {
   listSessions(range: DateRange): Promise<Session[]>;
   deleteSession(id: SessionId): Promise<void>;
 
+  /**
+   * Deletes every Session whose own `dateTime` falls strictly before the
+   * start of `cutoff`'s calendar day (spec 010 FR-009/FR-009a), atomically
+   * — either every matching Session is removed or (on failure) none of
+   * the intended removals is left partially applied (FR-010, the same
+   * all-or-nothing guarantee as `importBulk`/`resetToFreshInstall`).
+   * `cutoff` is an ISO 8601 date-time string denoting that start-of-day
+   * instant in the device's local timezone — this method does no
+   * clamping or date arithmetic of its own (spec 010 research.md §3),
+   * only a parsed-instant comparison, matching every existing
+   * `listSessions`/`deleteSession` comparison. Does not touch the
+   * Exercise catalogue, Settings, or the pending logging draft, regardless
+   * of their own dates. A `cutoff` matching zero Sessions is a valid call
+   * that resolves to `0`, not an error. Resolves to the number of
+   * Sessions removed.
+   */
+  deleteSessionsBefore(cutoff: string): Promise<number>;
+
   // Exercise catalogue
   saveExercise(exercise: Exercise): Promise<void>;
   getExercise(id: ExerciseId): Promise<Exercise | undefined>;

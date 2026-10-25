@@ -236,6 +236,158 @@ const sessionScenarios: Scenario[] = [
   },
 ];
 
+// Retention cutoff (spec 010 contracts/storage-port-additions.md scenarios 1-5)
+
+const retentionScenarios: Scenario[] = [
+  {
+    name: 'retention-1: deleteSessionsBefore removes only sessions strictly before the cutoff, durably',
+    async run(makeAdapter) {
+      const writer = await makeAdapter();
+      const older = makeSession({
+        id: 'sess-older' as SessionId,
+        dateTime: '2026-01-01T12:00:00.000Z',
+      });
+      const newer = makeSession({
+        id: 'sess-newer' as SessionId,
+        dateTime: '2026-06-01T12:00:00.000Z',
+      });
+      await writer.saveSession(older);
+      await writer.saveSession(newer);
+
+      const removed = await writer.deleteSessionsBefore(
+        '2026-03-01T00:00:00.000Z',
+      );
+      assert(
+        removed === 1,
+        `removed exactly the one older session, got ${removed}`,
+      );
+
+      const reader = await makeAdapter();
+      assert(
+        (await reader.getSession(older.id)) === undefined,
+        'the older session is gone after restart',
+      );
+      assert(
+        deepEqual(await reader.getSession(newer.id), newer),
+        'the newer session survives unchanged after restart',
+      );
+    },
+  },
+  {
+    name: 'retention-2: deleteSessionsBefore resolves to the exact removed count',
+    async run(makeAdapter) {
+      const writer = await makeAdapter();
+      await writer.saveSession(
+        makeSession({
+          id: 'sess-a' as SessionId,
+          dateTime: '2026-01-01T00:00:00.000Z',
+        }),
+      );
+      await writer.saveSession(
+        makeSession({
+          id: 'sess-b' as SessionId,
+          dateTime: '2026-01-02T00:00:00.000Z',
+        }),
+      );
+      await writer.saveSession(
+        makeSession({
+          id: 'sess-c' as SessionId,
+          dateTime: '2026-06-01T00:00:00.000Z',
+        }),
+      );
+
+      const removed = await writer.deleteSessionsBefore(
+        '2026-03-01T00:00:00.000Z',
+      );
+      assert(removed === 2, `expected 2 removed, got ${removed}`);
+    },
+  },
+  {
+    name: 'retention-3: deleteSessionsBefore matching zero sessions resolves to 0 and changes nothing',
+    async run(makeAdapter) {
+      const writer = await makeAdapter();
+      const session = makeSession({
+        id: 'sess-future' as SessionId,
+        dateTime: '2026-06-01T00:00:00.000Z',
+      });
+      await writer.saveSession(session);
+
+      const removed = await writer.deleteSessionsBefore(
+        '2020-01-01T00:00:00.000Z',
+      );
+      assert(removed === 0, `expected 0 removed, got ${removed}`);
+
+      const reader = await makeAdapter();
+      assert(
+        deepEqual(await reader.getSession(session.id), session),
+        'the session is untouched',
+      );
+    },
+  },
+  {
+    name: 'retention-4: deleteSessionsBefore leaves the Exercise catalogue, Settings, and the pending logging draft completely unchanged',
+    async run(makeAdapter) {
+      const writer = await makeAdapter();
+      const exercise = makeExercise();
+      const settings = makeSettings();
+      const draft = makeDraft();
+      await writer.saveExercise(exercise);
+      await writer.saveSettings(settings);
+      await writer.saveDraft(draft);
+      await writer.saveSession(
+        makeSession({
+          id: 'sess-old' as SessionId,
+          dateTime: '2026-01-01T00:00:00.000Z',
+        }),
+      );
+
+      await writer.deleteSessionsBefore('2026-06-01T00:00:00.000Z');
+
+      const reader = await makeAdapter();
+      assert(
+        deepEqual(await reader.getExercise(exercise.id), exercise),
+        'the exercise catalogue is unchanged',
+      );
+      assert(
+        deepEqual(await reader.getSettings(), settings),
+        'Settings is unchanged',
+      );
+      assert(
+        deepEqual(await reader.getDraft(), draft),
+        'the draft is unchanged',
+      );
+    },
+  },
+  {
+    name: 'retention-5: a session logged later the same calendar day as the cutoff is kept, not removed',
+    async run(makeAdapter) {
+      const writer = await makeAdapter();
+      // Cutoff denotes the start of 2026-03-01 (FR-009a) — a session later
+      // that same day must survive even though its own time-of-day is
+      // after the cutoff instant's clock time.
+      const sameDaySession = makeSession({
+        id: 'sess-same-day' as SessionId,
+        dateTime: '2026-03-01T20:00:00.000Z',
+      });
+      await writer.saveSession(sameDaySession);
+
+      const removed = await writer.deleteSessionsBefore(
+        '2026-03-01T00:00:00.000Z',
+      );
+      assert(
+        removed === 0,
+        `expected the same-day session to be kept, removed=${removed}`,
+      );
+
+      const reader = await makeAdapter();
+      assert(
+        deepEqual(await reader.getSession(sameDaySession.id), sameDaySession),
+        'the same-day session survives unchanged',
+      );
+    },
+  },
+];
+
 // Draft (contracts/storage-adapters.md scenarios 4-5, US2)
 
 const draftScenarios: Scenario[] = [
@@ -751,6 +903,7 @@ const cascadeScenarios: Scenario[] = [
 
 export const CONTRACT_SCENARIOS: Scenario[] = [
   ...sessionScenarios,
+  ...retentionScenarios,
   ...draftScenarios,
   ...settingsScenarios,
   ...storageStatusScenarios,

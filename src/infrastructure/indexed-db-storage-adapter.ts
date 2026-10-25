@@ -195,6 +195,27 @@ export class IndexedDbStorageAdapter implements StoragePort {
     await this.#run(() => this.#db.sessions.delete(id));
   }
 
+  async deleteSessionsBefore(cutoff: string): Promise<number> {
+    await this.#ensureSchemaChecked();
+    const cutoffInstant = Date.parse(cutoff);
+    // No Dexie index on `dateTime` (the `sessions` store is keyed by `id`
+    // alone, same as `listSessions`'s own full-scan-plus-JS-filter above)
+    // — matching that existing read's approach rather than adding a new
+    // Dexie schema version just for this one query.
+    return this.#run(() =>
+      this.#db.transaction('rw', this.#db.sessions, async () => {
+        const all = await this.#db.sessions.toArray();
+        const matchIds = all
+          .filter((s) => Date.parse(s.dateTime) < cutoffInstant)
+          .map((s) => s.id);
+        if (matchIds.length > 0) {
+          await this.#db.sessions.bulkDelete(matchIds);
+        }
+        return matchIds.length;
+      }),
+    );
+  }
+
   // Exercise catalogue
 
   async saveExercise(exercise: Exercise): Promise<void> {
