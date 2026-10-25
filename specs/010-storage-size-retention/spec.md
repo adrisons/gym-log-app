@@ -29,8 +29,7 @@ exporting, deleting everything, and re-importing a hand-edited file — which
 is neither simple nor safe. This feature closes both gaps on the same Data
 section: a plain-language size readout next to the existing storage-status
 line, and a focused "delete old data" action that removes only Sessions
-dated before a cutoff the user picks, leaving the exercise catalogue, band
-labels, Settings, and any in-progress logging draft untouched — a lighter,
+dated before a cutoff the user picks, leaving the exercise catalogue, Settings, and any in-progress logging draft untouched — a lighter,
 repeatable alternative to 006's nuclear "delete everything" for someone who
 just wants to stop carrying years of old history around.
 
@@ -76,8 +75,7 @@ A user who wants to stop keeping years of old workouts around opens
 Settings → Data → "Delete old data", picks how far back to keep data —
 either a preloaded quick option (older than 1 year / 6 months / 3 months)
 or a specific date — and confirms. Every session dated before that cutoff
-is removed; everything from the cutoff date onward, the exercise catalogue,
-band labels, Settings, and any in-progress logging draft are left exactly
+is removed; everything from the cutoff date onward, the exercise catalogue, Settings, and any in-progress logging draft are left exactly
 as they were.
 
 **Why this priority**: this is the feature's other independently valuable
@@ -104,8 +102,7 @@ earlier sessions are gone afterward.
    disabled (nothing to delete).
 4. **Given** the user confirms the delete action, **When** the deletion
    completes, **Then** every session dated before the cutoff is gone, every
-   session on or after the cutoff is unchanged, the exercise catalogue,
-   band labels, and Settings are unchanged, and a brief success
+   session on or after the cutoff is unchanged, the exercise catalogue, and Settings are unchanged, and a brief success
    confirmation is shown.
 5. **Given** the user has an in-progress (not yet submitted) logging draft
    whose own date is before the chosen cutoff, **When** the deletion
@@ -152,8 +149,7 @@ earlier sessions are gone afterward.
   computes its figures when the screen asks.
 - An exact, OS-reported disk/quota figure. See Assumptions for what the
   displayed size actually measures.
-- Deleting anything other than Sessions by date — the exercise catalogue,
-  band labels, Settings, and the pending logging draft are never touched by
+- Deleting anything other than Sessions by date — the exercise catalogue, Settings, and the pending logging draft are never touched by
   this feature, regardless of their own dates, matching this spec's
   "entries" scope (the user-facing term for stored training history) as
   distinct from configuration/catalogue data.
@@ -223,8 +219,7 @@ earlier sessions are gone afterward.
   the count of matching sessions is zero.
 - **FR-009**: Confirming the delete action MUST remove every stored Session
   whose own date is strictly before the chosen cutoff, and MUST NOT modify
-  any session dated on or after the cutoff, the exercise catalogue, band
-  labels, Settings, or the pending logging draft.
+  any session dated on or after the cutoff, the exercise catalogue, Settings, or the pending logging draft.
 - **FR-009a**: The cutoff (from either a quick option or an explicit date)
   denotes the start of that calendar day in the device's local timezone — a
   Session is only deleted when its own `dateTime` falls entirely before
@@ -245,10 +240,10 @@ earlier sessions are gone afterward.
 
 - **Stored data size**: a derived, read-only figure — the total size of
   everything the device's `StoragePort` currently holds (Sessions, the
-  Exercise catalogue, band labels, Settings, and the pending logging draft
-  if any — the same scope as 006's own "delete everything," FR-016),
-  expressed to the user as a whole-number KB/MB amount. Not persisted;
-  recomputed on demand (FR-004).
+  Exercise catalogue, Settings, and the pending logging draft if any — the
+  same scope `StoragePort.resetToFreshInstall`'s own doc comment currently
+  describes for 006's "delete everything"), expressed to the user as a
+  whole-number KB/MB amount. Not persisted; recomputed on demand (FR-004).
 - **Retention cutoff**: a single date, supplied by the user (via a quick
   option or an explicit date) for one run of the "Delete old data" action.
   Not persisted past that one action — reopening the modal later starts
@@ -273,11 +268,11 @@ earlier sessions are gone afterward.
 ## Assumptions
 
 - "The app's stored data" (FR-001) means every record the `StoragePort`
-  holds on this device — Sessions, the Exercise catalogue, band labels,
-  Settings, and the pending logging draft — matching 006's own "delete
-  everything" scope (FR-016, `resetToFreshInstall`) exactly, not just
-  Sessions. Only the *deletion* in User Story 2 is scoped to Sessions by
-  date; the *size readout* in User Story 1 covers everything stored.
+  holds on this device — Sessions, the Exercise catalogue, Settings, and
+  the pending logging draft — matching `resetToFreshInstall`'s own current
+  scope exactly (006's "delete everything"), not just Sessions. Only the
+  *deletion* in User Story 2 is scoped to Sessions by date; the *size
+  readout* in User Story 1 covers everything stored.
 - The displayed size is an approximation, not a literal OS/browser-reported
   disk or quota figure — reasonable because the two storage adapters
   (ADR-0002) do not expose a uniform, exact "bytes on disk" figure to the
@@ -300,7 +295,7 @@ earlier sessions are gone afterward.
   existing double confirmation because it is total and resets the whole
   device. This keeps the UX minimal per the feature's own ask while still
   stating plainly, once, what is about to happen and how much it affects.
-- The exercise catalogue, band labels, Settings, and the pending logging
+- The exercise catalogue, Settings, and the pending logging
   draft are never touched by the scoped deletion regardless of any date
   they might individually carry, since none of them is "training history"
   in the sense the user means by "entries" — only Sessions are.

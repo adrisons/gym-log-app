@@ -15,9 +15,9 @@ matching the spec's own Key Entities section.
 Computed fresh on every read by `computeStorageSizeLabel` (application
 layer) — not cached, not written to any store (FR-004). Source records:
 every Session (`listSessions(allStoredDataRange())`), the Exercise
-catalogue (`listExercises()`), band labels and other Settings
-(`getSettings()`), and the pending logging draft if any (`getDraft()`) —
-the same scope as `StoragePort.resetToFreshInstall` (spec 006 FR-016).
+catalogue (`listExercises()`), Settings (`getSettings()`), and the pending
+logging draft if any (`getDraft()`) — the same scope
+`StoragePort.resetToFreshInstall`'s own doc comment currently describes.
 
 ## Retention cutoff (ephemeral UI/flow state, not persisted)
 

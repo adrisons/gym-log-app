@@ -62,3 +62,13 @@
   deferred — no residual issues need `/speckit-clarify`.
 - All checklist items pass after the fix pass; spec Status moved to
   `Reviewed`. Ready for `/speckit-plan`.
+- Correction during `/speckit-implement` prep: the "band labels" scope
+  added above (from `specs/006-settings-data/spec.md`'s own text) turned
+  out to be stale — band load management was removed from the shipped app
+  in a later change (commit `88fdcdb`, "remove band load management"), and
+  the current `StoragePort.resetToFreshInstall` doc comment no longer
+  mentions band labels at all. Every "band labels" mention was removed
+  from `spec.md`/`plan.md`/`data-model.md`/`research.md`/`contracts/`/
+  `tasks.md` accordingly — current stored-data scope is Sessions, the
+  Exercise catalogue, Settings, and the pending logging draft, grounded in
+  the current source rather than a since-superseded spec document.

@@ -11,10 +11,8 @@ across `/speckit-tasks`.
 **Decision**: Compute size in the `application` layer, not a new port
 method. `computeStorageSizeLabel` reads every record through the port's
 *existing* methods — `listSessions(allStoredDataRange())`, `listExercises()`,
-`getSettings()`, `getDraft()` (band labels: see `getSettings()`'s existing
-shape, per 006 — confirm during implementation whether they are a field on
-`Settings` or their own read; either way, no new read method) — builds one
-plain object from the results, and measures
+`getSettings()`, `getDraft()` — builds one plain object from the results,
+and measures
 `new TextEncoder().encode(JSON.stringify(thatObject)).length` (exact UTF-8
 byte length of the object's JSON form).
 

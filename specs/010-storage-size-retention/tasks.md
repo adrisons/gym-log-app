@@ -63,10 +63,9 @@ value (quickstart.md §1).
 
 - [ ] T003 [US1] Implement `computeStorageSizeLabel(storage: StoragePort): Promise<string>`
   in `src/application/settings/storage-size.ts`: reads
-  `listSessions(allStoredDataRange())`, `listExercises()`, `getSettings()`
-  (band labels — confirm during this task whether they're a `Settings`
-  field or need their own read, per data-model.md), and `getDraft()`;
-  builds one combined plain object from the results; measures
+  `listSessions(allStoredDataRange())`, `listExercises()`, `getSettings()`,
+  and `getDraft()`; builds one combined plain object from the results;
+  measures
   `new TextEncoder().encode(JSON.stringify(thatObject)).length`; applies
   the unit-selection/rounding algorithm from research.md §2 (must make
   T001 pass). No `StoragePort` change.
@@ -102,8 +101,8 @@ sessions are gone afterward (quickstart.md §2-3).
   `InMemoryStorageAdapter` — contract scenarios 1-5 from
   `contracts/storage-port-additions.md` (removes strictly-before matches
   only, resolves to the exact removed count, zero-match is a valid `0`
-  result, leaves the Exercise catalogue/band labels/Settings/draft
-  untouched, keeps a same-day session) — in
+  result, leaves the Exercise catalogue/Settings/draft untouched, keeps a
+  same-day session) — in
   `test/unit/infrastructure/in-memory-storage-adapter.test.ts`
 - [ ] T007 [P] [US2] Extend `test/e2e/indexed-db-adapter.contract.spec.ts`
   with the same contract scenarios 1-5, run against

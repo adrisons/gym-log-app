@@ -11,7 +11,7 @@ methods unchanged). Follows the port's existing rules: returns a
  * every matching Session is removed or (on failure) none of the intended
  * removals is left partially applied (FR-010, same all-or-nothing
  * guarantee as `importBulk`/`resetToFreshInstall`). Does not touch the
- * Exercise catalogue, band labels, Settings, or the pending logging draft,
+ * Exercise catalogue, Settings, or the pending logging draft,
  * regardless of their own dates (FR-009). Resolves to the number of
  * Sessions removed (FR-011).
  */
@@ -64,8 +64,7 @@ counterpart:
    removed.
 3. `deleteSessionsBefore(cutoff)` matching zero Sessions resolves to `0`
    and changes nothing.
-4. `deleteSessionsBefore(cutoff)` leaves the Exercise catalogue, band
-   labels, Settings, and the pending logging draft completely unchanged.
+4. `deleteSessionsBefore(cutoff)` leaves the Exercise catalogue, Settings, and the pending logging draft completely unchanged.
 5. A Session whose `dateTime` is later the same calendar day as `cutoff`
    is kept, not removed (start-of-day semantics, FR-009a).
 6. (File System adapter only, mirroring the existing `importBulk`/
