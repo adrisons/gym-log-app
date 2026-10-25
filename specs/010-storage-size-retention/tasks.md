@@ -215,7 +215,7 @@ testable — quickstart.md §2-4.
   binary installed here — only Chromium is pre-installed in this
   environment); CI's `test-e2e` job installs both browsers fresh and
   covers it.
-- [ ] T020 Update `specs/010-storage-size-retention/spec.md`'s **Status**
+- [X] T020 Update `specs/010-storage-size-retention/spec.md`'s **Status**
   line to `Implemented — merged to main via PR #<N>` once the feature PR
   merges, per the `sdd-workflow` skill's Status convention.
 
