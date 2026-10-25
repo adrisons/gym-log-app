@@ -50,11 +50,14 @@ established for `importBulk`/`resetToFreshInstall`.
 
 ## Contract tests
 
+Five scenarios added to the shared suite in
+`test/contract/storage-adapter-contract.ts`'s `CONTRACT_SCENARIOS`
+(`findScenario`'s own lookup, run by both
 `test/e2e/indexed-db-adapter.contract.spec.ts` and
-`test/e2e/file-system-adapter.contract.spec.ts` each gain the same
-scenario list (mirroring how both files already run the same cases for
-every existing port method), plus an `InMemoryStorageAdapter` unit-test
-counterpart:
+`test/e2e/file-system-adapter.contract.spec.ts` automatically — neither
+file enumerates scenario names itself, matching every existing port
+method's own coverage), plus an `InMemoryStorageAdapter` unit-test
+counterpart in `test/unit/infrastructure/in-memory-storage-adapter.test.ts`:
 
 1. `deleteSessionsBefore(cutoff)` removes every Session whose `dateTime` is
    strictly before `cutoff` and leaves every Session on or after `cutoff`
@@ -64,12 +67,21 @@ counterpart:
    removed.
 3. `deleteSessionsBefore(cutoff)` matching zero Sessions resolves to `0`
    and changes nothing.
-4. `deleteSessionsBefore(cutoff)` leaves the Exercise catalogue, Settings, and the pending logging draft completely unchanged.
+4. `deleteSessionsBefore(cutoff)` leaves the Exercise catalogue, Settings,
+   and the pending logging draft completely unchanged.
 5. A Session whose `dateTime` is later the same calendar day as `cutoff`
    is kept, not removed (start-of-day semantics, FR-009a).
-6. (File System adapter only, mirroring the existing `importBulk`/
-   `resetToFreshInstall` interruption cases in that file) a
-   `deleteSessionsBefore` call interrupted after the journal is written but
-   before every matching file is removed resumes correctly — on the next
-   read or write, the remaining matches are removed and the journal is
-   cleared, with no double-counting or partial state observable in between.
+
+No separate interruption/crash-recovery scenario is added: the File System
+adapter's `PendingBulkWrite` journal gives crash-safety by construction
+(the implementation follows the exact write-journal/apply/clear-journal
+sequence `importBulk`/`resetToFreshInstall` already use), but — checked
+during implementation — *neither of those two existing methods* has an
+automated interruption test of its own anywhere in this suite or the
+`storage-harness.ts` fixture (no `window.__run*` entry point simulates a
+crash mid-journal-write today). Adding one here, for `deleteSessionsBefore`
+alone, would set a stricter bar than this codebase holds its own
+established bulk-write precedent to; matching the implementation pattern
+is the contract this method commits to, consistent with 2-5 above and with
+`importBulk`/`resetToFreshInstall`'s own actual (not just documented)
+coverage level.

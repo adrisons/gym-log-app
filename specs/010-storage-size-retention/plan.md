@@ -146,19 +146,24 @@ src/
 │   └── file-system-storage-adapter.ts # + deleteSessionsBefore (journal pattern, 3rd PendingBulkWrite kind)
 └── presentation/
     └── settings/
-        ├── data-section.tsx          # wires the new readout + modal trigger in
+        ├── settings-screen.tsx       # wires storage-size-section in, next to
+        │                                storage-status-section (both live here,
+        │                                not in data-section.tsx)
+        ├── data-section.tsx          # wires the new delete-old-data-flow trigger in
         ├── storage-size-section.tsx  # NEW — the KB/MB readout (FR-001-004)
         └── delete-old-data-flow.tsx  # NEW — the cutoff modal (FR-005-012)
 
 test/
 ├── unit/
-│   ├── application/settings/         # storage-size.ts rounding/unit-selection behavior
-│   ├── application/logging/          # or wherever deleteSessionsBefore's store action
-│   │                                    lands, exercised via InMemoryStorageAdapter
+│   ├── application/settings/         # storage-size.ts rounding/unit-selection behavior,
+│   │                                    retention-cutoff.ts clamping behavior
+│   ├── infrastructure/               # deleteSessionsBefore against InMemoryStorageAdapter
 │   └── presentation/settings/        # storage-size-section, delete-old-data-flow
+├── contract/
+│   └── storage-adapter-contract.ts   # + deleteSessionsBefore scenarios (shared list)
 └── e2e/
-    ├── indexed-db-adapter.contract.spec.ts   # + deleteSessionsBefore scenarios
-    └── file-system-adapter.contract.spec.ts  # + deleteSessionsBefore scenarios
+    ├── indexed-db-adapter.contract.spec.ts   # runs CONTRACT_SCENARIOS automatically
+    └── file-system-adapter.contract.spec.ts  # runs CONTRACT_SCENARIOS automatically
 ```
 
 **Structure Decision**: Single-project PWA, unchanged. New files land inside

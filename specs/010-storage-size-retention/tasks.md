@@ -49,19 +49,19 @@ value (quickstart.md §1).
 
 ### Tests for User Story 1
 
-- [ ] T001 [P] [US1] Unit tests for `computeStorageSizeLabel`'s
+- [X] T001 [P] [US1] Unit tests for `computeStorageSizeLabel`'s
   unit-selection/rounding rules (research.md §2: exact-`kb`-before-rounding
   unit selection; the 1023.6 KB → "1 MB" promotion case from FR-002; the
   "≥1 byte never rounds to 0 KB" floor from FR-003) in
   `test/unit/application/settings/storage-size.test.ts`
-- [ ] T002 [P] [US1] Component test for the size readout — renders a
+- [X] T002 [P] [US1] Component test for the size readout — renders a
   whole-number KB/MB string next to the existing storage-status line, with
   no decimal point ever present (FR-001) — in
   `test/unit/presentation/settings/storage-size-section.test.tsx`
 
 ### Implementation for User Story 1
 
-- [ ] T003 [US1] Implement `computeStorageSizeLabel(storage: StoragePort): Promise<string>`
+- [X] T003 [US1] Implement `computeStorageSizeLabel(storage: StoragePort): Promise<string>`
   in `src/application/settings/storage-size.ts`: reads
   `listSessions(allStoredDataRange())`, `listExercises()`, `getSettings()`,
   and `getDraft()`; builds one combined plain object from the results;
@@ -69,16 +69,21 @@ value (quickstart.md §1).
   `new TextEncoder().encode(JSON.stringify(thatObject)).length`; applies
   the unit-selection/rounding algorithm from research.md §2 (must make
   T001 pass). No `StoragePort` change.
-- [ ] T004 [US1] Create `StorageSizeSection` in
+- [X] T004 [US1] Create `StorageSizeSection` in
   `src/presentation/settings/storage-size-section.tsx`: calls
   `computeStorageSizeLabel` on mount (mirrors
   `storage-status-section.tsx`'s own on-mount-read shape) and renders the
   resulting string (must make T002 pass).
-- [ ] T005 [US1] Wire `StorageSizeSection` into
-  `src/presentation/settings/data-section.tsx`, next to the existing
-  `StorageStatusSection` (recomputed whenever this section is shown,
-  FR-004 — same "re-read on mount" convention already used throughout
-  this screen).
+- [X] T005 [US1] Wire `StorageSizeSection` into
+  `src/presentation/settings/settings-screen.tsx`, right after the
+  existing `StorageStatusSection` (which itself lives in that screen file,
+  not `data-section.tsx` — corrected from this task's original plan.md
+  file list during implementation). Recomputed on mount (FR-004) and
+  additionally remounted (via a `dataVersion` key bumped from
+  `handleDataChanged`) after any `DataSection` flow changes stored data —
+  import, delete-everything, or User Story 2's delete-old-data — so it
+  doesn't wait for a full navigate-away-and-back to reflect a change made
+  without leaving the screen.
 
 **Checkpoint**: User Story 1 is fully functional and independently
 testable — quickstart.md §1.
@@ -97,29 +102,35 @@ sessions are gone afterward (quickstart.md §2-3).
 
 ### Tests for User Story 2
 
-- [ ] T006 [P] [US2] Unit tests for `deleteSessionsBefore` against
+- [X] T006 [P] [US2] Unit tests for `deleteSessionsBefore` against
   `InMemoryStorageAdapter` — contract scenarios 1-5 from
   `contracts/storage-port-additions.md` (removes strictly-before matches
   only, resolves to the exact removed count, zero-match is a valid `0`
   result, leaves the Exercise catalogue/Settings/draft untouched, keeps a
   same-day session) — in
   `test/unit/infrastructure/in-memory-storage-adapter.test.ts`
-- [ ] T007 [P] [US2] Extend `test/e2e/indexed-db-adapter.contract.spec.ts`
-  with the same contract scenarios 1-5, run against
-  `IndexedDbStorageAdapter`, plus durability (survives a simulated
-  restart, matching this file's existing durability-case pattern)
-- [ ] T008 [P] [US2] Extend `test/e2e/file-system-adapter.contract.spec.ts`
-  with the same contract scenarios 1-5 against `FileSystemStorageAdapter`,
-  plus scenario 6 (a call interrupted after the journal write but before
-  every matching file is removed resumes correctly on the next read/write,
-  matching this file's existing `importBulk`/`resetToFreshInstall`
-  interruption-case pattern)
-- [ ] T009 [P] [US2] Unit tests for the quick-option cutoff helper —
+- [X] T007 [P] [US2] Add the 5 `deleteSessionsBefore` scenarios from
+  `contracts/storage-port-additions.md` to
+  `test/contract/storage-adapter-contract.ts`'s `CONTRACT_SCENARIOS` (a
+  new `retentionScenarios` array, alongside `sessionScenarios` etc.) —
+  `test/e2e/indexed-db-adapter.contract.spec.ts` and
+  `test/e2e/file-system-adapter.contract.spec.ts` both pick them up
+  automatically (neither file enumerates scenario names itself), covering
+  both `IndexedDbStorageAdapter` and `FileSystemStorageAdapter` from one
+  scenario list, durably (a `makeAdapter()` restart-simulation call,
+  matching every other durability case in that file).
+- [X] T008 [P] [US2] No separate interruption/crash-recovery scenario — see
+  `contracts/storage-port-additions.md`'s "Contract tests" section: neither
+  `importBulk` nor `resetToFreshInstall` has one either anywhere in this
+  suite today, so `deleteSessionsBefore`'s File System implementation
+  (T014) gets crash-safety from following their exact journal pattern, not
+  from a new test only this method would have.
+- [X] T009 [P] [US2] Unit tests for the quick-option cutoff helper —
   month/leap-day clamping per research.md §3 (e.g. 6 months before Aug 31
   clamps to the last valid day of February, not an overflow into March;
   1 year before a leap day clamps correctly) and the start-of-day zeroing
   (FR-009a) — in `test/unit/application/settings/retention-cutoff.test.ts`
-- [ ] T010 [P] [US2] Component tests for the "Delete old data" modal in
+- [X] T010 [P] [US2] Component tests for the "Delete old data" modal in
   `test/unit/presentation/settings/delete-old-data-flow.test.tsx`:
   delete action disabled with no cutoff chosen (FR-008); each quick option
   selects a cutoff and shows a live count (FR-006, FR-007); an explicit
@@ -134,22 +145,22 @@ sessions are gone afterward (quickstart.md §2-3).
 
 ### Implementation for User Story 2
 
-- [ ] T011 [US2] Add `deleteSessionsBefore(cutoff: string): Promise<number>`
+- [X] T011 [US2] Add `deleteSessionsBefore(cutoff: string): Promise<number>`
   to the `StoragePort` interface in
   `src/application/ports/storage-port.ts`, with the doc comment from
   `contracts/storage-port-additions.md` (start-of-day semantics, FR-009's
   untouched-record list, the all-or-nothing guarantee).
-- [ ] T012 [P] [US2] Implement `deleteSessionsBefore` in
+- [X] T012 [P] [US2] Implement `deleteSessionsBefore` in
   `src/infrastructure/in-memory-storage-adapter.ts`: filter `#sessions` by
   `Date.parse(dateTime) < Date.parse(cutoff)` (parsed-instant comparison,
   matching this adapter's existing `listSessions` convention), delete the
   matches, return the removed count (depends on T011; must make T006 pass).
-- [ ] T013 [P] [US2] Implement `deleteSessionsBefore` in
+- [X] T013 [P] [US2] Implement `deleteSessionsBefore` in
   `src/infrastructure/indexed-db-storage-adapter.ts`: a single Dexie
   `'rw'` transaction on the `sessions` table using a `dateTime`
   range-delete, returning Dexie's own deleted-row count (research.md §4;
   depends on T011; must make T007 pass).
-- [ ] T014 [P] [US2] Implement `deleteSessionsBefore` in
+- [X] T014 [P] [US2] Implement `deleteSessionsBefore` in
   `src/infrastructure/file-system-storage-adapter.ts`: add a third
   `PendingBulkWrite` journal variant (`{ kind: 'delete-before', cutoff }`)
   alongside the existing `'import'`/`'reset'` kinds; write the journal,
@@ -157,22 +168,24 @@ sessions are gone afterward (quickstart.md §2-3).
   replay-on-next-read/write handling `#replayPendingBulkWriteAtRoot`
   already gives the other two kinds (research.md §4; depends on T011;
   must make T008 pass).
-- [ ] T015 [US2] Implement the quick-option cutoff helper in
+- [X] T015 [US2] Implement the quick-option cutoff helper in
   `src/application/settings/retention-cutoff.ts`: `cutoffMonthsAgo(from, months)`
   per research.md §3's clamping algorithm, plus a start-of-day normalizer
   for both quick options and an explicit date (FR-009a) (must make T009
   pass).
-- [ ] T016 [US2] Create `DeleteOldDataFlow` in
+- [X] T016 [US2] Create `DeleteOldDataFlow` in
   `src/presentation/settings/delete-old-data-flow.tsx`: the modal from
-  research.md §5's inline `.block-card` dialog pattern (mirroring
-  `delete-everything-flow.tsx`'s shape) — three quick-option controls plus
+  research.md §5's inline-confirmation pattern (mirroring
+  `delete-everything-flow.tsx`'s own shape — `role="alertdialog"`, the
+  existing `.settings-preview`/`.settings-confirm-actions` classes) —
+  three quick-option controls plus
   an explicit-date field (FR-006), a live matching-session count via
   `listSessions` filtered client-side by the chosen cutoff (FR-007),
   delete disabled with no cutoff or a zero count (FR-008), confirming
   calls `storage.deleteSessionsBefore(cutoff)` and shows the returned
   count in a brief success message (FR-011), and a cancel action — kept to
   only the text FR-012 allows (depends on T011-T015; must make T010 pass).
-- [ ] T017 [US2] Wire `DeleteOldDataFlow` into
+- [X] T017 [US2] Wire `DeleteOldDataFlow` into
   `src/presentation/settings/data-section.tsx`, next to
   `DeleteEverythingFlow`, passed the same `onDataChanged` callback this
   section's other data-changing flows already use (depends on T016).
@@ -184,14 +197,24 @@ testable — quickstart.md §2-4.
 
 ## Phase 5: Polish & Cross-Cutting
 
-- [ ] T018 [P] Run `npm run check:no-color-literals` and confirm
+- [X] T018 [P] Run `npm run check:no-color-literals` and confirm
   `storage-size-section.tsx`/`delete-old-data-flow.tsx` introduce no new
-  CSS beyond existing `settings.css`/`logging.css` token-based classes
-  (constitution Principle V).
-- [ ] T019 Run the full `quickstart.md` validation manually (all five
-  sections) against a real browser build, including
-  `npm run test:contract-adapters` for the adapter parity in quickstart.md
-  §5.
+  CSS at all — both reuse existing `settings.css` token-based classes
+  (constitution Principle V). Passed: "No literal colour values found
+  outside src/presentation/design/."
+- [X] T019 Quickstart validation: §5 (`npm run test:contract-adapters`,
+  Chromium) run against a real browser build — all 62 scenarios pass,
+  including the 10 new `retention-*` cases across both real adapters
+  (`IndexedDbStorageAdapter`/`FileSystemStorageAdapter`). The full
+  Playwright suite (`npx playwright test --project=chromium`, 68 tests,
+  including shell/logging smoke) also passes. §§1-4's manual UI walkthrough
+  was not run by hand in this sandbox (no interactive browser session
+  available here); §§1-4's behavior is otherwise covered by the Vitest
+  component tests (T002, T010) exercising the same acceptance scenarios.
+  `--project=webkit` could not run in this sandbox (no WebKit browser
+  binary installed here — only Chromium is pre-installed in this
+  environment); CI's `test-e2e` job installs both browsers fresh and
+  covers it.
 - [ ] T020 Update `specs/010-storage-size-retention/spec.md`'s **Status**
   line to `Implemented — merged to main via PR #<N>` once the feature PR
   merges, per the `sdd-workflow` skill's Status convention.

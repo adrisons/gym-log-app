@@ -109,10 +109,17 @@ one's own existing atomic-bulk-write precedent:
   mode to guard against — same simplicity as every other method on this
   adapter.
 - **`IndexedDbStorageAdapter`**: a single Dexie `'rw'` transaction on the
-  `sessions` table, `where('dateTime').below(cutoff).delete()` (Dexie's own
-  range-delete API) inside the transaction, returning Dexie's own deleted-
-  row count — transactional atomicity is Dexie's existing guarantee, the
-  same one `importBulk`/`resetToFreshInstall` already rely on.
+  `sessions` table — read every session, filter by `dateTime` in JS, then
+  `bulkDelete` the matching ids, inside the transaction, returning the
+  matched count. Not `where('dateTime').below(cutoff).delete()`: the
+  `sessions` store has no Dexie index on `dateTime` (it's keyed by `id`
+  alone — `infrastructure/indexed-db/schema.ts`), the same reason
+  `listSessions` itself already does a full-table-scan-plus-JS-filter
+  rather than an indexed range query; adding an index would mean a new
+  Dexie schema version just for this one query, an unjustified schema
+  change for a feature this small. Transactional atomicity is Dexie's
+  existing guarantee either way, the same one `importBulk`/
+  `resetToFreshInstall` already rely on.
 - **`FileSystemStorageAdapter`**: a third `PendingBulkWrite` journal kind
   (`{ kind: 'delete-before', cutoff }`) alongside the existing `'import'`/
   `'reset'` kinds — written before any file is touched, replayed on the
@@ -137,13 +144,15 @@ composition `schema-guardian` flagged as insufficient for FR-010.
 
 ## 5. UI pattern for the "Delete old data" modal
 
-**Decision**: Follow this Settings → Data section's own existing dialog
-convention exactly — a self-contained `.block-card`-shelled inline panel
-(`role="dialog"`), the same shape `create-exercise-panel.tsx` and
-`delete-everything-flow.tsx`'s confirmation steps already use, not a new
-overlay/backdrop UI primitive. "Modal" in the spec's user-facing language
-maps to this existing pattern, which `docs/design.md`'s own dialog system
-already covers.
+**Decision**: Follow this Settings screen's own existing inline-confirmation
+convention exactly — `delete-everything-flow.tsx`'s own shape
+(`role="alertdialog"`, the `.settings-preview`/`.settings-confirm-actions`
+classes already in `settings.css`), not a new overlay/backdrop UI
+primitive, and not the Logging/Catalogue screens' own `.block-card`
+dialog shell (`logging.css`) — a different stylesheet and screen area
+this feature has no reason to pull in. "Modal" in the spec's user-facing
+language maps to this existing Settings-screen pattern, which
+`docs/design.md`'s own dialog system already covers.
 
 **Rationale**: `docs/stack.md`'s "no CSS-in-JS, one dialog system" posture
 and this screen's own established precedent make introducing a second
@@ -152,10 +161,11 @@ new pattern for a feature whose own Non-Goals explicitly call for minimal
 text and a simple, familiar shape — reusing what `delete-everything-flow.tsx`
 already does is the simpler choice, not a new one.
 
-**Alternatives considered**: a true modal backdrop (like `block-card.tsx`'s
-own rename popup, `.block-card__rename-backdrop`) — rejected for this
-flow specifically; that pattern exists in the codebase for blocking
-interaction with a specific in-progress edit mid-list, not for a
+**Alternatives considered**: a true modal backdrop (like
+`block-card.tsx`'s own rename popup in the Logging screen,
+`.block-card__rename-backdrop`) — rejected for this flow specifically;
+that pattern exists in a different screen area for blocking interaction
+with a specific in-progress edit mid-list, not for a
 Settings-level confirmation, where every existing confirmation
 (delete-everything, exercise-catalogue delete) already uses the inline
 card shape instead.
